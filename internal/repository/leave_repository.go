@@ -1,0 +1,354 @@
+package repository
+
+import (
+	"kartezya-hr/internal/domain"
+	"kartezya-hr/internal/types"
+
+	"gorm.io/gorm"
+)
+
+type LeaveRepository interface {
+	// Leave methods
+	Create(leave *domain.LeaveRequest) error
+	GetByID(id uint) (*domain.LeaveRequest, error)
+	GetAll(limit, offset int, sortParams types.SortParams) ([]*domain.LeaveRequest, int64, error)
+	GetByEmployeeIDWithLeaveType(employeeID uint, limit, offset int, sortParams types.SortParams) ([]*domain.LeaveRequest, int64, error)
+	GetByEmployeeIDWithLeaveTypeAndStatus(employeeID uint, limit, offset int, sortParams types.SortParams, status string) ([]*domain.LeaveRequest, int64, error)
+	GetAllWithStatus(limit, offset int, sortParams types.SortParams, status string) ([]*domain.LeaveRequest, int64, error)
+	Update(leave *domain.LeaveRequest) error
+	Delete(id uint) error
+	GetByEmployeeID(employeeID uint, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error)
+	GetByStatus(status string, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error)
+	GetByDateRange(startDate, endDate string) ([]*domain.LeaveRequest, error)
+}
+
+// LeaveTypeRepository interface for leave types
+type LeaveTypeRepository interface {
+	Create(leaveType *domain.LeaveType, createdBy string) error
+	GetByID(id uint) (*domain.LeaveType, error)
+	GetByName(name string) (*domain.LeaveType, error)
+	GetAll(limit, offset int, sortParams types.SortParams) ([]*domain.LeaveType, int64, error)
+	GetLookup() ([]*domain.LeaveType, error)
+	Update(leaveType *domain.LeaveType, modifiedBy string) error
+	Delete(id uint) error
+}
+
+type leaveRepository struct {
+	db *gorm.DB
+}
+
+func NewLeaveRepository(db *gorm.DB) LeaveRepository {
+	return &leaveRepository{db: db}
+}
+
+// Implement Leave methods
+func (r *leaveRepository) Create(leave *domain.LeaveRequest) error {
+	return r.db.Create(leave).Error
+}
+
+func (r *leaveRepository) GetByID(id uint) (*domain.LeaveRequest, error) {
+	var leave domain.LeaveRequest
+	err := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").First(&leave, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &leave, nil
+}
+
+func (r *leaveRepository) GetAll(limit, offset int, sortParams types.SortParams) ([]*domain.LeaveRequest, int64, error) {
+	var leaves []*domain.LeaveRequest
+	var total int64
+
+	// Count total records
+	countQuery := r.db.Model(&domain.LeaveRequest{}).Where("deleted = ?", false)
+	if err := countQuery.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Build main query with preloads
+	query := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Where("deleted = ?", false)
+
+	// Apply sorting
+	if sortParams.Sort != "" {
+		orderClause := sortParams.Sort
+		if sortParams.Direction == "DESC" {
+			orderClause += " DESC"
+		} else {
+			orderClause += " ASC"
+		}
+		query = query.Order(orderClause)
+	} else {
+		query = query.Order("id ASC")
+	}
+
+	// Apply pagination
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+
+	err := query.Find(&leaves).Error
+	return leaves, total, err
+}
+
+func (r *leaveRepository) GetByEmployeeIDWithLeaveType(employeeID uint, limit, offset int, sortParams types.SortParams) ([]*domain.LeaveRequest, int64, error) {
+	var leaves []*domain.LeaveRequest
+	var total int64
+
+	// Count total records
+	countQuery := r.db.Model(&domain.LeaveRequest{}).Where("employee_id = ? AND deleted = ?", employeeID, false)
+	if err := countQuery.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Build main query with preloads
+	query := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Where("employee_id = ? AND deleted = ?", employeeID, false)
+
+	// Apply sorting
+	if sortParams.Sort != "" {
+		orderClause := sortParams.Sort
+		if sortParams.Direction == "DESC" {
+			orderClause += " DESC"
+		} else {
+			orderClause += " ASC"
+		}
+		query = query.Order(orderClause)
+	} else {
+		query = query.Order("id ASC")
+	}
+
+	// Apply pagination
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+
+	err := query.Find(&leaves).Error
+	return leaves, total, err
+}
+
+func (r *leaveRepository) GetByEmployeeIDWithLeaveTypeAndStatus(employeeID uint, limit, offset int, sortParams types.SortParams, status string) ([]*domain.LeaveRequest, int64, error) {
+	var leaves []*domain.LeaveRequest
+	var total int64
+
+	// Count total records
+	countQuery := r.db.Model(&domain.LeaveRequest{}).Where("employee_id = ? AND status = ? AND deleted = ?", employeeID, status, false)
+	if err := countQuery.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Build main query with preloads
+	query := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Where("employee_id = ? AND status = ? AND deleted = ?", employeeID, status, false)
+
+	// Apply sorting
+	if sortParams.Sort != "" {
+		orderClause := sortParams.Sort
+		if sortParams.Direction == "DESC" {
+			orderClause += " DESC"
+		} else {
+			orderClause += " ASC"
+		}
+		query = query.Order(orderClause)
+	} else {
+		query = query.Order("id ASC")
+	}
+
+	// Apply pagination
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+
+	err := query.Find(&leaves).Error
+	return leaves, total, err
+}
+
+func (r *leaveRepository) Update(leave *domain.LeaveRequest) error {
+	return r.db.Save(leave).Error
+}
+
+func (r *leaveRepository) Delete(id uint) error {
+	return r.db.Model(&domain.LeaveRequest{}).Where("id = ?", id).Update("deleted", true).Error
+}
+
+func (r *leaveRepository) GetByEmployeeID(employeeID uint, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error) {
+	var leaves []*domain.LeaveRequest
+	query := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Where("employee_id = ? AND deleted = ?", employeeID, false)
+
+	if sortBy != "" {
+		orderClause := sortBy
+		if sortDir == types.DESC {
+			orderClause += " DESC"
+		} else {
+			orderClause += " ASC"
+		}
+		query = query.Order(orderClause)
+	}
+
+	err := query.Find(&leaves).Error
+	return leaves, err
+}
+
+func (r *leaveRepository) GetByStatus(status string, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error) {
+	var leaves []*domain.LeaveRequest
+	query := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Where("status = ? AND deleted = ?", status, false)
+
+	if sortBy != "" {
+		orderClause := sortBy
+		if sortDir == types.DESC {
+			orderClause += " DESC"
+		} else {
+			orderClause += " ASC"
+		}
+		query = query.Order(orderClause)
+	}
+
+	err := query.Find(&leaves).Error
+	return leaves, err
+}
+
+func (r *leaveRepository) GetByDateRange(startDate, endDate string) ([]*domain.LeaveRequest, error) {
+	var leaves []*domain.LeaveRequest
+	err := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").
+		Where("start_date >= ? AND end_date <= ? AND deleted = ?", startDate, endDate, false).
+		Find(&leaves).Error
+	return leaves, err
+}
+
+func (r *leaveRepository) GetAllWithStatus(limit, offset int, sortParams types.SortParams, status string) ([]*domain.LeaveRequest, int64, error) {
+	var leaves []*domain.LeaveRequest
+	var total int64
+
+	// Build query with status filter if provided
+	query := r.db.Model(&domain.LeaveRequest{}).Where("deleted = ?", false)
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+
+	// Count total records
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Build main query with preloads
+	mainQuery := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Where("deleted = ?", false)
+	if status != "" {
+		mainQuery = mainQuery.Where("status = ?", status)
+	}
+
+	// Apply sorting
+	if sortParams.Sort != "" {
+		orderClause := sortParams.Sort
+		if sortParams.Direction == "DESC" {
+			orderClause += " DESC"
+		} else {
+			orderClause += " ASC"
+		}
+		mainQuery = mainQuery.Order(orderClause)
+	} else {
+		mainQuery = mainQuery.Order("id ASC")
+	}
+
+	// Apply pagination
+	if limit > 0 {
+		mainQuery = mainQuery.Limit(limit)
+	}
+	if offset > 0 {
+		mainQuery = mainQuery.Offset(offset)
+	}
+
+	err := mainQuery.Find(&leaves).Error
+	return leaves, total, err
+}
+
+// Leave Type Repository implementation
+type leaveTypeRepository struct {
+	db *gorm.DB
+}
+
+func NewLeaveTypeRepository(db *gorm.DB) LeaveTypeRepository {
+	return &leaveTypeRepository{db: db}
+}
+
+func (r *leaveTypeRepository) Create(leaveType *domain.LeaveType, createdBy string) error {
+	leaveType.CreatedBy = createdBy
+	leaveType.ModifiedBy = createdBy
+	return r.db.Create(leaveType).Error
+}
+
+func (r *leaveTypeRepository) GetByID(id uint) (*domain.LeaveType, error) {
+	var leaveType domain.LeaveType
+	err := r.db.First(&leaveType, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &leaveType, nil
+}
+
+func (r *leaveTypeRepository) GetByName(name string) (*domain.LeaveType, error) {
+	var leaveType domain.LeaveType
+	err := r.db.Where("name = ? AND deleted = ?", name, false).First(&leaveType).Error
+	if err != nil {
+		return nil, err
+	}
+	return &leaveType, nil
+}
+
+func (r *leaveTypeRepository) GetAll(limit, offset int, sortParams types.SortParams) ([]*domain.LeaveType, int64, error) {
+	var leaveTypes []*domain.LeaveType
+	var total int64
+
+	// Count total records
+	countQuery := r.db.Model(&domain.LeaveType{}).Where("deleted = ?", false)
+	if err := countQuery.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Build main query
+	query := r.db.Where("deleted = ?", false)
+
+	// Apply sorting
+	if sortParams.Sort != "" {
+		orderClause := sortParams.Sort
+		if sortParams.Direction == "DESC" {
+			orderClause += " DESC"
+		} else {
+			orderClause += " ASC"
+		}
+		query = query.Order(orderClause)
+	} else {
+		query = query.Order("id ASC")
+	}
+
+	// Apply pagination
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+
+	err := query.Find(&leaveTypes).Error
+	return leaveTypes, total, err
+}
+
+func (r *leaveTypeRepository) GetLookup() ([]*domain.LeaveType, error) {
+	var leaveTypes []*domain.LeaveType
+	err := r.db.Select("id, name").Where("deleted = ?", false).Order("id ASC").Find(&leaveTypes).Error
+	return leaveTypes, err
+}
+
+func (r *leaveTypeRepository) Update(leaveType *domain.LeaveType, modifiedBy string) error {
+	leaveType.ModifiedBy = modifiedBy
+	return r.db.Save(leaveType).Error
+}
+
+func (r *leaveTypeRepository) Delete(id uint) error {
+	return r.db.Model(&domain.LeaveType{}).Where("id = ?", id).Update("deleted", true).Error
+}

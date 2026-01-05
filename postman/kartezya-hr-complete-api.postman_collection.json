@@ -1,0 +1,1016 @@
+{
+  "info": {
+    "name": "Kartezya HR API - Complete Collection",
+    "description": "Complete API collection for Kartezya HR Management System with all endpoints including authentication, employee management, leave management, and organizational structure",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "kartezya-hr-complete-api"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@kartezya.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "profile"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Companies",
+      "item": [
+        {
+          "name": "Create Company",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Kartezya Tech\",\n  \"description\": \"Technology company\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/companies",
+              "host": ["{{baseUrl}}"],
+              "path": ["companies"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Companies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/companies?page=1&limit=10&sort=name&direction=ASC",
+              "host": ["{{baseUrl}}"],
+              "path": ["companies"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "name"
+                },
+                {
+                  "key": "direction",
+                  "value": "ASC"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Company by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/companies/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["companies", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Company",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Kartezya Technologies\",\n  \"description\": \"Updated technology company\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/companies/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["companies", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Company",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/companies/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["companies", "1"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Departments",
+      "item": [
+        {
+          "name": "Create Department",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Engineering\",\n  \"description\": \"Software engineering department\",\n  \"company_id\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/departments",
+              "host": ["{{baseUrl}}"],
+              "path": ["departments"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Departments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/departments?page=1&limit=10&sort=name&direction=ASC",
+              "host": ["{{baseUrl}}"],
+              "path": ["departments"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "name"
+                },
+                {
+                  "key": "direction",
+                  "value": "ASC"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Departments Lookup",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/departments/lookup",
+              "host": ["{{baseUrl}}"],
+              "path": ["departments", "lookup"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Department by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/departments/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["departments", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Department",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Software Engineering\",\n  \"description\": \"Updated software engineering department\",\n  \"company_id\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/departments/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["departments", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Department",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/departments/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["departments", "1"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Job Positions",
+      "item": [
+        {
+          "name": "Create Job Position",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Senior Software Engineer\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/job-positions",
+              "host": ["{{baseUrl}}"],
+              "path": ["job-positions"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Job Positions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/job-positions?page=1&limit=10&sort=title&direction=ASC",
+              "host": ["{{baseUrl}}"],
+              "path": ["job-positions"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "title"
+                },
+                {
+                  "key": "direction",
+                  "value": "ASC"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Job Positions Lookup",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/job-positions/lookup",
+              "host": ["{{baseUrl}}"],
+              "path": ["job-positions", "lookup"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Job Position by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/job-positions/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["job-positions", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Job Position",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Lead Software Engineer\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/job-positions/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["job-positions", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Job Position",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/job-positions/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["job-positions", "1"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Employees",
+      "item": [
+        {
+          "name": "Create Employee",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"John\",\n  \"last_name\": \"Doe\",\n  \"email\": \"john.doe@kartezya.com\",\n  \"phone\": \"+1234567890\",\n  \"hire_date\": \"2024-01-15\",\n  \"birth_date\": \"1990-05-20\",\n  \"address\": \"123 Main St, City, State\",\n  \"emergency_contact_name\": \"Jane Doe\",\n  \"emergency_contact_phone\": \"+1234567891\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/employees",
+              "host": ["{{baseUrl}}"],
+              "path": ["employees"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Employees",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/employees?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["employees"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Employee by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/employees/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["employees", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Employee",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"John\",\n  \"last_name\": \"Smith\",\n  \"email\": \"john.smith@kartezya.com\",\n  \"phone\": \"+1234567890\",\n  \"birth_date\": \"1990-05-20\",\n  \"address\": \"456 Updated St, City, State\",\n  \"emergency_contact_name\": \"Jane Smith\",\n  \"emergency_contact_phone\": \"+1234567891\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/employees/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["employees", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Employee",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/employees/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["employees", "1"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Work Information",
+      "item": [
+        {
+          "name": "Create Work Information",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employee_id\": 1,\n  \"company_id\": 1,\n  \"department_id\": 1,\n  \"job_position_id\": 1,\n  \"start_date\": \"2024-01-15\",\n  \"end_date\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/work-information",
+              "host": ["{{baseUrl}}"],
+              "path": ["work-information"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Work Information",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/work-information?page=1&limit=10&sort=id&direction=ASC",
+              "host": ["{{baseUrl}}"],
+              "path": ["work-information"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "id"
+                },
+                {
+                  "key": "direction",
+                  "value": "ASC"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Work Information by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/work-information/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["work-information", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Work Information",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/work-information/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["work-information", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Work Information",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employee_id\": 1,\n  \"company_id\": 1,\n  \"department_id\": 1,\n  \"job_position_id\": 2,\n  \"start_date\": \"2024-01-15\",\n  \"end_date\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/work-information/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["work-information", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Work Information",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/work-information/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["work-information", "1"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Leave Types",
+      "item": [
+        {
+          "name": "Create Leave Type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Annual Leave\",\n  \"description\": \"Annual vacation leave\",\n  \"is_paid\": true,\n  \"is_limited\": true,\n  \"is_accrual\": true,\n  \"is_required_document\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/leave/types",
+              "host": ["{{baseUrl}}"],
+              "path": ["leave", "types"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Leave Types",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/leave/types?page=1&limit=10&sort=name&direction=ASC",
+              "host": ["{{baseUrl}}"],
+              "path": ["leave", "types"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "name"
+                },
+                {
+                  "key": "direction",
+                  "value": "ASC"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Leave Types Lookup",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/leave/types/lookup",
+              "host": ["{{baseUrl}}"],
+              "path": ["leave", "types", "lookup"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Leave Type by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/leave/types/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["leave", "types", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Leave Type",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Annual Vacation Leave\",\n  \"description\": \"Updated annual vacation leave\",\n  \"is_paid\": true,\n  \"is_limited\": true,\n  \"is_accrual\": true,\n  \"is_required_document\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/leave/types/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["leave", "types", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Leave Type",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/leave/types/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["leave", "types", "1"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Leave Requests",
+      "item": [
+        {
+          "name": "Create Leave Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employee_id\": 1,\n  \"leave_type_id\": 1,\n  \"start_date\": \"2024-02-01T00:00:00Z\",\n  \"end_date\": \"2024-02-05T00:00:00Z\",\n  \"reason\": \"Family vacation\",\n  \"is_paid\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/leave/requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["leave", "requests"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Leave Requests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/leave/requests?page=1&limit=10&sort=created_at&direction=DESC&status=PENDING",
+              "host": ["{{baseUrl}}"],
+              "path": ["leave", "requests"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "created_at"
+                },
+                {
+                  "key": "direction",
+                  "value": "DESC"
+                },
+                {
+                  "key": "status",
+                  "value": "PENDING"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Leave Requests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/leave/requests/me?page=1&limit=10&sort=created_at&direction=DESC",
+              "host": ["{{baseUrl}}"],
+              "path": ["leave", "requests", "me"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "created_at"
+                },
+                {
+                  "key": "direction",
+                  "value": "DESC"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Leave Request by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/leave/requests/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["leave", "requests", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Leave Request",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employee_id\": 1,\n  \"leave_type_id\": 1,\n  \"start_date\": \"2024-02-01T00:00:00Z\",\n  \"end_date\": \"2024-02-07T00:00:00Z\",\n  \"reason\": \"Extended family vacation\",\n  \"is_paid\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/leave/requests/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["leave", "requests", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Approve Leave Request",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/leave/requests/1/approve",
+              "host": ["{{baseUrl}}"],
+              "path": ["leave", "requests", "1", "approve"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Leave Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Insufficient leave balance\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/leave/requests/1/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["leave", "requests", "1", "reject"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Leave Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Plans changed\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/leave/requests/1/cancel",
+              "host": ["{{baseUrl}}"],
+              "path": ["leave", "requests", "1", "cancel"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Leave Balances",
+      "item": [
+        {
+          "name": "Get My Leave Balances",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/leave/balances/me?page=1&limit=10&sort=leave_type_id&direction=ASC",
+              "host": ["{{baseUrl}}"],
+              "path": ["leave", "balances", "me"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "leave_type_id"
+                },
+                {
+                  "key": "direction",
+                  "value": "ASC"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-set auth token from login response",
+          "if (pm.info.requestName === 'Login') {",
+          "    // This will be handled in the test script",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-extract auth token from login response",
+          "if (pm.info.requestName === 'Login' && pm.response.code === 200) {",
+          "    const responseJson = pm.response.json();",
+          "    if (responseJson.success && responseJson.data && responseJson.data.token) {",
+          "        pm.collectionVariables.set('authToken', responseJson.data.token);",
+          "        console.log('Auth token set successfully');",
+          "    }",
+          "}"
+        ]
+      }
+    }
+  ]
+}

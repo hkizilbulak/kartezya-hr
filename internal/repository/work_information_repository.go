@@ -1,0 +1,116 @@
+package repository
+
+import (
+	"fmt"
+	"kartezya-hr/internal/domain"
+	"kartezya-hr/internal/types"
+
+	"gorm.io/gorm"
+)
+
+type WorkInformationRepository interface {
+	Create(workInfo *domain.EmployeeWorkInformation, createdBy string) error
+	GetByID(id uint) (*domain.EmployeeWorkInformation, error)
+	GetByEmployeeID(employeeID uint) ([]domain.EmployeeWorkInformation, error)
+	GetByUserID(userID uint) ([]domain.EmployeeWorkInformation, error)
+	GetAll(limit, offset int, sortParams types.SortParams) ([]domain.EmployeeWorkInformation, int64, error)
+	Update(workInfo *domain.EmployeeWorkInformation, modifiedBy string) error
+	Delete(id uint, deletedBy string) error
+}
+
+type workInformationRepository struct {
+	db *gorm.DB
+}
+
+func NewWorkInformationRepository(db *gorm.DB) WorkInformationRepository {
+	return &workInformationRepository{
+		db: db,
+	}
+}
+
+func (r *workInformationRepository) Create(workInfo *domain.EmployeeWorkInformation, createdBy string) error {
+	workInfo.CreatedBy = createdBy
+	workInfo.ModifiedBy = createdBy
+	return r.db.Create(workInfo).Error
+}
+
+func (r *workInformationRepository) GetByID(id uint) (*domain.EmployeeWorkInformation, error) {
+	var workInfo domain.EmployeeWorkInformation
+	err := r.db.Preload("Employee").Preload("Company").Preload("Department").Preload("JobPosition").
+		Where("id = ? AND deleted = ?", id, false).First(&workInfo).Error
+	if err != nil {
+		return nil, err
+	}
+	return &workInfo, nil
+}
+
+func (r *workInformationRepository) GetByEmployeeID(employeeID uint) ([]domain.EmployeeWorkInformation, error) {
+	var workInfos []domain.EmployeeWorkInformation
+	err := r.db.Preload("Employee").Preload("Company").Preload("Department").Preload("JobPosition").
+		Where("employee_id = ? AND deleted = ?", employeeID, false).Find(&workInfos).Error
+	return workInfos, err
+}
+
+func (r *workInformationRepository) GetByUserID(userID uint) ([]domain.EmployeeWorkInformation, error) {
+	var workInfos []domain.EmployeeWorkInformation
+	err := r.db.Preload("Employee").Preload("Company").Preload("Department").Preload("JobPosition").
+		Joins("JOIN employees ON employees.id = employee_work_informations.employee_id").
+		Where("employees.user_id = ? AND employee_work_informations.deleted = ? AND employees.deleted = ?", userID, false, false).
+		Find(&workInfos).Error
+	return workInfos, err
+}
+
+func (r *workInformationRepository) GetAll(limit, offset int, sortParams types.SortParams) ([]domain.EmployeeWorkInformation, int64, error) {
+	var workInformations []domain.EmployeeWorkInformation
+	var total int64
+
+	// Validate and sanitize sort field
+	validSortFields := map[string]bool{
+		"id":              true,
+		"employee_id":     true,
+		"company_id":      true,
+		"department_id":   true,
+		"job_position_id": true,
+		"start_date":      true,
+		"end_date":        true,
+		"created_at":      true,
+		"updated_at":      true,
+	}
+
+	sortField := "id"
+	if validSortFields[sortParams.Sort] {
+		sortField = sortParams.Sort
+	}
+
+	direction := "ASC"
+	if sortParams.Direction == "DESC" {
+		direction = "DESC"
+	}
+
+	orderBy := fmt.Sprintf("%s %s", sortField, direction)
+
+	// Count total records
+	r.db.Model(&domain.EmployeeWorkInformation{}).Where("deleted = ?", false).Count(&total)
+
+	// Get paginated records with sorting
+	err := r.db.Preload("Employee").Preload("Company").Preload("Department").Preload("JobPosition").
+		Where("deleted = ?", false).
+		Order(orderBy).
+		Limit(limit).Offset(offset).Find(&workInformations).Error
+
+	return workInformations, total, err
+}
+
+func (r *workInformationRepository) Update(workInfo *domain.EmployeeWorkInformation, modifiedBy string) error {
+	workInfo.ModifiedBy = modifiedBy
+	return r.db.Save(workInfo).Error
+}
+
+func (r *workInformationRepository) Delete(id uint, deletedBy string) error {
+	return r.db.Model(&domain.EmployeeWorkInformation{}).
+		Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"deleted":     true,
+			"modified_by": deletedBy,
+		}).Error
+}

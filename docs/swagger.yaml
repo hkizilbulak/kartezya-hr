@@ -1,0 +1,3038 @@
+basePath: /api/v1
+definitions:
+  domain.Company:
+    properties:
+      address:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      departments:
+        description: Relationships
+        items:
+          $ref: '#/definitions/domain.Department'
+        type: array
+      email:
+        type: string
+      id:
+        type: integer
+      modified_by:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+      updated_at:
+        type: string
+      website:
+        type: string
+    type: object
+  domain.Department:
+    properties:
+      company:
+        allOf:
+        - $ref: '#/definitions/domain.Company'
+        description: Relationships
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      employee_work_information:
+        items:
+          $ref: '#/definitions/domain.EmployeeWorkInformation'
+        type: array
+      id:
+        type: integer
+      manager:
+        type: string
+      modified_by:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  domain.Employee:
+    properties:
+      address:
+        type: string
+      city:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        type: string
+      date_of_birth:
+        type: string
+      deleted:
+        type: boolean
+      emergency_contact:
+        type: string
+      emergency_contact_name:
+        type: string
+      emergency_contact_relation:
+        type: string
+      employee_work_information:
+        items:
+          $ref: '#/definitions/domain.EmployeeWorkInformation'
+        type: array
+      first_name:
+        type: string
+      gender:
+        type: string
+      hire_date:
+        type: string
+      id:
+        type: integer
+      last_name:
+        type: string
+      leave_balances:
+        items:
+          $ref: '#/definitions/domain.LeaveBalance'
+        type: array
+      leave_date:
+        type: string
+      leave_requests:
+        items:
+          $ref: '#/definitions/domain.LeaveRequest'
+        type: array
+      marital_status:
+        type: string
+      modified_by:
+        type: string
+      phone:
+        type: string
+      state:
+        type: string
+      total_experience:
+        type: number
+      updated_at:
+        type: string
+      user:
+        allOf:
+        - $ref: '#/definitions/domain.User'
+        description: Relationships
+      user_id:
+        type: integer
+    type: object
+  domain.EmployeeWorkInformation:
+    properties:
+      company:
+        $ref: '#/definitions/domain.Company'
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      department:
+        $ref: '#/definitions/domain.Department'
+      department_id:
+        type: integer
+      employee:
+        allOf:
+        - $ref: '#/definitions/domain.Employee'
+        description: Relationships
+      employee_id:
+        type: integer
+      end_date:
+        type: string
+      id:
+        type: integer
+      job_position:
+        $ref: '#/definitions/domain.JobPosition'
+      job_position_id:
+        type: integer
+      modified_by:
+        type: string
+      start_date:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  domain.JobPosition:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      employee_work_information:
+        description: Relationships
+        items:
+          $ref: '#/definitions/domain.EmployeeWorkInformation'
+        type: array
+      id:
+        type: integer
+      modified_by:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  domain.LeaveBalance:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      employee:
+        allOf:
+        - $ref: '#/definitions/domain.Employee'
+        description: Relationships
+      employee_id:
+        type: integer
+      id:
+        type: integer
+      leave_type:
+        $ref: '#/definitions/domain.LeaveType'
+      leave_type_id:
+        type: integer
+      modified_by:
+        type: string
+      remaining_days:
+        type: number
+      total_days:
+        type: number
+      updated_at:
+        type: string
+      used_days:
+        type: number
+      year:
+        type: integer
+    type: object
+  domain.LeaveDocument:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      file_name:
+        type: string
+      file_path:
+        type: string
+      file_size:
+        type: integer
+      id:
+        type: integer
+      leave_request:
+        allOf:
+        - $ref: '#/definitions/domain.LeaveRequest'
+        description: Relationships
+      leave_request_id:
+        type: integer
+      mime_type:
+        type: string
+      modified_by:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  domain.LeaveRequest:
+    properties:
+      approved_at:
+        type: string
+      approved_by:
+        type: integer
+      approver:
+        $ref: '#/definitions/domain.User'
+      cancel_reason:
+        type: string
+      cancelled_at:
+        type: string
+      comments:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      employee:
+        allOf:
+        - $ref: '#/definitions/domain.Employee'
+        description: Relationships
+      employee_id:
+        type: integer
+      end_date:
+        type: string
+      id:
+        type: integer
+      is_paid:
+        type: boolean
+      leave_documents:
+        items:
+          $ref: '#/definitions/domain.LeaveDocument'
+        type: array
+      leave_type:
+        $ref: '#/definitions/domain.LeaveType'
+      leave_type_id:
+        type: integer
+      modified_by:
+        type: string
+      reason:
+        type: string
+      rejected_at:
+        type: string
+      rejection_reason:
+        type: string
+      requested_days:
+        type: number
+      start_date:
+        type: string
+      status:
+        description: PENDING, APPROVED, REJECTED, CANCELLED
+        type: string
+      updated_at:
+        type: string
+    type: object
+  domain.LeaveType:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      description:
+        type: string
+      id:
+        type: integer
+      is_accrual:
+        type: boolean
+      is_limited:
+        type: boolean
+      is_paid:
+        type: boolean
+      is_required_document:
+        type: boolean
+      leave_balances:
+        description: Relationships
+        items:
+          $ref: '#/definitions/domain.LeaveBalance'
+        type: array
+      leave_requests:
+        items:
+          $ref: '#/definitions/domain.LeaveRequest'
+        type: array
+      modified_by:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  domain.Role:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      description:
+        type: string
+      id:
+        type: integer
+      modified_by:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+      user_roles:
+        description: Relationships
+        items:
+          $ref: '#/definitions/domain.UserRole'
+        type: array
+    type: object
+  domain.User:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      email:
+        type: string
+      employee:
+        $ref: '#/definitions/domain.Employee'
+      id:
+        type: integer
+      modified_by:
+        type: string
+      updated_at:
+        type: string
+      user_roles:
+        description: Relationships
+        items:
+          $ref: '#/definitions/domain.UserRole'
+        type: array
+    type: object
+  domain.UserRole:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      id:
+        type: integer
+      modified_by:
+        type: string
+      role:
+        $ref: '#/definitions/domain.Role'
+      role_id:
+        type: integer
+      updated_at:
+        type: string
+      user:
+        allOf:
+        - $ref: '#/definitions/domain.User'
+        description: Relationships
+      user_id:
+        type: integer
+    type: object
+  handler.APIResponse:
+    properties:
+      data: {}
+      error:
+        type: string
+      success:
+        type: boolean
+    type: object
+  handler.ApproveRejectRequest:
+    properties:
+      reason:
+        type: string
+    type: object
+  handler.CancelLeaveRequest:
+    properties:
+      reason:
+        type: string
+    required:
+    - reason
+    type: object
+  handler.CreateCompanyRequest:
+    properties:
+      address:
+        type: string
+      email:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+      website:
+        type: string
+    required:
+    - name
+    type: object
+  handler.CreateDepartmentRequest:
+    properties:
+      company_id:
+        type: integer
+      manager:
+        type: string
+      name:
+        type: string
+    required:
+    - company_id
+    - name
+    type: object
+  handler.CreateEmployeeRequest:
+    properties:
+      address:
+        type: string
+      city:
+        type: string
+      company_email:
+        type: string
+      date_of_birth:
+        type: string
+      emergency_contact:
+        type: string
+      emergency_contact_name:
+        type: string
+      emergency_contact_relation:
+        type: string
+      first_name:
+        type: string
+      gender:
+        type: string
+      hire_date:
+        type: string
+      last_name:
+        type: string
+      leave_date:
+        type: string
+      marital_status:
+        type: string
+      phone:
+        type: string
+      state:
+        type: string
+      total_experience:
+        type: number
+    required:
+    - company_email
+    - first_name
+    - last_name
+    type: object
+  handler.CreateJobPositionRequest:
+    properties:
+      title:
+        type: string
+    required:
+    - title
+    type: object
+  handler.CreateLeaveRequestRequest:
+    properties:
+      employee_id:
+        type: integer
+      end_date:
+        type: string
+      is_paid:
+        type: boolean
+      leave_type_id:
+        type: integer
+      reason:
+        type: string
+      start_date:
+        type: string
+    required:
+    - employee_id
+    - end_date
+    - leave_type_id
+    - reason
+    - start_date
+    type: object
+  handler.CreateLeaveTypeRequest:
+    properties:
+      description:
+        type: string
+      is_accrual:
+        type: boolean
+      is_limited:
+        type: boolean
+      is_paid:
+        type: boolean
+      is_required_document:
+        type: boolean
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  handler.CreateWorkInformationRequest:
+    properties:
+      company_id:
+        type: integer
+      department_id:
+        type: integer
+      employee_id:
+        type: integer
+      end_date:
+        type: string
+      job_position_id:
+        type: integer
+      start_date:
+        type: string
+    required:
+    - company_id
+    - department_id
+    - employee_id
+    - job_position_id
+    - start_date
+    type: object
+  handler.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  handler.UpdateCompanyRequest:
+    properties:
+      address:
+        type: string
+      email:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+      website:
+        type: string
+    required:
+    - name
+    type: object
+  handler.UpdateDepartmentRequest:
+    properties:
+      company_id:
+        type: integer
+      manager:
+        type: string
+      name:
+        type: string
+    required:
+    - company_id
+    - name
+    type: object
+  handler.UpdateEmployeeRequest:
+    properties:
+      address:
+        type: string
+      city:
+        type: string
+      company_email:
+        type: string
+      date_of_birth:
+        type: string
+      emergency_contact:
+        type: string
+      emergency_contact_name:
+        type: string
+      emergency_contact_relation:
+        type: string
+      first_name:
+        type: string
+      gender:
+        type: string
+      hire_date:
+        type: string
+      last_name:
+        type: string
+      leave_date:
+        type: string
+      marital_status:
+        type: string
+      phone:
+        type: string
+      state:
+        type: string
+      total_experience:
+        type: number
+    required:
+    - company_email
+    - first_name
+    - last_name
+    type: object
+  handler.UpdateJobPositionRequest:
+    properties:
+      title:
+        type: string
+    required:
+    - title
+    type: object
+  handler.UpdateLeaveRequestRequest:
+    properties:
+      employee_id:
+        type: integer
+      end_date:
+        type: string
+      is_paid:
+        type: boolean
+      leave_type_id:
+        type: integer
+      reason:
+        type: string
+      start_date:
+        type: string
+    required:
+    - employee_id
+    - end_date
+    - leave_type_id
+    - reason
+    - start_date
+    type: object
+  handler.UpdateWorkInformationRequest:
+    properties:
+      company_id:
+        type: integer
+      department_id:
+        type: integer
+      employee_id:
+        type: integer
+      end_date:
+        type: string
+      job_position_id:
+        type: integer
+      start_date:
+        type: string
+    required:
+    - company_id
+    - department_id
+    - employee_id
+    - job_position_id
+    - start_date
+    type: object
+  service.LoginResponse:
+    properties:
+      expires_at:
+        type: string
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/service.UserWithRoles'
+    type: object
+  service.PageInfo:
+    properties:
+      direction:
+        type: string
+      limit:
+        type: integer
+      page:
+        type: integer
+      sort:
+        type: string
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  service.PaginatedResponse:
+    properties:
+      data: {}
+      page:
+        $ref: '#/definitions/service.PageInfo'
+    type: object
+  service.UserWithRoles:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      email:
+        type: string
+      employee:
+        $ref: '#/definitions/domain.Employee'
+      id:
+        type: integer
+      modified_by:
+        type: string
+      roles:
+        items:
+          type: string
+        type: array
+      updated_at:
+        type: string
+      user_roles:
+        description: Relationships
+        items:
+          $ref: '#/definitions/domain.UserRole'
+        type: array
+    type: object
+  types.AdminLeaveRequestResponse:
+    properties:
+      approved_at:
+        type: string
+      approved_by:
+        type: integer
+      cancel_reason:
+        type: string
+      cancelled_at:
+        type: string
+      comments:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      employee:
+        $ref: '#/definitions/types.EmployeeLookup'
+      end_date:
+        type: string
+      id:
+        type: integer
+      is_paid:
+        type: boolean
+      leave_type:
+        $ref: '#/definitions/types.LeaveTypeLookup'
+      modified_by:
+        type: string
+      reason:
+        type: string
+      rejected_at:
+        type: string
+      rejection_reason:
+        type: string
+      requested_days:
+        type: number
+      start_date:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  types.CompanyLookup:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  types.CompanyResponse:
+    properties:
+      address:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      email:
+        type: string
+      id:
+        type: integer
+      modified_by:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+      updated_at:
+        type: string
+      website:
+        type: string
+    type: object
+  types.DepartmentLookup:
+    properties:
+      id:
+        type: integer
+      manager:
+        type: string
+      name:
+        type: string
+    type: object
+  types.DepartmentResponse:
+    properties:
+      company:
+        $ref: '#/definitions/types.CompanyLookup'
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      id:
+        type: integer
+      manager:
+        type: string
+      modified_by:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  types.EmployeeLookup:
+    properties:
+      first_name:
+        type: string
+      id:
+        type: integer
+      last_name:
+        type: string
+    type: object
+  types.JobPositionLookup:
+    properties:
+      id:
+        type: integer
+      title:
+        type: string
+    type: object
+  types.LeaveTypeLookup:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  types.LeaveTypeResponse:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      description:
+        type: string
+      id:
+        type: integer
+      is_accrual:
+        type: boolean
+      is_limited:
+        type: boolean
+      is_paid:
+        type: boolean
+      is_required_document:
+        type: boolean
+      modified_by:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  types.MyLeaveRequestResponse:
+    properties:
+      approved_at:
+        type: string
+      cancel_reason:
+        type: string
+      cancelled_at:
+        type: string
+      comments:
+        type: string
+      created_at:
+        type: string
+      end_date:
+        type: string
+      id:
+        type: integer
+      is_paid:
+        type: boolean
+      leave_type:
+        $ref: '#/definitions/types.LeaveTypeLookup'
+      reason:
+        type: string
+      rejected_at:
+        type: string
+      rejection_reason:
+        type: string
+      requested_days:
+        type: number
+      start_date:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  types.WorkInformationCompanyLookup:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  types.WorkInformationDepartmentLookup:
+    properties:
+      id:
+        type: integer
+      manager:
+        type: string
+      name:
+        type: string
+    type: object
+  types.WorkInformationEmployeeLookup:
+    properties:
+      first_name:
+        type: string
+      id:
+        type: integer
+      last_name:
+        type: string
+    type: object
+  types.WorkInformationJobPositionLookup:
+    properties:
+      id:
+        type: integer
+      title:
+        type: string
+    type: object
+  types.WorkInformationResponse:
+    properties:
+      company:
+        $ref: '#/definitions/types.WorkInformationCompanyLookup'
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      department:
+        $ref: '#/definitions/types.WorkInformationDepartmentLookup'
+      employee:
+        $ref: '#/definitions/types.WorkInformationEmployeeLookup'
+      end_date:
+        type: string
+      id:
+        type: integer
+      job_position:
+        $ref: '#/definitions/types.WorkInformationJobPositionLookup'
+      modified_by:
+        type: string
+      start_date:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  types.WorkInformationWithNames:
+    properties:
+      company_name:
+        type: string
+      department_name:
+        type: string
+      end_date:
+        type: string
+      id:
+        type: integer
+      job_position_name:
+        type: string
+      manager:
+        type: string
+      start_date:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@kartezya.com
+    name: API Support
+  description: |-
+    This is a comprehensive HR Management System API built with Go and Gin framework.
+    It provides endpoints for managing employees, leave requests, companies, departments, and more.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  title: Kartezya HR Management System API
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user with email and password
+      parameters:
+      - description: Login credentials
+        in: body
+        name: loginRequest
+        required: true
+        schema:
+          $ref: '#/definitions/handler.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/service.LoginResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      summary: User login
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: Logout the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: User logout
+      tags:
+      - auth
+  /auth/profile:
+    get:
+      consumes:
+      - application/json
+      description: Get the profile of the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/domain.User'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get user profile
+      tags:
+      - auth
+  /companies:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated list of companies with sorting (Admin only)
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10)'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Sort field (default: id)'
+        in: query
+        name: sort
+        type: string
+      - description: 'Sort direction (default: ASC)'
+        in: query
+        name: direction
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.CompanyResponse'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get companies with pagination
+      tags:
+      - companies
+    post:
+      consumes:
+      - application/json
+      description: Create a new company (Admin only)
+      parameters:
+      - description: Company data
+        in: body
+        name: company
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateCompanyRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.CompanyResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create company
+      tags:
+      - companies
+  /companies/{company_id}/departments:
+    get:
+      description: Get all departments for a specific company (Admin only)
+      parameters:
+      - description: Company ID
+        in: path
+        name: company_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.DepartmentResponse'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List departments by company
+      tags:
+      - departments
+  /companies/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a company by ID (Admin only)
+      parameters:
+      - description: Company ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete company
+      tags:
+      - companies
+    get:
+      consumes:
+      - application/json
+      description: Get a specific company by ID (Admin only)
+      parameters:
+      - description: Company ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.CompanyResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get company by ID
+      tags:
+      - companies
+    put:
+      consumes:
+      - application/json
+      description: Update a company by ID (Admin only)
+      parameters:
+      - description: Company ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated company data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateCompanyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update company
+      tags:
+      - companies
+  /companies/{id}/departments:
+    get:
+      consumes:
+      - application/json
+      description: Get all departments for a specific company (Admin only)
+      parameters:
+      - description: Company ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/domain.Department'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get company departments
+      tags:
+      - companies
+  /companies/{id}/departments/lookup:
+    get:
+      consumes:
+      - application/json
+      description: Get simplified list of departments for a specific company (Admin
+        only)
+      parameters:
+      - description: Company ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.DepartmentLookup'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get company departments lookup
+      tags:
+      - companies
+  /companies/lookup:
+    get:
+      consumes:
+      - application/json
+      description: Get simplified list of companies for dropdown/lookup (Admin only)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.CompanyLookup'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get companies lookup
+      tags:
+      - companies
+  /departments:
+    get:
+      description: Get all departments with pagination (Admin only)
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by company ID
+        in: query
+        name: company_id
+        type: integer
+      - description: 'Sort by field (default: id)'
+        in: query
+        name: sort
+        type: string
+      - description: 'Sort direction (default: ASC)'
+        in: query
+        name: direction
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/service.PaginatedResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List departments
+      tags:
+      - departments
+    post:
+      consumes:
+      - application/json
+      description: Create a new department (Admin only)
+      parameters:
+      - description: Department data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateDepartmentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.DepartmentResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new department
+      tags:
+      - departments
+  /departments/{id}:
+    delete:
+      description: Delete a department by ID (Admin only)
+      parameters:
+      - description: Department ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete department
+      tags:
+      - departments
+    get:
+      description: Get a specific department by ID (Admin only)
+      parameters:
+      - description: Department ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.DepartmentResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get department by ID
+      tags:
+      - departments
+    put:
+      consumes:
+      - application/json
+      description: Update a department by ID (Admin only)
+      parameters:
+      - description: Department ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated department data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateDepartmentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update department
+      tags:
+      - departments
+  /employees:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated list of all employees (Admin only)
+      parameters:
+      - description: 'Limit number of results (default: 10)'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Offset for pagination (default: 0)'
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/domain.Employee'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List all employees
+      tags:
+      - employees
+    post:
+      consumes:
+      - application/json
+      description: Create a new employee (Admin only)
+      parameters:
+      - description: Employee data
+        in: body
+        name: employee
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateEmployeeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: 'success: true, data: Employee'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a new employee
+      tags:
+      - employees
+  /employees/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete employee by ID (Admin only)
+      parameters:
+      - description: Employee ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete employee
+      tags:
+      - employees
+    get:
+      consumes:
+      - application/json
+      description: Get employee details by ID (Admin only)
+      parameters:
+      - description: Employee ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'success: true, data: Employee'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get employee by ID
+      tags:
+      - employees
+    put:
+      consumes:
+      - application/json
+      description: Update employee details by ID (Admin or own profile)
+      parameters:
+      - description: Employee ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated employee data
+        in: body
+        name: employee
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateEmployeeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update employee
+      tags:
+      - employees
+  /employees/me:
+    get:
+      consumes:
+      - application/json
+      description: Get the profile of the authenticated employee
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'success: true, data: Employee'
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get my employee profile
+      tags:
+      - employees
+  /job-positions:
+    get:
+      description: Get paginated list of job positions with sorting (Admin only)
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10)'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Sort field (default: id)'
+        in: query
+        name: sort
+        type: string
+      - description: 'Sort direction (default: ASC)'
+        in: query
+        name: direction
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/domain.JobPosition'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get job positions with pagination
+      tags:
+      - job-positions
+    post:
+      consumes:
+      - application/json
+      description: Create a new job position (Admin only)
+      parameters:
+      - description: Job position data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateJobPositionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/domain.JobPosition'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new job position
+      tags:
+      - job-positions
+  /job-positions/{id}:
+    delete:
+      description: Delete a job position by ID (Admin only)
+      parameters:
+      - description: Job Position ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete job position
+      tags:
+      - job-positions
+    get:
+      description: Get a specific job position by ID (Admin only)
+      parameters:
+      - description: Job Position ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/domain.JobPosition'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get job position by ID
+      tags:
+      - job-positions
+    put:
+      consumes:
+      - application/json
+      description: Update a job position by ID (Admin only)
+      parameters:
+      - description: Job Position ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated job position data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateJobPositionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update job position
+      tags:
+      - job-positions
+  /job-positions/lookup:
+    get:
+      consumes:
+      - application/json
+      description: Get simplified list of job positions for dropdown/lookup (Admin
+        only)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.JobPositionLookup'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get job positions lookup
+      tags:
+      - job-positions
+  /leave-types:
+    post:
+      consumes:
+      - application/json
+      description: Create a new leave type (Admin only)
+      parameters:
+      - description: Leave type data
+        in: body
+        name: leaveType
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateLeaveTypeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.LeaveTypeResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create leave type
+      tags:
+      - leave-types
+  /leave/balances/me:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated leave balances for the authenticated employee
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - default: '"leave_type_id"'
+        description: Sort field
+        in: query
+        name: sort
+        type: string
+      - default: '"ASC"'
+        description: Sort direction (ASC/DESC)
+        in: query
+        name: direction
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'success: true, data: []MyLeaveBalanceResponse, page: PageInfo'
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get my leave balances
+      tags:
+      - leave-balances
+  /leave/requests:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated list of all leave requests (Admin only)
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10)'
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by status (PENDING, APPROVED, REJECTED)
+        in: query
+        name: status
+        type: string
+      - description: 'Sort field (default: created_at)'
+        in: query
+        name: sort
+        type: string
+      - description: 'Sort direction (default: DESC)'
+        in: query
+        name: direction
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.AdminLeaveRequestResponse'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get all leave requests
+      tags:
+      - leave-requests
+    post:
+      consumes:
+      - application/json
+      description: Create a new leave request (Employee for own, Admin for any)
+      parameters:
+      - description: Leave request data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateLeaveRequestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a leave request
+      tags:
+      - leave-requests
+  /leave/requests/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get a specific leave request by ID (Admin only)
+      parameters:
+      - description: Leave Request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.AdminLeaveRequestResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get leave request by ID
+      tags:
+      - leave-requests
+    put:
+      consumes:
+      - application/json
+      description: Update a leave request by ID (Employee for own, Admin for any)
+      parameters:
+      - description: Leave Request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated leave request data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateLeaveRequestRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update leave request
+      tags:
+      - leave-requests
+  /leave/requests/{id}/approve:
+    post:
+      consumes:
+      - application/json
+      description: Approve a leave request by ID (Admin only)
+      parameters:
+      - description: Leave Request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Approve leave request
+      tags:
+      - leave-requests
+  /leave/requests/{id}/cancel:
+    post:
+      consumes:
+      - application/json
+      description: Cancel a leave request by ID (Employee for own, Admin for any)
+      parameters:
+      - description: Leave Request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Cancellation reason
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CancelLeaveRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Cancel leave request
+      tags:
+      - leave-requests
+  /leave/requests/{id}/reject:
+    post:
+      consumes:
+      - application/json
+      description: Reject a leave request by ID (Admin only)
+      parameters:
+      - description: Leave Request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Rejection reason
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ApproveRejectRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Reject leave request
+      tags:
+      - leave-requests
+  /leave/requests/me:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated leave requests for the authenticated employee
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10)'
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by status (PENDING, APPROVED, REJECTED)
+        in: query
+        name: status
+        type: string
+      - description: 'Sort field (default: created_at)'
+        in: query
+        name: sort
+        type: string
+      - description: 'Sort direction (default: DESC)'
+        in: query
+        name: direction
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.MyLeaveRequestResponse'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my leave requests
+      tags:
+      - leave-requests
+  /leave/types:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated list of leave types (Admin only)
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10)'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Sort field (default: id)'
+        in: query
+        name: sort
+        type: string
+      - description: 'Sort direction (default: ASC)'
+        in: query
+        name: direction
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.LeaveTypeResponse'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List leave types
+      tags:
+      - leave-types
+  /leave/types/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a leave type by ID (Admin only)
+      parameters:
+      - description: Leave Type ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete leave type
+      tags:
+      - leave-types
+    get:
+      consumes:
+      - application/json
+      description: Get a specific leave type by ID (Admin only)
+      parameters:
+      - description: Leave Type ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.LeaveTypeResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get leave type by ID
+      tags:
+      - leave-types
+    put:
+      consumes:
+      - application/json
+      description: Update a leave type by ID (Admin only)
+      parameters:
+      - description: Leave Type ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated leave type data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateLeaveTypeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.LeaveTypeResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update leave type
+      tags:
+      - leave-types
+  /leave/types/lookup:
+    get:
+      consumes:
+      - application/json
+      description: Get simplified list of leave types for dropdown/lookup
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.LeaveTypeLookup'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get leave types lookup
+      tags:
+      - leave-types
+  /work-information:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated list of all work information (Admin only)
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10)'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Sort field (default: id)'
+        in: query
+        name: sort
+        type: string
+      - description: 'Sort direction (default: ASC)'
+        in: query
+        name: direction
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.WorkInformationResponse'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List work information
+      tags:
+      - work-information
+    post:
+      consumes:
+      - application/json
+      description: Create work information for an employee (Admin only)
+      parameters:
+      - description: Work information data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateWorkInformationRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.WorkInformationResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create work information
+      tags:
+      - work-information
+  /work-information/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete work information by ID (Admin only)
+      parameters:
+      - description: Work Information ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete work information
+      tags:
+      - work-information
+    get:
+      consumes:
+      - application/json
+      description: Get specific work information by ID
+      parameters:
+      - description: Work Information ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.WorkInformationResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get work information by ID
+      tags:
+      - work-information
+    put:
+      consumes:
+      - application/json
+      description: Update work information by ID (Admin only)
+      parameters:
+      - description: Work Information ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated work information data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateWorkInformationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.WorkInformationResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update work information
+      tags:
+      - work-information
+  /work-information/me:
+    get:
+      consumes:
+      - application/json
+      description: Get work information for the authenticated employee
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.WorkInformationWithNames'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my work information
+      tags:
+      - work-information
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
