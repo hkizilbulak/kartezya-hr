@@ -203,9 +203,9 @@ type Leave struct {
 	Deleted     bool       `json:"-" gorm:"default:false;column:deleted"`
 }
 
-// TableName maps the Leave model to the leave_requests table
+// TableName maps the Leave model to the hr_leave_requests table
 func (Leave) TableName() string {
-	return "leave_requests"
+	return "hr_leave_requests"
 }
 
 // LeaveDocument represents documents attached to leave requests
@@ -277,3 +277,70 @@ const (
 	AuditActionUpdate = "UPDATE"
 	AuditActionDelete = "DELETE"
 )
+
+// TableName methods to add hr_ prefix to all tables
+
+// User table name
+func (User) TableName() string {
+	return "hr_users"
+}
+
+// Role table name
+func (Role) TableName() string {
+	return "hr_roles"
+}
+
+// UserRole table name
+func (UserRole) TableName() string {
+	return "hr_user_roles"
+}
+
+// Employee table name
+func (Employee) TableName() string {
+	return "hr_employees"
+}
+
+// Company table name
+func (Company) TableName() string {
+	return "hr_companies"
+}
+
+// Department table name
+func (Department) TableName() string {
+	return "hr_departments"
+}
+
+// JobPosition table name
+func (JobPosition) TableName() string {
+	return "hr_job_positions"
+}
+
+// EmployeeWorkInformation table name
+func (EmployeeWorkInformation) TableName() string {
+	return "hr_employee_work_information"
+}
+
+// LeaveType table name
+func (LeaveType) TableName() string {
+	return "hr_leave_types"
+}
+
+// LeaveBalance table name
+func (LeaveBalance) TableName() string {
+	return "hr_leave_balances"
+}
+
+// LeaveRequest table name
+func (LeaveRequest) TableName() string {
+	return "hr_leave_requests"
+}
+
+// LeaveDocument table name
+func (LeaveDocument) TableName() string {
+	return "hr_leave_documents"
+}
+
+// AuditLog table name
+func (AuditLog) TableName() string {
+	return "hr_audit_logs"
+}

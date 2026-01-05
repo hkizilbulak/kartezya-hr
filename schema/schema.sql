@@ -15,7 +15,7 @@ CREATE TYPE marital_status_enum AS ENUM ('Evli', 'Bekar');
 -- ================================================
 
 -- Users table (no is_active field)
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE IF NOT EXISTS hr_users (
     id SERIAL PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- Roles table
-CREATE TABLE IF NOT EXISTS roles (
+CREATE TABLE IF NOT EXISTS hr_roles (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) UNIQUE NOT NULL,
     description TEXT,
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS roles (
 );
 
 -- User-Role junction table
-CREATE TABLE IF NOT EXISTS user_roles (
+CREATE TABLE IF NOT EXISTS hr_user_roles (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL,
     role_id INTEGER NOT NULL,
@@ -48,8 +48,8 @@ CREATE TABLE IF NOT EXISTS user_roles (
     deleted BOOLEAN NOT NULL DEFAULT false,
     created_by VARCHAR(50),
     modified_by VARCHAR(50),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES hr_users(id) ON DELETE CASCADE,
+    FOREIGN KEY (role_id) REFERENCES hr_roles(id) ON DELETE CASCADE,
     UNIQUE(user_id, role_id)
 );
 
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS user_roles (
 -- ================================================
 
 -- Companies table
-CREATE TABLE IF NOT EXISTS companies (
+CREATE TABLE IF NOT EXISTS hr_companies (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     address TEXT,
@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS companies (
 );
 
 -- Departments table
-CREATE TABLE IF NOT EXISTS departments (
+CREATE TABLE IF NOT EXISTS hr_departments (
     id SERIAL PRIMARY KEY,
     company_id INTEGER NOT NULL,
     name VARCHAR(255) NOT NULL,
@@ -83,11 +83,11 @@ CREATE TABLE IF NOT EXISTS departments (
     deleted BOOLEAN NOT NULL DEFAULT false,
     created_by VARCHAR(50),
     modified_by VARCHAR(50),
-    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+    FOREIGN KEY (company_id) REFERENCES hr_companies(id) ON DELETE CASCADE
 );
 
 -- Job Positions table (no department relationship as per requirements)
-CREATE TABLE IF NOT EXISTS job_positions (
+CREATE TABLE IF NOT EXISTS hr_job_positions (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS job_positions (
 -- ================================================
 
 -- Employees table with all new fields
-CREATE TABLE IF NOT EXISTS employees (
+CREATE TABLE IF NOT EXISTS hr_employees (
     id SERIAL PRIMARY KEY,
     user_id INTEGER UNIQUE NOT NULL,
     first_name VARCHAR(255) NOT NULL,
@@ -125,11 +125,11 @@ CREATE TABLE IF NOT EXISTS employees (
     deleted BOOLEAN NOT NULL DEFAULT false,
     created_by VARCHAR(50),
     modified_by VARCHAR(50),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES hr_users(id) ON DELETE CASCADE
 );
 
 -- Employee Work Information (updated structure: no salary, no is_active, added company_id and department_id)
-CREATE TABLE IF NOT EXISTS employee_work_informations (
+CREATE TABLE IF NOT EXISTS hr_employee_work_information (
     id SERIAL PRIMARY KEY,
     employee_id INTEGER NOT NULL,
     company_id INTEGER NOT NULL,
@@ -142,10 +142,10 @@ CREATE TABLE IF NOT EXISTS employee_work_informations (
     deleted BOOLEAN NOT NULL DEFAULT false,
     created_by VARCHAR(50),
     modified_by VARCHAR(50),
-    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
-    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
-    FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE,
-    FOREIGN KEY (job_position_id) REFERENCES job_positions(id) ON DELETE CASCADE
+    FOREIGN KEY (employee_id) REFERENCES hr_employees(id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES hr_companies(id) ON DELETE CASCADE,
+    FOREIGN KEY (department_id) REFERENCES hr_departments(id) ON DELETE CASCADE,
+    FOREIGN KEY (job_position_id) REFERENCES hr_job_positions(id) ON DELETE CASCADE
 );
 
 -- ================================================
@@ -153,7 +153,7 @@ CREATE TABLE IF NOT EXISTS employee_work_informations (
 -- ================================================
 
 -- Leave Types table with new boolean fields
-CREATE TABLE IF NOT EXISTS leave_types (
+CREATE TABLE IF NOT EXISTS hr_leave_types (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     description TEXT,
@@ -169,7 +169,7 @@ CREATE TABLE IF NOT EXISTS leave_types (
 );
 
 -- Leave Balances table
-CREATE TABLE IF NOT EXISTS leave_balances (
+CREATE TABLE IF NOT EXISTS hr_leave_balances (
     id SERIAL PRIMARY KEY,
     employee_id INTEGER NOT NULL,
     leave_type_id INTEGER NOT NULL,
@@ -182,13 +182,13 @@ CREATE TABLE IF NOT EXISTS leave_balances (
     deleted BOOLEAN NOT NULL DEFAULT false,
     created_by VARCHAR(50),
     modified_by VARCHAR(50),
-    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
-    FOREIGN KEY (leave_type_id) REFERENCES leave_types(id) ON DELETE CASCADE,
+    FOREIGN KEY (employee_id) REFERENCES hr_employees(id) ON DELETE CASCADE,
+    FOREIGN KEY (leave_type_id) REFERENCES hr_leave_types(id) ON DELETE CASCADE,
     UNIQUE(employee_id, leave_type_id, year)
 );
 
 -- Leave Requests table (updated to remove leave_sub_type_id)
-CREATE TABLE IF NOT EXISTS leave_requests (
+CREATE TABLE IF NOT EXISTS hr_leave_requests (
     id SERIAL PRIMARY KEY,
     employee_id INTEGER NOT NULL,
     leave_type_id INTEGER NOT NULL,
@@ -206,13 +206,13 @@ CREATE TABLE IF NOT EXISTS leave_requests (
     deleted BOOLEAN NOT NULL DEFAULT false,
     created_by VARCHAR(50),
     modified_by VARCHAR(50),
-    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
-    FOREIGN KEY (leave_type_id) REFERENCES leave_types(id) ON DELETE CASCADE,
-    FOREIGN KEY (approved_by) REFERENCES users(id)
+    FOREIGN KEY (employee_id) REFERENCES hr_employees(id) ON DELETE CASCADE,
+    FOREIGN KEY (leave_type_id) REFERENCES hr_leave_types(id) ON DELETE CASCADE,
+    FOREIGN KEY (approved_by) REFERENCES hr_users(id)
 );
 
 -- Leave Documents table
-CREATE TABLE IF NOT EXISTS leave_documents (
+CREATE TABLE IF NOT EXISTS hr_leave_documents (
     id SERIAL PRIMARY KEY,
     leave_request_id INTEGER NOT NULL,
     file_name VARCHAR(255) NOT NULL,
@@ -224,7 +224,7 @@ CREATE TABLE IF NOT EXISTS leave_documents (
     deleted BOOLEAN NOT NULL DEFAULT false,
     created_by VARCHAR(50),
     modified_by VARCHAR(50),
-    FOREIGN KEY (leave_request_id) REFERENCES leave_requests(id) ON DELETE CASCADE
+    FOREIGN KEY (leave_request_id) REFERENCES hr_leave_requests(id) ON DELETE CASCADE
 );
 
 -- ================================================
@@ -232,7 +232,7 @@ CREATE TABLE IF NOT EXISTS leave_documents (
 -- ================================================
 
 -- Audit Log table (no soft delete - append only)
-CREATE TABLE IF NOT EXISTS audit_logs (
+CREATE TABLE IF NOT EXISTS hr_audit_logs (
     id SERIAL PRIMARY KEY,
     entity_name VARCHAR(100) NOT NULL,
     entity_id INTEGER NOT NULL,
@@ -241,7 +241,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     new_value JSONB,
     created_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by INTEGER NOT NULL,
-    FOREIGN KEY (created_by) REFERENCES users(id)
+    FOREIGN KEY (created_by) REFERENCES hr_users(id)
 );
 
 -- ================================================
@@ -249,26 +249,26 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 -- ================================================
 
 -- Authentication indexes
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-CREATE INDEX IF NOT EXISTS idx_users_deleted ON users(deleted);
+CREATE INDEX IF NOT EXISTS idx_hr_users_email ON hr_users(email);
+CREATE INDEX IF NOT EXISTS idx_hr_users_deleted ON hr_users(deleted);
 
 -- Employee indexes
-CREATE INDEX IF NOT EXISTS idx_employees_user_id ON employees(user_id);
-CREATE INDEX IF NOT EXISTS idx_employees_deleted ON employees(deleted);
-CREATE INDEX IF NOT EXISTS idx_employees_hire_date ON employees(hire_date);
-CREATE INDEX IF NOT EXISTS idx_employees_leave_date ON employees(leave_date);
-CREATE INDEX IF NOT EXISTS idx_employees_gender ON employees(gender);
+CREATE INDEX IF NOT EXISTS idx_hr_employees_user_id ON hr_employees(user_id);
+CREATE INDEX IF NOT EXISTS idx_hr_employees_deleted ON hr_employees(deleted);
+CREATE INDEX IF NOT EXISTS idx_hr_employees_hire_date ON hr_employees(hire_date);
+CREATE INDEX IF NOT EXISTS idx_hr_employees_leave_date ON hr_employees(leave_date);
+CREATE INDEX IF NOT EXISTS idx_hr_employees_gender ON hr_employees(gender);
 
 -- Leave management indexes
-CREATE INDEX IF NOT EXISTS idx_leave_requests_employee_id ON leave_requests(employee_id);
-CREATE INDEX IF NOT EXISTS idx_leave_requests_status ON leave_requests(status);
-CREATE INDEX IF NOT EXISTS idx_leave_requests_dates ON leave_requests(start_date, end_date);
-CREATE INDEX IF NOT EXISTS idx_leave_requests_type ON leave_requests(leave_type_id);
-CREATE INDEX IF NOT EXISTS idx_leave_balances_employee_year ON leave_balances(employee_id, year);
+CREATE INDEX IF NOT EXISTS idx_hr_leave_requests_employee_id ON hr_leave_requests(employee_id);
+CREATE INDEX IF NOT EXISTS idx_hr_leave_requests_status ON hr_leave_requests(status);
+CREATE INDEX IF NOT EXISTS idx_hr_leave_requests_dates ON hr_leave_requests(start_date, end_date);
+CREATE INDEX IF NOT EXISTS idx_hr_leave_requests_type ON hr_leave_requests(leave_type_id);
+CREATE INDEX IF NOT EXISTS idx_hr_leave_balances_employee_year ON hr_leave_balances(employee_id, year);
 
 -- Audit indexes
-CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_name, entity_id);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_created_date ON audit_logs(created_date);
+CREATE INDEX IF NOT EXISTS idx_hr_audit_logs_entity ON hr_audit_logs(entity_name, entity_id);
+CREATE INDEX IF NOT EXISTS idx_hr_audit_logs_created_date ON hr_audit_logs(created_date);
 
 -- ================================================
 -- TRIGGERS FOR UPDATED_AT TIMESTAMPS
@@ -286,51 +286,51 @@ $$ LANGUAGE 'plpgsql';
 -- Add triggers to all tables with updated_at column
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_users_updated_at') THEN
-        CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_hr_users_updated_at') THEN
+        CREATE TRIGGER update_hr_users_updated_at BEFORE UPDATE ON hr_users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     END IF;
     
-    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_roles_updated_at') THEN
-        CREATE TRIGGER update_roles_updated_at BEFORE UPDATE ON roles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_hr_roles_updated_at') THEN
+        CREATE TRIGGER update_hr_roles_updated_at BEFORE UPDATE ON hr_roles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     END IF;
     
-    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_user_roles_updated_at') THEN
-        CREATE TRIGGER update_user_roles_updated_at BEFORE UPDATE ON user_roles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_hr_user_roles_updated_at') THEN
+        CREATE TRIGGER update_hr_user_roles_updated_at BEFORE UPDATE ON hr_user_roles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     END IF;
     
-    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_companies_updated_at') THEN
-        CREATE TRIGGER update_companies_updated_at BEFORE UPDATE ON companies FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_hr_companies_updated_at') THEN
+        CREATE TRIGGER update_hr_companies_updated_at BEFORE UPDATE ON hr_companies FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     END IF;
     
-    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_departments_updated_at') THEN
-        CREATE TRIGGER update_departments_updated_at BEFORE UPDATE ON departments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_hr_departments_updated_at') THEN
+        CREATE TRIGGER update_hr_departments_updated_at BEFORE UPDATE ON hr_departments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     END IF;
     
-    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_job_positions_updated_at') THEN
-        CREATE TRIGGER update_job_positions_updated_at BEFORE UPDATE ON job_positions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_hr_job_positions_updated_at') THEN
+        CREATE TRIGGER update_hr_job_positions_updated_at BEFORE UPDATE ON hr_job_positions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     END IF;
     
-    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_employees_updated_at') THEN
-        CREATE TRIGGER update_employees_updated_at BEFORE UPDATE ON employees FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_hr_employees_updated_at') THEN
+        CREATE TRIGGER update_hr_employees_updated_at BEFORE UPDATE ON hr_employees FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     END IF;
     
-    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_employee_work_informations_updated_at') THEN
-        CREATE TRIGGER update_employee_work_informations_updated_at BEFORE UPDATE ON employee_work_informations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_hr_employee_work_information_updated_at') THEN
+        CREATE TRIGGER update_hr_employee_work_information_updated_at BEFORE UPDATE ON hr_employee_work_information FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     END IF;
     
-    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_leave_types_updated_at') THEN
-        CREATE TRIGGER update_leave_types_updated_at BEFORE UPDATE ON leave_types FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_hr_leave_types_updated_at') THEN
+        CREATE TRIGGER update_hr_leave_types_updated_at BEFORE UPDATE ON hr_leave_types FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     END IF;
     
-    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_leave_balances_updated_at') THEN
-        CREATE TRIGGER update_leave_balances_updated_at BEFORE UPDATE ON leave_balances FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_hr_leave_balances_updated_at') THEN
+        CREATE TRIGGER update_hr_leave_balances_updated_at BEFORE UPDATE ON hr_leave_balances FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     END IF;
     
-    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_leave_requests_updated_at') THEN
-        CREATE TRIGGER update_leave_requests_updated_at BEFORE UPDATE ON leave_requests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_hr_leave_requests_updated_at') THEN
+        CREATE TRIGGER update_hr_leave_requests_updated_at BEFORE UPDATE ON hr_leave_requests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     END IF;
     
-    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_leave_documents_updated_at') THEN
-        CREATE TRIGGER update_leave_documents_updated_at BEFORE UPDATE ON leave_documents FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_hr_leave_documents_updated_at') THEN
+        CREATE TRIGGER update_hr_leave_documents_updated_at BEFORE UPDATE ON hr_leave_documents FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     END IF;
 END $$;

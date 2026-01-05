@@ -6,7 +6,7 @@
 -- ROLES
 -- ================================================
 
-INSERT INTO roles (name, description, created_by, modified_by) VALUES 
+INSERT INTO hr_roles (name, description, created_by, modified_by) VALUES 
 ('ADMIN', 'Administrator with full system access', 'system', 'system'),
 ('EMPLOYEE', 'Regular employee with limited access', 'system', 'system');
 
@@ -15,11 +15,11 @@ INSERT INTO roles (name, description, created_by, modified_by) VALUES
 -- ================================================
 
 -- Insert admin user (password hash for 'admin123')
-INSERT INTO users (email, password, created_by, modified_by) VALUES 
+INSERT INTO hr_users (email, password, created_by, modified_by) VALUES 
 ('admin@kartezya.com', '$2a$10$bqNs7T96Cn7DzPXb6FisC.H7v419wfItA93PZsXLzfZ9qiKgvPq1m', 'system', 'system');
 
 -- Assign admin role to admin user
-INSERT INTO user_roles (user_id, role_id, created_by, modified_by) VALUES 
+INSERT INTO hr_user_roles (user_id, role_id, created_by, modified_by) VALUES 
 (1, 1, 'admin@kartezya.com', 'admin@kartezya.com');
 
 -- ================================================
@@ -27,14 +27,14 @@ INSERT INTO user_roles (user_id, role_id, created_by, modified_by) VALUES
 -- ================================================
 
 -- Sample company
-INSERT INTO companies (name, address, phone, email, website, created_by, modified_by) VALUES 
+INSERT INTO hr_companies (name, address, phone, email, website, created_by, modified_by) VALUES 
 ('Kartezya Teknoloji', 'FSM Mahallesi Poligon Sok. Buyaka İş Kulesi Kule: 3 Daire: 1-2-3-4 Ümraniye/İstanbul', '0212 123 4567', 'info@kartezya.com', 'http://kartezya.com', 'admin@kartezya.com', 'admin@kartezya.com'),
 ('Yapıkredi Teknoloji', 'Yapı Kredi Plaza D Blok 34330 Levent - Beşiktaş/İstanbul', '0262 647 10 00', 'yapikredi@yapikredi.hs02.kep.tr', 'https://yapikredi.com.tr', 'admin@kartezya.com', 'admin@kartezya.com'),
 ('N11', 'Reşitpaşa Mah. Katar Cad. İTÜ Arı Teknokent 3 Binası Blok No: 4 İç Kapı No: 902 Sarıyer/İstanbul', '0850 333 0011', 'n11@hs01.kep.tr', 'https://n11.com', 'admin@kartezya.com', 'admin@kartezya.com'),
 ('Vodafone', 'Büyükdere Caddesi No:251 34398, Maslak/İstanbul', '0850 542 00 00', 'info@vodafone.com', 'https://vodafone.com.tr', 'admin@kartezya.com', 'admin@kartezya.com');
 
 -- Sample departments
-INSERT INTO departments (company_id, name, manager, created_by, modified_by) VALUES 
+INSERT INTO hr_departments (company_id, name, manager, created_by, modified_by) VALUES 
 (1, 'Genel Müdür', NULL,'admin@kartezya.com', 'admin@kartezya.com'),
 (1, 'İnsan Kaynakları', 'Kamuran Yılmaz / Cengiz Doğmenç', 'admin@kartezya.com', 'admin@kartezya.com'),
 (2, 'İştirakler Digital Bankacılık', 'Volkan Aydoslu / Ömer Gürarslan','admin@kartezya.com', 'admin@kartezya.com'),
@@ -73,7 +73,7 @@ INSERT INTO departments (company_id, name, manager, created_by, modified_by) VAL
 (3, 'Ödemeler', 'Soner Üstel / Ali Kemal Taşçı', 'admin@kartezya.com', 'admin@kartezya.com');
 
 -- Sample job positions (no department relationship)
-INSERT INTO job_positions (title, created_by, modified_by) VALUES 
+INSERT INTO hr_job_positions (title, created_by, modified_by) VALUES 
 ('General Manager', 'admin@kartezya.com', 'admin@kartezya.com'),
 ('HR Specialist', 'admin@kartezya.com', 'admin@kartezya.com'),
 ('Junior Software Developer', 'admin@kartezya.com', 'admin@kartezya.com'),
@@ -98,7 +98,7 @@ INSERT INTO job_positions (title, created_by, modified_by) VALUES
 -- ================================================
 
 -- Leave types with new boolean fields including is_required_document
-INSERT INTO leave_types (name, description, is_paid, is_limited, is_accrual, is_required_document, created_by, modified_by) VALUES 
+INSERT INTO hr_leave_types (name, description, is_paid, is_limited, is_accrual, is_required_document, created_by, modified_by) VALUES 
 ('Yıllık İzin', 'Mevcut izin bakiyesine, 1 – 5 yıl (5 dahil) arasında çalışanlara 14 gün, 5 – 15 yıl arasında çalışanlara 20 gün, 15 yıl ve üzeri çalışanlara 26 gün her yıl eklenir.', true, true, true, false, 'admin@kartezya.com', 'admin@kartezya.com'),
 ('Doğum İzni (Anne)', 'Doğumdan önce 8 hafta, doğumdan sonra 8 hafta olmak üzere 16 hafta izin kullanılabilir. Çoğul doğumlarda +2 hafta daha kullanılabilir.', true, false, false, true, 'admin@kartezya.com', 'admin@kartezya.com'),
 ('Süt İzni', 'Çocuk 1 yaşına gelene kadar günde 1.5 saat izin kullanılabilir.', true, false, false, true, 'admin@kartezya.com', 'admin@kartezya.com'),
