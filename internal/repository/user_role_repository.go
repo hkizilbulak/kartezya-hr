@@ -40,20 +40,20 @@ func (r *userRoleRepository) DeleteByUserID(userID uint, deletedBy string) error
 
 func (r *userRoleRepository) GetRolesByUserID(userID uint) ([]domain.Role, error) {
 	var roles []domain.Role
-	err := r.db.Table("roles").
-		Joins("JOIN user_roles ON roles.id = user_roles.role_id").
-		Where("user_roles.user_id = ? AND user_roles.deleted = ?", userID, false).
-		Where("roles.deleted = ?", false).
+	err := r.db.Table("hr_roles").
+		Joins("JOIN hr_user_roles ON hr_roles.id = hr_user_roles.role_id").
+		Where("hr_user_roles.user_id = ? AND hr_user_roles.deleted = ?", userID, false).
+		Where("hr_roles.deleted = ?", false).
 		Find(&roles).Error
 	return roles, err
 }
 
 func (r *userRoleRepository) HasRole(userID uint, roleName string) (bool, error) {
 	var count int64
-	err := r.db.Table("user_roles").
-		Joins("JOIN roles ON user_roles.role_id = roles.id").
-		Where("user_roles.user_id = ? AND roles.name = ?", userID, roleName).
-		Where("user_roles.deleted = ? AND roles.deleted = ?", false, false).
+	err := r.db.Table("hr_user_roles").
+		Joins("JOIN hr_roles ON hr_user_roles.role_id = hr_roles.id").
+		Where("hr_user_roles.user_id = ? AND hr_roles.name = ?", userID, roleName).
+		Where("hr_user_roles.deleted = ? AND hr_roles.deleted = ?", false, false).
 		Count(&count).Error
 	return count > 0, err
 }
