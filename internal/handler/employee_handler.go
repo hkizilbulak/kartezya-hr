@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"kartezya-hr/internal/service"
+	"kartezya-hr/internal/types"
 
 	"github.com/gin-gonic/gin"
 )
@@ -97,6 +98,11 @@ func (h *EmployeeHandler) CreateEmployee(c *gin.Context) {
 		})
 		return
 	}
+
+	// Normalize enum values to Turkish
+	req.Gender = types.NormalizeGender(req.Gender)
+	req.MaritalStatus = types.NormalizeMaritalStatus(req.MaritalStatus)
+	req.EmergencyContactRelation = types.NormalizeEmergencyContactRelation(req.EmergencyContactRelation)
 
 	employee, err := h.employeeService.CreateEmployee(req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalExperience, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, email)
 	if err != nil {
@@ -212,6 +218,11 @@ func (h *EmployeeHandler) UpdateEmployee(c *gin.Context) {
 		})
 		return
 	}
+
+	// Normalize enum values to Turkish
+	req.Gender = types.NormalizeGender(req.Gender)
+	req.MaritalStatus = types.NormalizeMaritalStatus(req.MaritalStatus)
+	req.EmergencyContactRelation = types.NormalizeEmergencyContactRelation(req.EmergencyContactRelation)
 
 	if err := h.employeeService.UpdateEmployee(id, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalExperience, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, email, requestingUserID, isAdmin(roles)); err != nil {
 		status := http.StatusInternalServerError

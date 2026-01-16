@@ -213,3 +213,46 @@ type MyLeaveBalanceResponse struct {
 	UsedDays      float64 `json:"used_days"`
 	RemainingDays float64 `json:"remaining_days"`
 }
+
+// Enum conversion helpers for handling both English and Turkish enum values
+// NormalizeGender converts English gender values to Turkish enum values
+func NormalizeGender(value string) string {
+	switch value {
+	case "MALE", "Male", "male", "Erkek":
+		return "Erkek"
+	case "FEMALE", "Female", "female", "Kadın":
+		return "Kadın"
+	default:
+		return value // Return as-is if not recognized, let database validation catch it
+	}
+}
+
+// NormalizeMaritalStatus converts English marital status values to Turkish enum values
+func NormalizeMaritalStatus(value string) string {
+	switch value {
+	case "MARRIED", "Married", "married", "Evli":
+		return "Evli"
+	case "SINGLE", "Single", "single", "Bekar":
+		return "Bekar"
+	default:
+		return value
+	}
+}
+
+// NormalizeEmergencyContactRelation converts English relation values to Turkish enum values
+func NormalizeEmergencyContactRelation(value string) string {
+	switch value {
+	case "MOTHER", "Mother", "mother", "Anne":
+		return "Anne"
+	case "FATHER", "Father", "father", "Baba":
+		return "Baba"
+	case "SPOUSE", "Spouse", "spouse", "Eş":
+		return "Eş"
+	case "SIBLING", "Sibling", "sibling", "Kardeş":
+		return "Kardeş"
+	case "OTHER", "Other", "other", "RELATIVE", "Relative", "relative", "Diğer":
+		return "Diğer"
+	default:
+		return value
+	}
+}
