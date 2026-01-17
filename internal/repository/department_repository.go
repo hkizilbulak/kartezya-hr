@@ -55,37 +55,55 @@ func (r *departmentRepository) GetAll(limit, offset int, sortParams types.SortPa
 	var departments []*domain.Department
 	var total int64
 
-	// Validate and sanitize sort field
-	validSortFields := map[string]bool{
-		"id":         true,
-		"company_id": true,
-		"name":       true,
-		"manager":    true,
-		"created_at": true,
-		"updated_at": true,
-	}
-
-	sortField := "id"
-	if validSortFields[sortParams.Sort] {
-		sortField = sortParams.Sort
-	}
-
+	// Determine sort field and direction
+	sortField := "d.id"
 	direction := "ASC"
+
 	if sortParams.Direction == "DESC" {
 		direction = "DESC"
 	}
 
-	orderBy := fmt.Sprintf("%s %s", sortField, direction)
+	// Map frontend sort fields to database columns
+	if sortParams.Sort != "" {
+		switch sortParams.Sort {
+		case "company":
+			sortField = "c.name"
+		case "name":
+			sortField = "d.name"
+		case "manager":
+			sortField = "d.manager"
+		case "created_at":
+			sortField = "d.created_at"
+		case "updated_at":
+			sortField = "d.updated_at"
+		default:
+			sortField = "d.id"
+		}
+	}
+
+	// Build SQL query with proper JOIN
+	query := `
+		SELECT d.* FROM hr_departments d
+		LEFT JOIN hr_companies c ON c.id = d.company_id
+		WHERE d.deleted = false
+		ORDER BY %s %s
+		LIMIT ? OFFSET ?
+	`
+	formattedQuery := fmt.Sprintf(query, sortField, direction)
+
+	// Execute query
+	err := r.db.Raw(formattedQuery, limit, offset).
+		Preload("Company").
+		Find(&departments).Error
+
+	if err != nil {
+		return nil, 0, err
+	}
 
 	// Count total records
 	r.db.Model(&domain.Department{}).Where("deleted = ?", false).Count(&total)
 
-	// Get paginated records with sorting
-	err := r.db.Preload("Company").Where("deleted = ?", false).
-		Order(orderBy).
-		Limit(limit).Offset(offset).Find(&departments).Error
-
-	return departments, total, err
+	return departments, total, nil
 }
 
 func (r *departmentRepository) GetByCompanyID(companyID uint) ([]*domain.Department, error) {
