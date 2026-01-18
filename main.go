@@ -52,9 +52,9 @@ func main() {
 	}
 
 	// Seed database with default data
-	if err := seedDatabase(db); err != nil {
+	/*if err := seedDatabase(db); err != nil {
 		log.Printf("Warning: Failed to seed database: %v", err)
-	}
+	}*/
 
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db.DB)
@@ -69,12 +69,13 @@ func main() {
 	jobPositionRepo := repository.NewJobPositionRepository(db.DB)
 	workInfoRepo := repository.NewWorkInformationRepository(db.DB)
 	leaveTypeRepo := repository.NewLeaveTypeRepository(db.DB)
+	holidayRepo := repository.NewHolidayRepository(db.DB)
 
 	// Initialize services
 	auditService := service.NewAuditService(auditRepo)
 	authService := service.NewAuthService(userRepo, userRoleRepo, roleRepo, auditService, cfg)
 	employeeService := service.NewEmployeeService(employeeRepo, userRepo, auditService)
-	leaveService := service.NewLeaveService(leaveRepo, leaveTypeRepo, leaveBalanceRepo, employeeRepo, auditService)
+	leaveService := service.NewLeaveService(leaveRepo, leaveTypeRepo, leaveBalanceRepo, employeeRepo, holidayRepo, auditService)
 	departmentService := service.NewDepartmentService(departmentRepo, companyRepo, auditService)
 	companyService := service.NewCompanyService(companyRepo, departmentRepo, departmentService, auditService)
 	jobPositionService := service.NewJobPositionService(jobPositionRepo, auditService)
@@ -146,6 +147,7 @@ func main() {
 		employeeRoutes := protected.Group("/employees")
 		{
 			employeeRoutes.GET("/me", employeeHandler.GetMyProfile)
+			employeeRoutes.PUT("/me", employeeHandler.UpdateMyProfile)
 			employeeRoutes.PUT("/:id", employeeHandler.UpdateEmployee)
 
 			// Admin only routes
@@ -189,6 +191,9 @@ func main() {
 				typesRoutes.PUT("/:id", authMiddleware.RequireAdmin(), leaveHandler.UpdateLeaveType)
 				typesRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), leaveHandler.DeleteLeaveType)
 			}
+
+			// Calculate days endpoints
+			leaveRoutes.POST("/calculate-working-days", leaveHandler.CalculateWorkingDays)
 		}
 
 		// Company management routes

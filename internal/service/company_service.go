@@ -2,18 +2,19 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/repository"
 	"kartezya-hr/internal/types"
 )
 
 type CompanyService interface {
-	CreateCompany(company *domain.Company, createdBy string) error
+	CreateCompany(company *domain.Company, userID uint) error
 	GetCompanyByID(id uint) (*types.CompanyResponse, error)
 	GetAllCompanies(page, limit int, sortParams types.SortParams) (*PaginatedResponse, error)
 	GetCompaniesLookup() ([]types.CompanyLookup, error)
-	UpdateCompany(id uint, company *domain.Company, modifiedBy string) error
-	DeleteCompany(id uint, deletedBy string) error
+	UpdateCompany(id uint, company *domain.Company, userID uint) error
+	DeleteCompany(id uint, userID uint) error
 	GetDepartmentsByCompany(companyID uint) ([]types.DepartmentResponse, error)
 	GetDepartmentsByCompanyLookup(companyID uint) ([]types.DepartmentLookup, error)
 }
@@ -34,7 +35,7 @@ func NewCompanyService(companyRepo repository.CompanyRepository, departmentRepo 
 	}
 }
 
-func (s *companyService) CreateCompany(company *domain.Company, createdBy string) error {
+func (s *companyService) CreateCompany(company *domain.Company, userID uint) error {
 	// Validation
 	if company.Name == "" {
 		return errors.New("company name is required")
@@ -46,6 +47,9 @@ func (s *companyService) CreateCompany(company *domain.Company, createdBy string
 		return errors.New("company with this name already exists")
 	}
 
+	// Create audit identifier
+	createdBy := fmt.Sprintf("%d", userID)
+
 	// Create the company
 	if err := s.companyRepo.Create(company, createdBy); err != nil {
 		return err
@@ -54,7 +58,6 @@ func (s *companyService) CreateCompany(company *domain.Company, createdBy string
 	// Audit the creation
 	if err := s.auditService.CreateAuditLog("Company", company.ID, domain.AuditActionCreate, nil, company, createdBy); err != nil {
 		// Log error but don't fail the operation
-		// In production, you might want to log this error
 	}
 
 	return nil
@@ -156,7 +159,7 @@ func (s *companyService) GetCompaniesLookup() ([]types.CompanyLookup, error) {
 	return lookupData, nil
 }
 
-func (s *companyService) UpdateCompany(id uint, company *domain.Company, modifiedBy string) error {
+func (s *companyService) UpdateCompany(id uint, company *domain.Company, userID uint) error {
 	if id == 0 {
 		return errors.New("invalid company ID")
 	}
@@ -184,26 +187,34 @@ func (s *companyService) UpdateCompany(id uint, company *domain.Company, modifie
 		}
 	}
 
-	// Set the ID for the update
-	company.ID = id
+	// Create audit identifier
+	modifiedBy := fmt.Sprintf("%d", userID)
+
+	// Clone the existing company and update only the provided fields
+	updatedCompany := *existingCompany
+	updatedCompany.Name = company.Name
+	updatedCompany.Address = company.Address
+	updatedCompany.Phone = company.Phone
+	updatedCompany.Email = company.Email
+	updatedCompany.Website = company.Website
 
 	// Update the company
-	if err := s.companyRepo.Update(company, modifiedBy); err != nil {
+	if err := s.companyRepo.Update(&updatedCompany, modifiedBy); err != nil {
 		return err
 	}
 
 	// Get updated company for audit
-	updatedCompany, _ := s.companyRepo.GetByID(id)
+	auditedCompany, _ := s.companyRepo.GetByID(id)
 
 	// Audit the update
-	if err := s.auditService.CreateAuditLog("Company", id, domain.AuditActionUpdate, existingCompany, updatedCompany, modifiedBy); err != nil {
+	if err := s.auditService.CreateAuditLog("Company", id, domain.AuditActionUpdate, existingCompany, auditedCompany, modifiedBy); err != nil {
 		// Log error but don't fail the operation
 	}
 
 	return nil
 }
 
-func (s *companyService) DeleteCompany(id uint, deletedBy string) error {
+func (s *companyService) DeleteCompany(id uint, userID uint) error {
 	if id == 0 {
 		return errors.New("invalid company ID")
 	}
@@ -225,6 +236,9 @@ func (s *companyService) DeleteCompany(id uint, deletedBy string) error {
 	if len(departments) > 0 {
 		return errors.New("cannot delete company with existing departments")
 	}
+
+	// Create audit identifier
+	deletedBy := fmt.Sprintf("%d", userID)
 
 	// Delete the company
 	if err := s.companyRepo.Delete(id, deletedBy); err != nil {

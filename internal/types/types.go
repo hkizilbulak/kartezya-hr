@@ -64,6 +64,7 @@ type EmployeeResponse struct {
 	User                     UserInfo `json:"user"`
 	FirstName                string   `json:"first_name"`
 	LastName                 string   `json:"last_name"`
+	Email                    string   `json:"email"`
 	Phone                    string   `json:"phone"`
 	Address                  string   `json:"address"`
 	State                    string   `json:"state"`
@@ -193,6 +194,7 @@ type AdminLeaveRequestResponse struct {
 	StartDate       time.Time       `json:"start_date"`
 	EndDate         time.Time       `json:"end_date"`
 	RequestedDays   float64         `json:"requested_days"`
+	RemainingDays   *float64        `json:"remaining_days"` // Leave balance remaining days (only for annual leave)
 	Reason          string          `json:"reason"`
 	Status          string          `json:"status"`
 	IsPaid          bool            `json:"is_paid"`

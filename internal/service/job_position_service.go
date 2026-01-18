@@ -2,18 +2,19 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/repository"
 	"kartezya-hr/internal/types"
 )
 
 type JobPositionService interface {
-	CreateJobPosition(jobPosition *domain.JobPosition, createdBy string) error
+	CreateJobPosition(jobPosition *domain.JobPosition, userID uint) error
 	GetJobPositionByID(id uint) (*types.JobPositionResponse, error)
 	GetAllJobPositions(page, limit int, sortParams types.SortParams) (*PaginatedResponse, error)
 	GetJobPositionsLookup() ([]types.JobPositionLookup, error)
-	UpdateJobPosition(id uint, title string, modifiedBy string) error
-	DeleteJobPosition(id uint, deletedBy string) error
+	UpdateJobPosition(id uint, title string, userID uint) error
+	DeleteJobPosition(id uint, userID uint) error
 }
 
 type jobPositionService struct {
@@ -28,7 +29,7 @@ func NewJobPositionService(jobPositionRepo repository.JobPositionRepository, aud
 	}
 }
 
-func (s *jobPositionService) CreateJobPosition(jobPosition *domain.JobPosition, createdBy string) error {
+func (s *jobPositionService) CreateJobPosition(jobPosition *domain.JobPosition, userID uint) error {
 	if jobPosition.Title == "" {
 		return errors.New("job position title is required")
 	}
@@ -38,6 +39,9 @@ func (s *jobPositionService) CreateJobPosition(jobPosition *domain.JobPosition, 
 	if err == nil && existingJobPosition != nil {
 		return errors.New("job position with this title already exists")
 	}
+
+	// Create audit identifier
+	createdBy := fmt.Sprintf("%d", userID)
 
 	// Create the job position
 	if err := s.jobPositionRepo.Create(jobPosition, createdBy); err != nil {
@@ -142,7 +146,7 @@ func (s *jobPositionService) GetJobPositionsLookup() ([]types.JobPositionLookup,
 	return lookupData, nil
 }
 
-func (s *jobPositionService) UpdateJobPosition(id uint, title string, modifiedBy string) error {
+func (s *jobPositionService) UpdateJobPosition(id uint, title string, userID uint) error {
 	// Get existing job position for audit trail and validation
 	existingJobPosition, err := s.jobPositionRepo.GetByID(id)
 	if err != nil {
@@ -158,25 +162,29 @@ func (s *jobPositionService) UpdateJobPosition(id uint, title string, modifiedBy
 		}
 	}
 
-	// Update the job position
-	existingJobPosition.Title = title
+	// Create audit identifier
+	modifiedBy := fmt.Sprintf("%d", userID)
 
-	if err := s.jobPositionRepo.Update(existingJobPosition, modifiedBy); err != nil {
+	// Clone the existing job position and update only the provided fields
+	updatedJobPosition := *existingJobPosition
+	updatedJobPosition.Title = title
+
+	if err := s.jobPositionRepo.Update(&updatedJobPosition, modifiedBy); err != nil {
 		return err
 	}
 
 	// Get updated job position for audit
-	updatedJobPosition, _ := s.jobPositionRepo.GetByID(id)
+	auditedJobPosition, _ := s.jobPositionRepo.GetByID(id)
 
 	// Audit the update
-	if err := s.auditService.CreateAuditLog("JobPosition", id, domain.AuditActionUpdate, existingJobPosition, updatedJobPosition, modifiedBy); err != nil {
+	if err := s.auditService.CreateAuditLog("JobPosition", id, domain.AuditActionUpdate, existingJobPosition, auditedJobPosition, modifiedBy); err != nil {
 		// Log error but don't fail the operation
 	}
 
 	return nil
 }
 
-func (s *jobPositionService) DeleteJobPosition(id uint, deletedBy string) error {
+func (s *jobPositionService) DeleteJobPosition(id uint, userID uint) error {
 	if id == 0 {
 		return errors.New("invalid job position ID")
 	}
@@ -186,6 +194,9 @@ func (s *jobPositionService) DeleteJobPosition(id uint, deletedBy string) error 
 	if err != nil {
 		return err
 	}
+
+	// Create audit identifier
+	deletedBy := fmt.Sprintf("%d", userID)
 
 	// Delete the job position
 	if err := s.jobPositionRepo.Delete(id, deletedBy); err != nil {

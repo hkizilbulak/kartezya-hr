@@ -62,8 +62,8 @@ func (h *CompanyHandler) CreateCompany(c *gin.Context) {
 		return
 	}
 
-	// Get current user email for audit
-	email, exists := c.Get("email")
+	// Get current user ID
+	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -80,7 +80,7 @@ func (h *CompanyHandler) CreateCompany(c *gin.Context) {
 		Website: req.Website,
 	}
 
-	err := h.companyService.CreateCompany(company, email.(string))
+	err := h.companyService.CreateCompany(company, userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -238,8 +238,8 @@ func (h *CompanyHandler) UpdateCompany(c *gin.Context) {
 		return
 	}
 
-	// Get current user email for audit
-	email, exists := c.Get("email")
+	// Get current user ID
+	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -256,7 +256,7 @@ func (h *CompanyHandler) UpdateCompany(c *gin.Context) {
 		Website: req.Website,
 	}
 
-	err = h.companyService.UpdateCompany(id, company, email.(string))
+	err = h.companyService.UpdateCompany(id, company, userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -295,8 +295,8 @@ func (h *CompanyHandler) DeleteCompany(c *gin.Context) {
 		return
 	}
 
-	// Get current user email for audit
-	email, exists := c.Get("email")
+	// Get current user ID
+	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -305,7 +305,7 @@ func (h *CompanyHandler) DeleteCompany(c *gin.Context) {
 		return
 	}
 
-	err = h.companyService.DeleteCompany(id, email.(string))
+	err = h.companyService.DeleteCompany(id, userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,

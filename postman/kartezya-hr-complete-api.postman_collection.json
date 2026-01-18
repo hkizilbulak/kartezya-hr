@@ -877,7 +877,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"employee_id\": 1,\n  \"leave_type_id\": 1,\n  \"start_date\": \"2024-02-01T00:00:00Z\",\n  \"end_date\": \"2024-02-07T00:00:00Z\",\n  \"reason\": \"Extended family vacation\",\n  \"is_paid\": true\n}"
+              "raw": "{\n  \"leave_type_id\": 1,\n  \"start_date\": \"2024-02-01T00:00:00Z\",\n  \"end_date\": \"2024-02-07T00:00:00Z\",\n  \"reason\": \"Extended family vacation\",\n  \"is_paid\": true\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/leave/requests/1",

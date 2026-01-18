@@ -58,8 +58,8 @@ func (h *DepartmentHandler) CreateDepartment(c *gin.Context) {
 		return
 	}
 
-	// Get current user email for audit
-	email, exists := c.Get("email")
+	// Get current user ID
+	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -74,7 +74,7 @@ func (h *DepartmentHandler) CreateDepartment(c *gin.Context) {
 		Manager:   req.Manager,
 	}
 
-	err := h.departmentService.CreateDepartment(department, email.(string))
+	err := h.departmentService.CreateDepartment(department, userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -240,8 +240,8 @@ func (h *DepartmentHandler) UpdateDepartment(c *gin.Context) {
 		return
 	}
 
-	// Get current user email for audit
-	email, exists := c.Get("email")
+	// Get current user ID
+	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -256,7 +256,7 @@ func (h *DepartmentHandler) UpdateDepartment(c *gin.Context) {
 		Manager:   req.Manager,
 	}
 
-	err = h.departmentService.UpdateDepartment(id, department, email.(string))
+	err = h.departmentService.UpdateDepartment(id, department, userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -294,8 +294,8 @@ func (h *DepartmentHandler) DeleteDepartment(c *gin.Context) {
 		return
 	}
 
-	// Get current user email for audit
-	email, exists := c.Get("email")
+	// Get current user ID
+	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -304,7 +304,7 @@ func (h *DepartmentHandler) DeleteDepartment(c *gin.Context) {
 		return
 	}
 
-	err = h.departmentService.DeleteDepartment(id, email.(string))
+	err = h.departmentService.DeleteDepartment(id, userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,

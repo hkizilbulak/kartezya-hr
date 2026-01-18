@@ -17,6 +17,7 @@ type EmployeeService interface {
 	GetEmployeeByID(id uint) (*types.EmployeeResponse, error)
 	GetEmployeeByUserID(userID uint) (*types.EmployeeResponse, error)
 	UpdateEmployee(id uint, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, modifiedBy string, requestingUserID uint, isAdmin bool) error
+	UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string) error
 	DeleteEmployee(id uint, deletedBy string, isAdmin bool) error
 	ListEmployees(limit, offset int, isAdmin bool) ([]*domain.Employee, error)
 }
@@ -208,6 +209,7 @@ func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeRespo
 		User:                     userInfo,
 		FirstName:                employee.FirstName,
 		LastName:                 employee.LastName,
+		Email:                    employee.Email,
 		Phone:                    employee.Phone,
 		Address:                  employee.Address,
 		State:                    employee.State,
@@ -276,39 +278,124 @@ func (s *employeeService) UpdateEmployee(id uint, companyEmail, firstName, lastN
 		}
 	}
 
-	// Create updated employee object
-	employee := &domain.Employee{
-		UserID:                   existingEmployee.UserID, // Preserve existing user ID
-		FirstName:                firstName,
-		LastName:                 lastName,
-		Phone:                    phone,
-		Address:                  address,
-		State:                    state,
-		City:                     city,
-		Gender:                   gender,
-		DateOfBirth:              dateOfBirthPtr,
-		HireDate:                 hireDatePtr,
-		LeaveDate:                leaveDatePtr,
-		TotalExperience:          totalExperience,
-		MaritalStatus:            maritalStatus,
-		EmergencyContact:         emergencyContact,
-		EmergencyContactName:     emergencyContactName,
-		EmergencyContactRelation: emergencyContactRelation,
-	}
-
-	// Set the ID after creating the struct
-	employee.ID = id
+	// Clone the existing employee and update only the provided fields
+	updatedEmployee := *existingEmployee
+	updatedEmployee.FirstName = firstName
+	updatedEmployee.LastName = lastName
+	updatedEmployee.Phone = phone
+	updatedEmployee.Address = address
+	updatedEmployee.State = state
+	updatedEmployee.City = city
+	updatedEmployee.Gender = gender
+	updatedEmployee.DateOfBirth = dateOfBirthPtr
+	updatedEmployee.HireDate = hireDatePtr
+	updatedEmployee.LeaveDate = leaveDatePtr
+	updatedEmployee.TotalExperience = totalExperience
+	updatedEmployee.MaritalStatus = maritalStatus
+	updatedEmployee.EmergencyContact = emergencyContact
+	updatedEmployee.EmergencyContactName = emergencyContactName
+	updatedEmployee.EmergencyContactRelation = emergencyContactRelation
 
 	// Update employee
-	if err := s.employeeRepo.Update(employee, modifiedBy); err != nil {
+	if err := s.employeeRepo.Update(&updatedEmployee, modifiedBy); err != nil {
 		return err
 	}
 
 	// Get updated employee for audit
-	updatedEmployee, _ := s.employeeRepo.GetByID(id)
+	auditedEmployee, _ := s.employeeRepo.GetByID(id)
 
 	// Audit the update
-	if err := s.auditService.CreateAuditLog("Employee", id, domain.AuditActionUpdate, existingEmployee, updatedEmployee, modifiedBy); err != nil {
+	if err := s.auditService.CreateAuditLog("Employee", id, domain.AuditActionUpdate, existingEmployee, auditedEmployee, modifiedBy); err != nil {
+		// Log error but don't fail the operation
+	}
+
+	return nil
+}
+
+func (s *employeeService) UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string) error {
+	// Get employee by user ID
+	employee, err := s.employeeRepo.GetByUserID(userID)
+	if err != nil {
+		return fmt.Errorf("employee not found: %v", err)
+	}
+
+	// Get user record
+	user, err := s.userRepo.GetByID(employee.UserID)
+	if err != nil {
+		return fmt.Errorf("user not found: %v", err)
+	}
+
+	// Update user email if it has changed
+	if email != "" && user.Email != email {
+		// Check if new email already exists for another user
+		if existingEmailUser, err := s.userRepo.GetByEmail(email); err == nil && existingEmailUser.ID != user.ID {
+			return fmt.Errorf("email %s is already in use by another user", email)
+		}
+
+		// Update user email
+		user.Email = email
+		if err := s.userRepo.Update(user, ""); err != nil {
+			return fmt.Errorf("failed to update user email: %v", err)
+		}
+	}
+
+	// Parse date of birth
+	var dateOfBirthPtr *time.Time
+
+	if dateOfBirth != "" {
+		if parsed, err := time.Parse("2006-01-02T15:04:05.000Z", dateOfBirth); err == nil {
+			dateOfBirthPtr = &parsed
+		} else if parsed, err := time.Parse("2006-01-02", dateOfBirth); err == nil {
+			dateOfBirthPtr = &parsed
+		}
+	}
+
+	// Clone the existing employee and update only the provided fields
+	updatedEmployee := *employee
+	if email != "" {
+		updatedEmployee.Email = email
+	}
+	if phone != "" {
+		updatedEmployee.Phone = phone
+	}
+	if address != "" {
+		updatedEmployee.Address = address
+	}
+	if state != "" {
+		updatedEmployee.State = state
+	}
+	if city != "" {
+		updatedEmployee.City = city
+	}
+	if gender != "" {
+		updatedEmployee.Gender = gender
+	}
+	if dateOfBirthPtr != nil {
+		updatedEmployee.DateOfBirth = dateOfBirthPtr
+	}
+	if totalExperience != 0 {
+		updatedEmployee.TotalExperience = totalExperience
+	}
+	if maritalStatus != "" {
+		updatedEmployee.MaritalStatus = maritalStatus
+	}
+	if emergencyContact != "" {
+		updatedEmployee.EmergencyContact = emergencyContact
+	}
+	if emergencyContactName != "" {
+		updatedEmployee.EmergencyContactName = emergencyContactName
+	}
+	if emergencyContactRelation != "" {
+		updatedEmployee.EmergencyContactRelation = emergencyContactRelation
+	}
+
+	// Update employee
+	if err := s.employeeRepo.Update(&updatedEmployee, ""); err != nil {
+		return fmt.Errorf("failed to update profile: %v", err)
+	}
+
+	// Audit the update
+	if err := s.auditService.CreateAuditLog("Employee", employee.ID, domain.AuditActionUpdate, employee, &updatedEmployee, ""); err != nil {
 		// Log error but don't fail the operation
 	}
 

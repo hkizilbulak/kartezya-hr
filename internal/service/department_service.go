@@ -2,18 +2,19 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/repository"
 	"kartezya-hr/internal/types"
 )
 
 type DepartmentService interface {
-	CreateDepartment(department *domain.Department, createdBy string) error
+	CreateDepartment(department *domain.Department, userID uint) error
 	GetDepartmentByID(id uint) (*types.DepartmentResponse, error)
 	GetAllDepartments(page, limit int, sortParams types.SortParams) (*PaginatedResponse, error)
 	GetDepartmentsByCompany(companyID uint) ([]types.DepartmentResponse, error)
-	UpdateDepartment(id uint, department *domain.Department, modifiedBy string) error
-	DeleteDepartment(id uint, deletedBy string) error
+	UpdateDepartment(id uint, department *domain.Department, userID uint) error
+	DeleteDepartment(id uint, userID uint) error
 }
 
 type departmentService struct {
@@ -30,7 +31,7 @@ func NewDepartmentService(departmentRepo repository.DepartmentRepository, compan
 	}
 }
 
-func (s *departmentService) CreateDepartment(department *domain.Department, createdBy string) error {
+func (s *departmentService) CreateDepartment(department *domain.Department, userID uint) error {
 	// Validation
 	if department.Name == "" {
 		return errors.New("department name is required")
@@ -50,6 +51,9 @@ func (s *departmentService) CreateDepartment(department *domain.Department, crea
 	if err == nil && existingDepartment != nil {
 		return errors.New("department with this name already exists in the company")
 	}
+
+	// Create audit identifier
+	createdBy := fmt.Sprintf("%d", userID)
 
 	// Create the department
 	if err := s.departmentRepo.Create(department, createdBy); err != nil {
@@ -195,7 +199,7 @@ func (s *departmentService) GetDepartmentsByCompany(companyID uint) ([]types.Dep
 	return departmentResponses, nil
 }
 
-func (s *departmentService) UpdateDepartment(id uint, department *domain.Department, modifiedBy string) error {
+func (s *departmentService) UpdateDepartment(id uint, department *domain.Department, userID uint) error {
 	if id == 0 {
 		return errors.New("invalid department ID")
 	}
@@ -232,26 +236,32 @@ func (s *departmentService) UpdateDepartment(id uint, department *domain.Departm
 		}
 	}
 
-	// Set the ID for the update
-	department.ID = id
+	// Create audit identifier
+	modifiedBy := fmt.Sprintf("%d", userID)
+
+	// Clone the existing department and update only the provided fields
+	updatedDepartment := *existingDepartment
+	updatedDepartment.Name = department.Name
+	updatedDepartment.Manager = department.Manager
+	updatedDepartment.CompanyID = department.CompanyID
 
 	// Update the department
-	if err := s.departmentRepo.Update(department, modifiedBy); err != nil {
+	if err := s.departmentRepo.Update(&updatedDepartment, modifiedBy); err != nil {
 		return err
 	}
 
 	// Get updated department for audit
-	updatedDepartment, _ := s.departmentRepo.GetByID(id)
+	auditedDepartment, _ := s.departmentRepo.GetByID(id)
 
 	// Audit the update
-	if err := s.auditService.CreateAuditLog("Department", id, domain.AuditActionUpdate, existingDepartment, updatedDepartment, modifiedBy); err != nil {
+	if err := s.auditService.CreateAuditLog("Department", id, domain.AuditActionUpdate, existingDepartment, auditedDepartment, modifiedBy); err != nil {
 		// Log error but don't fail the operation
 	}
 
 	return nil
 }
 
-func (s *departmentService) DeleteDepartment(id uint, deletedBy string) error {
+func (s *departmentService) DeleteDepartment(id uint, userID uint) error {
 	if id == 0 {
 		return errors.New("invalid department ID")
 	}
@@ -269,6 +279,9 @@ func (s *departmentService) DeleteDepartment(id uint, deletedBy string) error {
 	if len(existingDepartment.EmployeeWorkInformation) > 0 {
 		return errors.New("cannot delete department with existing employees")
 	}
+
+	// Create audit identifier
+	deletedBy := fmt.Sprintf("%d", userID)
 
 	// Delete the department
 	if err := s.departmentRepo.Delete(id, deletedBy); err != nil {

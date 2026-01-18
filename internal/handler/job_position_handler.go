@@ -34,7 +34,7 @@ type UpdateJobPositionRequest struct {
 // @Summary Create a new job position
 // @Description Create a new job position (Admin only)
 // @Tags job-positions
-// @Accept json
+// @Accept jsonablo
 // @Produce json
 // @Security BearerAuth
 // @Param request body CreateJobPositionRequest true "Job position data"
@@ -54,8 +54,8 @@ func (h *JobPositionHandler) CreateJobPosition(c *gin.Context) {
 		return
 	}
 
-	// Get current user email for audit
-	email, exists := c.Get("email")
+	// Get current user ID
+	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -68,7 +68,7 @@ func (h *JobPositionHandler) CreateJobPosition(c *gin.Context) {
 		Title: req.Title,
 	}
 
-	err := h.jobPositionService.CreateJobPosition(jobPosition, email.(string))
+	err := h.jobPositionService.CreateJobPosition(jobPosition, userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -224,8 +224,8 @@ func (h *JobPositionHandler) UpdateJobPosition(c *gin.Context) {
 		return
 	}
 
-	// Get current user email for audit
-	email, exists := c.Get("email")
+	// Get current user ID
+	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -234,7 +234,7 @@ func (h *JobPositionHandler) UpdateJobPosition(c *gin.Context) {
 		return
 	}
 
-	err = h.jobPositionService.UpdateJobPosition(id, req.Title, email.(string))
+	err = h.jobPositionService.UpdateJobPosition(id, req.Title, userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -272,8 +272,8 @@ func (h *JobPositionHandler) DeleteJobPosition(c *gin.Context) {
 		return
 	}
 
-	// Get current user email for audit
-	email, exists := c.Get("email")
+	// Get current user ID
+	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -282,7 +282,7 @@ func (h *JobPositionHandler) DeleteJobPosition(c *gin.Context) {
 		return
 	}
 
-	err = h.jobPositionService.DeleteJobPosition(id, email.(string))
+	err = h.jobPositionService.DeleteJobPosition(id, userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,

@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"kartezya-hr/internal/domain"
@@ -26,33 +27,36 @@ const (
 
 type LeaveService interface {
 	// Leave methods
-	CreateLeave(leave *domain.LeaveRequest, createdBy string, isAdmin bool) error
+	CreateLeave(leave *domain.LeaveRequest, userID uint, isAdmin bool) error
 	GetLeaveByID(id uint) (*domain.LeaveRequest, error)
 	GetLeaveByIDFormatted(id uint) (*types.AdminLeaveRequestResponse, error)
-	UpdateLeave(leave *domain.LeaveRequest, modifiedBy string) error
-	DeleteLeave(id uint, deletedBy string) error
+	UpdateLeave(leave *domain.LeaveRequest, userID uint) error
+	DeleteLeave(id uint, userID uint) error
 	GetLeavesByEmployeeID(employeeID uint, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error)
 	GetLeavesByUserID(userID uint, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error)
 	GetMyLeaveRequestsPaginated(userID uint, page, limit int, sortParams types.SortParams, status string) (*PaginatedResponse, error)
 	GetAllLeaveRequestsPaginated(page, limit int, sortParams types.SortParams, status string) (*PaginatedResponse, error)
 	GetLeavesByStatus(status string, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error)
 	GetLeavesByDateRange(startDate, endDate string) ([]*domain.LeaveRequest, error)
-	ApproveLeave(id uint, approverID uint, approvedBy string) error
-	RejectLeave(id uint, rejectionReason string, rejectedBy string, rejectorID uint) error
-	CancelLeave(id uint, cancelReason string, cancelledBy string, userID uint, isAdmin bool) error
+	ApproveLeave(id uint, userID uint) error
+	RejectLeave(id uint, rejectionReason string, userID uint) error
+	CancelLeave(id uint, cancelReason string, userID uint, isAdmin bool) error
 
 	// Leave Balance methods
 	ValidateLeaveBalance(employeeID, leaveTypeID uint, requestedDays float64, isAdmin bool) error
-	DeductLeaveBalance(employeeID, leaveTypeID uint, requestedDays float64, modifiedBy string) error
+	DeductLeaveBalance(employeeID, leaveTypeID uint, requestedDays float64, userID uint) error
 	GetMyLeaveBalances(userID uint, page, limit int, sortParams types.SortParams) (*PaginatedResponse, error)
 
 	// Leave Type methods
-	CreateLeaveType(leaveType *domain.LeaveType, createdBy string) error
+	CreateLeaveType(leaveType *domain.LeaveType, userID uint) error
 	GetLeaveTypeByID(id uint) (*types.LeaveTypeResponse, error)
 	GetAllLeaveTypes(page, limit int, sortParams types.SortParams) (*PaginatedResponse, error)
 	GetLeaveTypesLookup() ([]types.LeaveTypeLookup, error)
-	UpdateLeaveType(leaveType *domain.LeaveType, modifiedBy string) error
-	DeleteLeaveType(id uint, deletedBy string) error
+	UpdateLeaveType(leaveType *domain.LeaveType, userID uint) error
+	DeleteLeaveType(id uint, userID uint) error
+
+	// Working days calculation
+	CalculateWorkingDays(startDate, endDate time.Time) (float64, error)
 }
 
 type leaveService struct {
@@ -60,6 +64,7 @@ type leaveService struct {
 	leaveTypeRepo    repository.LeaveTypeRepository
 	leaveBalanceRepo repository.LeaveBalanceRepository
 	employeeRepo     repository.EmployeeRepository
+	holidayRepo      repository.HolidayRepository
 	auditService     AuditService
 }
 
@@ -68,6 +73,7 @@ func NewLeaveService(
 	leaveTypeRepo repository.LeaveTypeRepository,
 	leaveBalanceRepo repository.LeaveBalanceRepository,
 	employeeRepo repository.EmployeeRepository,
+	holidayRepo repository.HolidayRepository,
 	auditService AuditService,
 ) LeaveService {
 	return &leaveService{
@@ -75,12 +81,13 @@ func NewLeaveService(
 		leaveTypeRepo:    leaveTypeRepo,
 		leaveBalanceRepo: leaveBalanceRepo,
 		employeeRepo:     employeeRepo,
+		holidayRepo:      holidayRepo,
 		auditService:     auditService,
 	}
 }
 
 // CreateLeaveWithValidation creates a leave request with balance validation for employees
-func (s *leaveService) CreateLeave(leave *domain.LeaveRequest, createdBy string, isAdmin bool) error {
+func (s *leaveService) CreateLeave(leave *domain.LeaveRequest, userID uint, isAdmin bool) error {
 	if leave == nil {
 		return errors.New("leave cannot be nil")
 	}
@@ -98,8 +105,8 @@ func (s *leaveService) CreateLeave(leave *domain.LeaveRequest, createdBy string,
 	if leave.EndDate.IsZero() {
 		return errors.New("end_date is required")
 	}
-	if leave.RequestedDays <= 0 {
-		return errors.New("days must be greater than 0")
+	if leave.RequestedDays < 1 {
+		return errors.New("selected date range does not include any working days")
 	}
 
 	// Validate leave balance for non-admin users
@@ -113,6 +120,8 @@ func (s *leaveService) CreateLeave(leave *domain.LeaveRequest, createdBy string,
 	}
 	leave.CreatedAt = time.Now()
 	leave.UpdatedAt = time.Now()
+	leave.CreatedBy = strconv.FormatUint(uint64(userID), 10)
+	leave.ModifiedBy = strconv.FormatUint(uint64(userID), 10)
 
 	// Create the leave
 	if err := s.leaveRepo.Create(leave); err != nil {
@@ -120,7 +129,7 @@ func (s *leaveService) CreateLeave(leave *domain.LeaveRequest, createdBy string,
 	}
 
 	// Audit the creation
-	if err := s.auditService.CreateAuditLog("Leave", leave.ID, domain.AuditActionCreate, nil, leave, createdBy); err != nil {
+	if err := s.auditService.CreateAuditLog("Leave", leave.ID, domain.AuditActionCreate, nil, leave, strconv.FormatUint(uint64(userID), 10)); err != nil {
 		// Log error but don't fail the operation
 	}
 
@@ -205,7 +214,7 @@ func (s *leaveService) GetAllLeaves(page, limit int, sortParams types.SortParams
 	}, nil
 }
 
-func (s *leaveService) UpdateLeave(leave *domain.LeaveRequest, modifiedBy string) error {
+func (s *leaveService) UpdateLeave(leave *domain.LeaveRequest, userID uint) error {
 	if leave == nil {
 		return errors.New("leave cannot be nil")
 	}
@@ -225,25 +234,37 @@ func (s *leaveService) UpdateLeave(leave *domain.LeaveRequest, modifiedBy string
 		return fmt.Errorf("only pending leave requests can be updated, current status: %s", existingLeave.Status)
 	}
 
-	leave.UpdatedAt = time.Now()
+	if leave.RequestedDays < 1 {
+		return errors.New("selected date range does not include any working days")
+	}
+
+	// Clone the existing leave and update only the provided fields
+	updatedLeave := *existingLeave
+	updatedLeave.LeaveTypeID = leave.LeaveTypeID
+	updatedLeave.StartDate = leave.StartDate
+	updatedLeave.EndDate = leave.EndDate
+	updatedLeave.RequestedDays = leave.RequestedDays
+	updatedLeave.Reason = leave.Reason
+	updatedLeave.UpdatedAt = time.Now()
+	updatedLeave.ModifiedBy = strconv.FormatUint(uint64(userID), 10)
 
 	// Update the leave
-	if err := s.leaveRepo.Update(leave); err != nil {
+	if err := s.leaveRepo.Update(&updatedLeave); err != nil {
 		return fmt.Errorf("failed to update leave: %w", err)
 	}
 
 	// Get updated leave for audit
-	updatedLeave, _ := s.leaveRepo.GetByID(leave.ID)
+	auditedLeave, _ := s.leaveRepo.GetByID(leave.ID)
 
 	// Audit the update
-	if err := s.auditService.CreateAuditLog("Leave", leave.ID, domain.AuditActionUpdate, existingLeave, updatedLeave, modifiedBy); err != nil {
+	if err := s.auditService.CreateAuditLog("Leave", leave.ID, domain.AuditActionUpdate, existingLeave, auditedLeave, strconv.FormatUint(uint64(userID), 10)); err != nil {
 		// Log error but don't fail the operation
 	}
 
 	return nil
 }
 
-func (s *leaveService) DeleteLeave(id uint, deletedBy string) error {
+func (s *leaveService) DeleteLeave(id uint, userID uint) error {
 	// Get existing leave for audit
 	existingLeave, err := s.leaveRepo.GetByID(id)
 	if err != nil {
@@ -256,7 +277,7 @@ func (s *leaveService) DeleteLeave(id uint, deletedBy string) error {
 	}
 
 	// Audit the deletion
-	if err := s.auditService.CreateAuditLog("Leave", id, domain.AuditActionDelete, existingLeave, nil, deletedBy); err != nil {
+	if err := s.auditService.CreateAuditLog("Leave", id, domain.AuditActionDelete, existingLeave, nil, strconv.FormatUint(uint64(userID), 10)); err != nil {
 		// Log error but don't fail the operation
 	}
 
@@ -378,6 +399,15 @@ func (s *leaveService) GetAllLeaveRequestsPaginated(page, limit int, sortParams 
 	// Convert to AdminLeaveRequestResponse format
 	var responseData []*types.AdminLeaveRequestResponse
 	for _, leave := range leaves {
+		// Get leave balance remaining days for annual leave only
+		var remainingDays *float64
+		if leave.LeaveType.Name == "Yıllık İzin" || leave.LeaveType.Name == "Annual Leave" {
+			balances, err := s.leaveBalanceRepo.GetByEmployeeAndLeaveType(leave.EmployeeID, leave.LeaveTypeID)
+			if err == nil && balances != nil && len(balances) > 0 {
+				remainingDays = &balances[0].RemainingDays
+			}
+		}
+
 		responseData = append(responseData, &types.AdminLeaveRequestResponse{
 			ID:         leave.ID,
 			CreatedAt:  leave.CreatedAt,
@@ -397,6 +427,7 @@ func (s *leaveService) GetAllLeaveRequestsPaginated(page, limit int, sortParams 
 			StartDate:       leave.StartDate,
 			EndDate:         leave.EndDate,
 			RequestedDays:   leave.RequestedDays,
+			RemainingDays:   remainingDays,
 			Reason:          leave.Reason,
 			Status:          leave.Status,
 			IsPaid:          leave.IsPaid,
@@ -431,24 +462,48 @@ func (s *leaveService) GetLeavesByDateRange(startDate, endDate string) ([]*domai
 	return s.leaveRepo.GetByDateRange(startDate, endDate)
 }
 
-func (s *leaveService) ApproveLeave(id uint, approverID uint, approvedBy string) error {
+func (s *leaveService) ApproveLeave(id uint, userID uint) error {
 	// Get existing leave for audit and balance deduction
 	existingLeave, err := s.leaveRepo.GetByID(id)
 	if err != nil {
 		return err
 	}
 
-	// Deduct leave balance when approving the request
-	if err := s.DeductLeaveBalance(existingLeave.EmployeeID, existingLeave.LeaveTypeID, existingLeave.RequestedDays, approvedBy); err != nil {
-		return fmt.Errorf("failed to deduct leave balance: %w", err)
+	// Get leave type to check if it's annual leave
+	leaveType, err := s.leaveTypeRepo.GetByID(existingLeave.LeaveTypeID)
+	if err != nil {
+		return fmt.Errorf("failed to get leave type: %w", err)
+	}
+
+	// For annual leave type, validate balance before approval
+	if leaveType.Name == "Yıllık İzin" || leaveType.Name == "Annual Leave" {
+		balances, err := s.leaveBalanceRepo.GetByEmployeeAndLeaveType(existingLeave.EmployeeID, existingLeave.LeaveTypeID)
+		if err != nil {
+			return fmt.Errorf("failed to get leave balance: %w", err)
+		}
+
+		// Check if sufficient balance exists
+		var totalRemainingDays float64
+		if balances != nil && len(balances) > 0 {
+			totalRemainingDays = balances[0].RemainingDays
+		}
+
+		if totalRemainingDays < existingLeave.RequestedDays {
+			return fmt.Errorf("insufficient leave balance: requested %.1f days, available %.1f days", existingLeave.RequestedDays, totalRemainingDays)
+		}
+
+		// Deduct leave balance for annual leave
+		if err := s.DeductLeaveBalance(existingLeave.EmployeeID, existingLeave.LeaveTypeID, existingLeave.RequestedDays, userID); err != nil {
+			return fmt.Errorf("failed to deduct leave balance: %w", err)
+		}
 	}
 
 	leave := *existingLeave // Create a copy
 	leave.Status = LeaveStatusApproved
-	leave.ApprovedBy = &approverID
+	leave.ApprovedBy = &userID
 	now := time.Now()
 	leave.ApprovedAt = &now
-	leave.ModifiedBy = approvedBy
+	leave.ModifiedBy = strconv.FormatUint(uint64(userID), 10)
 
 	// Update the leave
 	if err := s.leaveRepo.Update(&leave); err != nil {
@@ -459,14 +514,14 @@ func (s *leaveService) ApproveLeave(id uint, approverID uint, approvedBy string)
 	updatedLeave, _ := s.leaveRepo.GetByID(id)
 
 	// Audit the approval
-	if err := s.auditService.CreateAuditLog("Leave", id, domain.AuditActionUpdate, existingLeave, updatedLeave, approvedBy); err != nil {
+	if err := s.auditService.CreateAuditLog("Leave", id, domain.AuditActionUpdate, existingLeave, updatedLeave, strconv.FormatUint(uint64(userID), 10)); err != nil {
 		// Log error but don't fail the operation
 	}
 
 	return nil
 }
 
-func (s *leaveService) RejectLeave(id uint, rejectionReason string, rejectedBy string, rejectorID uint) error {
+func (s *leaveService) RejectLeave(id uint, rejectionReason string, userID uint) error {
 	// Get existing leave for audit
 	existingLeave, err := s.leaveRepo.GetByID(id)
 	if err != nil {
@@ -476,10 +531,10 @@ func (s *leaveService) RejectLeave(id uint, rejectionReason string, rejectedBy s
 	leave := *existingLeave // Create a copy
 	leave.Status = LeaveStatusRejected
 	leave.RejectionReason = rejectionReason
-	leave.ApprovedBy = &rejectorID // Set the rejector's user ID in ApprovedBy field
+	leave.ApprovedBy = &userID // Set the rejector's user ID in ApprovedBy field
 	now := time.Now()
 	leave.RejectedAt = &now // Set the rejection timestamp
-	leave.ModifiedBy = rejectedBy
+	leave.ModifiedBy = strconv.FormatUint(uint64(userID), 10)
 
 	// Update the leave
 	if err := s.leaveRepo.Update(&leave); err != nil {
@@ -490,26 +545,26 @@ func (s *leaveService) RejectLeave(id uint, rejectionReason string, rejectedBy s
 	updatedLeave, _ := s.leaveRepo.GetByID(id)
 
 	// Audit the rejection
-	if err := s.auditService.CreateAuditLog("Leave", id, domain.AuditActionUpdate, existingLeave, updatedLeave, rejectedBy); err != nil {
+	if err := s.auditService.CreateAuditLog("Leave", id, domain.AuditActionUpdate, existingLeave, updatedLeave, strconv.FormatUint(uint64(userID), 10)); err != nil {
 		// Log error but don't fail the operation
 	}
 
 	return nil
 }
 
-func (s *leaveService) CancelLeave(id uint, cancelReason string, cancelledBy string, userID uint, isAdmin bool) error {
+func (s *leaveService) CancelLeave(id uint, cancelReason string, userID uint, isAdmin bool) error {
 	// Get existing leave for validation and audit
 	existingLeave, err := s.leaveRepo.GetByID(id)
 	if err != nil {
 		return err
 	}
 
-	// Check if the leave request can be cancelled (only PENDING requests)
-	if existingLeave.Status != LeaveStatusPending {
-		return fmt.Errorf("only pending leave requests can be cancelled, current status: %s", existingLeave.Status)
+	// Check if the leave request can be cancelled (only PENDING and APPROVED requests)
+	if existingLeave.Status != LeaveStatusPending && existingLeave.Status != LeaveStatusApproved {
+		return fmt.Errorf("only pending or approved leave requests can be cancelled, current status: %s", existingLeave.Status)
 	}
 
-	// Authorization check: employees can only cancel their own requests, admins can cancel any
+	// Authorization check: employees can only cancel their own PENDING requests, admins can cancel any PENDING or APPROVED
 	if !isAdmin {
 		// Get employee ID from user ID
 		employee, err := s.employeeRepo.GetByUserID(userID)
@@ -520,6 +575,27 @@ func (s *leaveService) CancelLeave(id uint, cancelReason string, cancelledBy str
 		if existingLeave.EmployeeID != employee.ID {
 			return errors.New("you can only cancel your own leave requests")
 		}
+
+		// Employees can only cancel PENDING requests
+		if existingLeave.Status != LeaveStatusPending {
+			return fmt.Errorf("you can only cancel pending leave requests, current status: %s", existingLeave.Status)
+		}
+	}
+
+	// If the leave is APPROVED and being cancelled by admin, reverse the deduction
+	if existingLeave.Status == LeaveStatusApproved && isAdmin {
+		// Get leave type to check if it's annual leave
+		leaveType, err := s.leaveTypeRepo.GetByID(existingLeave.LeaveTypeID)
+		if err != nil {
+			return fmt.Errorf("failed to get leave type: %w", err)
+		}
+
+		// Reverse leave balance deduction only for annual leave type
+		if leaveType.Name == "Yıllık İzin" || leaveType.Name == "Annual Leave" {
+			if err := s.ReverseLeaveBalance(existingLeave.EmployeeID, existingLeave.LeaveTypeID, existingLeave.RequestedDays, userID); err != nil {
+				return fmt.Errorf("failed to reverse leave balance: %w", err)
+			}
+		}
 	}
 
 	leave := *existingLeave // Create a copy
@@ -527,7 +603,7 @@ func (s *leaveService) CancelLeave(id uint, cancelReason string, cancelledBy str
 	leave.CancelReason = cancelReason
 	now := time.Now()
 	leave.CancelledAt = &now
-	leave.ModifiedBy = cancelledBy
+	leave.ModifiedBy = strconv.FormatUint(uint64(userID), 10)
 
 	// Update the leave
 	if err := s.leaveRepo.Update(&leave); err != nil {
@@ -538,7 +614,7 @@ func (s *leaveService) CancelLeave(id uint, cancelReason string, cancelledBy str
 	updatedLeave, _ := s.leaveRepo.GetByID(id)
 
 	// Audit the cancellation
-	if err := s.auditService.CreateAuditLog("Leave", id, domain.AuditActionUpdate, existingLeave, updatedLeave, cancelledBy); err != nil {
+	if err := s.auditService.CreateAuditLog("Leave", id, domain.AuditActionUpdate, existingLeave, updatedLeave, strconv.FormatUint(uint64(userID), 10)); err != nil {
 		// Log error but don't fail the operation
 	}
 
@@ -558,9 +634,9 @@ func (s *leaveService) ValidateLeaveBalance(employeeID, leaveTypeID uint, reques
 		return fmt.Errorf("failed to get leave balances: %w", err)
 	}
 
-	if len(balances) == 0 {
+	/*if len(balances) == 0 {
 		return fmt.Errorf("no leave balance found for employee %d and leave type %d", employeeID, leaveTypeID)
-	}
+	}*/
 
 	// Calculate total remaining days across all years
 	var totalRemainingDays float64
@@ -569,90 +645,53 @@ func (s *leaveService) ValidateLeaveBalance(employeeID, leaveTypeID uint, reques
 	}
 
 	// Check if sufficient balance exists
-	if totalRemainingDays < requestedDays {
+	/*if totalRemainingDays < requestedDays {
 		return fmt.Errorf("insufficient leave balance: requested %.1f days, available %.1f days", requestedDays, totalRemainingDays)
-	}
+	}*/
 
 	return nil
 }
 
-func (s *leaveService) DeductLeaveBalance(employeeID, leaveTypeID uint, requestedDays float64, modifiedBy string) error {
-	// Get all leave balance records ordered by year ASC (oldest first)
-	balances, err := s.leaveBalanceRepo.GetByEmployeeAndLeaveType(employeeID, leaveTypeID)
-	if err != nil {
-		return fmt.Errorf("failed to get leave balances: %w", err)
+func (s *leaveService) DeductLeaveBalance(employeeID, leaveTypeID uint, requestedDays float64, userID uint) error {
+	// Get leave balance record for employee and leave type
+	// Since there's only one record per employee+leaveType, we use FirstOrCreate
+	balance := &domain.LeaveBalance{
+		EmployeeID:  employeeID,
+		LeaveTypeID: leaveTypeID,
 	}
 
-	if len(balances) == 0 {
-		return fmt.Errorf("no leave balance found for employee %d and leave type %d", employeeID, leaveTypeID)
+	// Try to find existing balance, if not found create with default values
+	result, err := s.leaveBalanceRepo.GetByEmployeeAndLeaveType(employeeID, leaveTypeID)
+	if err != nil || result == nil || len(result) == 0 {
+		// Create new balance with 0 values
+		balance.TotalDays = 0
+		balance.UsedDays = 0
+		balance.RemainingDays = 0
+		balance.CreatedBy = strconv.FormatUint(uint64(userID), 10)
+		balance.ModifiedBy = strconv.FormatUint(uint64(userID), 10)
+
+		// Create the new balance
+		if err := s.leaveBalanceRepo.Create(balance, strconv.FormatUint(uint64(userID), 10)); err != nil {
+			return fmt.Errorf("failed to create leave balance: %w", err)
+		}
+	} else {
+		// Use the existing balance
+		balance = result[0]
 	}
 
-	remainingDaysToDeduct := requestedDays
-	var balancesToUpdate []*domain.LeaveBalance
+	// Deduct the requested days from remaining_days (allow negative)
+	balance.UsedDays += requestedDays
+	balance.RemainingDays -= requestedDays
+	balance.ModifiedBy = strconv.FormatUint(uint64(userID), 10)
 
-	// First pass: Deduct from oldest years with remaining_days > 0
-	for _, balance := range balances {
-		if remainingDaysToDeduct <= 0 {
-			break
-		}
-
-		if balance.RemainingDays > 0 {
-			// Create a copy for modification
-			updatedBalance := *balance
-
-			// Calculate deduction amount
-			deductAmount := remainingDaysToDeduct
-			if deductAmount > balance.RemainingDays {
-				deductAmount = balance.RemainingDays
-			}
-
-			// Update the balance
-			updatedBalance.UsedDays += deductAmount
-			updatedBalance.RemainingDays -= deductAmount
-			remainingDaysToDeduct -= deductAmount
-
-			balancesToUpdate = append(balancesToUpdate, &updatedBalance)
-		}
+	// Update the balance
+	if err := s.leaveBalanceRepo.Update(balance, strconv.FormatUint(uint64(userID), 10)); err != nil {
+		return fmt.Errorf("failed to update leave balance: %w", err)
 	}
 
-	// Second pass: If there are still days to deduct, apply to most recent year (allow negative)
-	if remainingDaysToDeduct > 0 {
-		// Find the most recent year balance (last in the ordered list)
-		mostRecentBalance := balances[len(balances)-1]
-
-		// Check if we already have this balance in our update list
-		var mostRecentUpdated *domain.LeaveBalance
-		for _, balance := range balancesToUpdate {
-			if balance.ID == mostRecentBalance.ID {
-				mostRecentUpdated = balance
-				break
-			}
-		}
-
-		// If not in update list, create a copy
-		if mostRecentUpdated == nil {
-			mostRecentCopy := *mostRecentBalance
-			mostRecentUpdated = &mostRecentCopy
-			balancesToUpdate = append(balancesToUpdate, mostRecentUpdated)
-		}
-
-		// Deduct remaining days (allow negative remaining_days)
-		mostRecentUpdated.UsedDays += remainingDaysToDeduct
-		mostRecentUpdated.RemainingDays -= remainingDaysToDeduct
-	}
-
-	// Update all modified balances in a single transaction
-	if len(balancesToUpdate) > 0 {
-		if err := s.leaveBalanceRepo.UpdateMultiple(balancesToUpdate, modifiedBy); err != nil {
-			return fmt.Errorf("failed to update leave balances: %w", err)
-		}
-
-		// Audit the balance changes
-		for _, balance := range balancesToUpdate {
-			if err := s.auditService.CreateAuditLog("LeaveBalance", balance.ID, domain.AuditActionUpdate, nil, balance, modifiedBy); err != nil {
-				// Log error but don't fail the operation
-			}
-		}
+	// Audit the balance change
+	if err := s.auditService.CreateAuditLog("LeaveBalance", balance.ID, domain.AuditActionUpdate, nil, balance, strconv.FormatUint(uint64(userID), 10)); err != nil {
+		// Log error but don't fail the operation
 	}
 
 	return nil
@@ -691,7 +730,6 @@ func (s *leaveService) GetMyLeaveBalances(userID uint, page, limit int, sortPara
 	for _, balance := range leaveBalances {
 		responseData = append(responseData, &types.MyLeaveBalanceResponse{
 			LeaveTypeName: balance.LeaveType.Name,
-			Year:          balance.Year,
 			TotalDays:     balance.TotalDays,
 			UsedDays:      balance.UsedDays,
 			RemainingDays: balance.RemainingDays,
@@ -711,8 +749,41 @@ func (s *leaveService) GetMyLeaveBalances(userID uint, page, limit int, sortPara
 	}, nil
 }
 
+// ReverseLeaveBalance reverses the leave balance deduction when an approved leave is cancelled
+func (s *leaveService) ReverseLeaveBalance(employeeID, leaveTypeID uint, requestedDays float64, userID uint) error {
+	// Get leave balance record for employee and leave type
+	result, err := s.leaveBalanceRepo.GetByEmployeeAndLeaveType(employeeID, leaveTypeID)
+	if err != nil {
+		return fmt.Errorf("failed to get leave balance: %w", err)
+	}
+
+	if result == nil || len(result) == 0 {
+		// If no balance record exists, nothing to reverse
+		return nil
+	}
+
+	balance := result[0]
+
+	// Reverse the deduction (add back the days)
+	balance.UsedDays -= requestedDays
+	balance.RemainingDays += requestedDays
+	balance.ModifiedBy = strconv.FormatUint(uint64(userID), 10)
+
+	// Update the balance
+	if err := s.leaveBalanceRepo.Update(balance, strconv.FormatUint(uint64(userID), 10)); err != nil {
+		return fmt.Errorf("failed to update leave balance: %w", err)
+	}
+
+	// Audit the balance change
+	if err := s.auditService.CreateAuditLog("LeaveBalance", balance.ID, domain.AuditActionUpdate, nil, balance, strconv.FormatUint(uint64(userID), 10)); err != nil {
+		// Log error but don't fail the operation
+	}
+
+	return nil
+}
+
 // Leave Type methods implementation
-func (s *leaveService) CreateLeaveType(leaveType *domain.LeaveType, createdBy string) error {
+func (s *leaveService) CreateLeaveType(leaveType *domain.LeaveType, userID uint) error {
 	if leaveType == nil {
 		return errors.New("leave type cannot be nil")
 	}
@@ -730,14 +801,16 @@ func (s *leaveService) CreateLeaveType(leaveType *domain.LeaveType, createdBy st
 
 	// Set audit fields
 	leaveType.Deleted = false
+	leaveType.CreatedBy = strconv.FormatUint(uint64(userID), 10)
+	leaveType.ModifiedBy = strconv.FormatUint(uint64(userID), 10)
 
 	// Create the leave type
-	if err := s.leaveTypeRepo.Create(leaveType, createdBy); err != nil {
+	if err := s.leaveTypeRepo.Create(leaveType, strconv.FormatUint(uint64(userID), 10)); err != nil {
 		return err
 	}
 
 	// Audit the creation
-	if err := s.auditService.CreateAuditLog("LeaveType", leaveType.ID, domain.AuditActionCreate, nil, leaveType, createdBy); err != nil {
+	if err := s.auditService.CreateAuditLog("LeaveType", leaveType.ID, domain.AuditActionCreate, nil, leaveType, strconv.FormatUint(uint64(userID), 10)); err != nil {
 		// Log error but don't fail the operation
 	}
 
@@ -838,7 +911,7 @@ func (s *leaveService) GetLeaveTypesLookup() ([]types.LeaveTypeLookup, error) {
 	return lookupData, nil
 }
 
-func (s *leaveService) UpdateLeaveType(leaveType *domain.LeaveType, modifiedBy string) error {
+func (s *leaveService) UpdateLeaveType(leaveType *domain.LeaveType, userID uint) error {
 	if leaveType == nil {
 		return errors.New("leave type cannot be nil")
 	}
@@ -862,23 +935,33 @@ func (s *leaveService) UpdateLeaveType(leaveType *domain.LeaveType, modifiedBy s
 		}
 	}
 
+	// Clone the existing leave type and update only the provided fields
+	updatedLeaveType := *existingLeaveType
+	updatedLeaveType.Name = leaveType.Name
+	updatedLeaveType.Description = leaveType.Description
+	updatedLeaveType.IsPaid = leaveType.IsPaid
+	updatedLeaveType.IsLimited = leaveType.IsLimited
+	updatedLeaveType.IsAccrual = leaveType.IsAccrual
+	updatedLeaveType.IsRequiredDocument = leaveType.IsRequiredDocument
+	updatedLeaveType.ModifiedBy = strconv.FormatUint(uint64(userID), 10)
+
 	// Update the leave type
-	if err := s.leaveTypeRepo.Update(leaveType, modifiedBy); err != nil {
+	if err := s.leaveTypeRepo.Update(&updatedLeaveType, strconv.FormatUint(uint64(userID), 10)); err != nil {
 		return err
 	}
 
 	// Get updated leave type for audit
-	updatedLeaveType, _ := s.leaveTypeRepo.GetByID(leaveType.ID)
+	auditedLeaveType, _ := s.leaveTypeRepo.GetByID(leaveType.ID)
 
 	// Audit the update
-	if err := s.auditService.CreateAuditLog("LeaveType", leaveType.ID, domain.AuditActionUpdate, existingLeaveType, updatedLeaveType, modifiedBy); err != nil {
+	if err := s.auditService.CreateAuditLog("LeaveType", leaveType.ID, domain.AuditActionUpdate, existingLeaveType, auditedLeaveType, strconv.FormatUint(uint64(userID), 10)); err != nil {
 		// Log error but don't fail the operation
 	}
 
 	return nil
 }
 
-func (s *leaveService) DeleteLeaveType(id uint, deletedBy string) error {
+func (s *leaveService) DeleteLeaveType(id uint, userID uint) error {
 	// Get existing leave type for audit
 	existingLeaveType, err := s.leaveTypeRepo.GetByID(id)
 	if err != nil {
@@ -891,9 +974,62 @@ func (s *leaveService) DeleteLeaveType(id uint, deletedBy string) error {
 	}
 
 	// Audit the deletion
-	if err := s.auditService.CreateAuditLog("LeaveType", id, domain.AuditActionDelete, existingLeaveType, nil, deletedBy); err != nil {
+	if err := s.auditService.CreateAuditLog("LeaveType", id, domain.AuditActionDelete, existingLeaveType, nil, strconv.FormatUint(uint64(userID), 10)); err != nil {
 		// Log error but don't fail the operation
 	}
 
 	return nil
+}
+
+// CalculateWorkingDays calculates the actual number of working days excluding holidays
+// It takes into account weekends and public holidays
+func (s *leaveService) CalculateWorkingDays(startDate, endDate time.Time) (float64, error) {
+	if startDate.After(endDate) {
+		return 0, errors.New("start date must be before or equal to end date")
+	}
+
+	// Normalize dates to midnight to ensure consistent date comparison
+	startDate = time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, startDate.Location())
+	endDate = time.Date(endDate.Year(), endDate.Month(), endDate.Day(), 0, 0, 0, 0, endDate.Location())
+
+	// Get all holidays between start and end dates
+	holidays, err := s.holidayRepo.GetByDateRange(startDate, endDate)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get holidays: %w", err)
+	}
+
+	// Create a map of holiday dates for fast lookup
+	holidayMap := make(map[string]bool)
+	for _, holiday := range holidays {
+		holidayMap[holiday.HolidayDate.Format("2006-01-02")] = true
+	}
+
+	// Count working days (excluding weekends and holidays)
+	workingDays := 0.0
+	currentDate := startDate
+
+	// Loop through each day from start to end date (inclusive)
+	for {
+		// Check if it's a weekend (Saturday = 6, Sunday = 0)
+		dayOfWeek := currentDate.Weekday()
+		isWeekend := dayOfWeek == time.Saturday || dayOfWeek == time.Sunday
+
+		// Check if it's a holiday
+		isHoliday := holidayMap[currentDate.Format("2006-01-02")]
+
+		// Count as working day if it's neither a weekend nor a holiday
+		if !isWeekend && !isHoliday {
+			workingDays += 1.0
+		}
+
+		// If we've reached the end date, break the loop
+		if currentDate.Equal(endDate) {
+			break
+		}
+
+		// Move to next day
+		currentDate = currentDate.AddDate(0, 0, 1)
+	}
+
+	return workingDays, nil
 }

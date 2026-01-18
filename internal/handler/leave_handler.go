@@ -35,30 +35,19 @@ type CreateLeaveTypeRequest struct {
 	IsRequiredDocument bool   `json:"is_required_document"`
 }
 
-type CreateLeaveRequest struct {
-	LeaveTypeID uint      `json:"leave_type_id" binding:"required"`
-	StartDate   time.Time `json:"start_date" binding:"required"`
-	EndDate     time.Time `json:"end_date" binding:"required"`
-	Reason      string    `json:"reason" binding:"required"`
-	IsPaid      bool      `json:"is_paid"`
-}
-
 type CreateLeaveRequestRequest struct {
-	EmployeeID  uint      `json:"employee_id" binding:"required"`
+	EmployeeID  *uint     `json:"employee_id"`
 	LeaveTypeID uint      `json:"leave_type_id" binding:"required"`
 	StartDate   time.Time `json:"start_date" binding:"required"`
 	EndDate     time.Time `json:"end_date" binding:"required"`
-	Reason      string    `json:"reason" binding:"required"`
-	IsPaid      bool      `json:"is_paid"`
+	Reason      string    `json:"reason"`
 }
 
 type UpdateLeaveRequestRequest struct {
-	EmployeeID  uint      `json:"employee_id" binding:"required"`
 	LeaveTypeID uint      `json:"leave_type_id" binding:"required"`
 	StartDate   time.Time `json:"start_date" binding:"required"`
 	EndDate     time.Time `json:"end_date" binding:"required"`
-	Reason      string    `json:"reason" binding:"required"`
-	IsPaid      bool      `json:"is_paid"`
+	Reason      *string   `json:"reason"`
 }
 
 type ApproveRejectRequest struct {
@@ -67,6 +56,18 @@ type ApproveRejectRequest struct {
 
 type CancelLeaveRequest struct {
 	Reason string `json:"reason" binding:"required"`
+}
+
+type CalculateWorkingDaysRequest struct {
+	StartDate time.Time `json:"start_date" binding:"required"`
+	EndDate   time.Time `json:"end_date" binding:"required"`
+}
+
+type CalculateWorkingDaysResponse struct {
+	StartDate    time.Time `json:"start_date"`
+	EndDate      time.Time `json:"end_date"`
+	WorkingDays  float64   `json:"working_days"`
+	CalendarDays int       `json:"calendar_days"`
 }
 
 // CreateLeaveType godoc
@@ -83,7 +84,7 @@ type CancelLeaveRequest struct {
 // @Failure 403 {object} APIResponse
 // @Router /leave-types [post]
 func (h *LeaveHandler) CreateLeaveType(c *gin.Context) {
-	_, email, _, ok := getUserContext(c)
+	userID, _, _, ok := getUserContext(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -111,7 +112,7 @@ func (h *LeaveHandler) CreateLeaveType(c *gin.Context) {
 		IsRequiredDocument: req.IsRequiredDocument,
 	}
 
-	if err := h.leaveService.CreateLeaveType(leaveType, email); err != nil {
+	if err := h.leaveService.CreateLeaveType(leaveType, userID); err != nil {
 		status := http.StatusInternalServerError
 		if err.Error() == "only administrators can create leave types" {
 			status = http.StatusForbidden
@@ -252,7 +253,7 @@ func (h *LeaveHandler) GetLeaveTypeByID(c *gin.Context) {
 // @Failure 403 {object} APIResponse
 // @Router /leave/types/{id} [put]
 func (h *LeaveHandler) UpdateLeaveType(c *gin.Context) {
-	_, email, _, ok := getUserContext(c)
+	userID, _, _, ok := getUserContext(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -291,7 +292,7 @@ func (h *LeaveHandler) UpdateLeaveType(c *gin.Context) {
 
 	leaveType.ID = id
 
-	if err := h.leaveService.UpdateLeaveType(leaveType, email); err != nil {
+	if err := h.leaveService.UpdateLeaveType(leaveType, userID); err != nil {
 		status := http.StatusInternalServerError
 		if err.Error() == "only administrators can update leave types" {
 			status = http.StatusForbidden
@@ -324,7 +325,7 @@ func (h *LeaveHandler) UpdateLeaveType(c *gin.Context) {
 // @Failure 403 {object} APIResponse
 // @Router /leave/types/{id} [delete]
 func (h *LeaveHandler) DeleteLeaveType(c *gin.Context) {
-	_, email, _, ok := getUserContext(c)
+	userID, _, _, ok := getUserContext(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -342,7 +343,7 @@ func (h *LeaveHandler) DeleteLeaveType(c *gin.Context) {
 		return
 	}
 
-	if err := h.leaveService.DeleteLeaveType(id, email); err != nil {
+	if err := h.leaveService.DeleteLeaveType(id, userID); err != nil {
 		status := http.StatusInternalServerError
 		if err.Error() == "only administrators can delete leave types" {
 			status = http.StatusForbidden
@@ -374,7 +375,7 @@ func (h *LeaveHandler) DeleteLeaveType(c *gin.Context) {
 // @Failure 403 {object} APIResponse
 // @Router /leave/requests [post]
 func (h *LeaveHandler) CreateLeaveRequest(c *gin.Context) {
-	userID, email, roles, ok := getUserContext(c)
+	userID, _, roles, ok := getUserContext(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -396,8 +397,11 @@ func (h *LeaveHandler) CreateLeaveRequest(c *gin.Context) {
 	// Authorization check: Non-admin users can only create leave requests for themselves
 	if !isAdmin(roles) {
 		// First get the employee record from userID to get the correct employeeID
+		log.Printf("DEBUG: Non-admin user creating leave request - userID: %d, requestedEmployeeID: %v", userID, req.EmployeeID)
+
 		employee, err := h.employeeService.GetEmployeeByUserID(userID)
 		if err != nil {
+			log.Printf("DEBUG: Failed to get employee by userID %d - Error: %v", userID, err)
 			c.JSON(http.StatusForbidden, gin.H{
 				"success": false,
 				"error":   "Unable to verify employee authorization",
@@ -405,31 +409,73 @@ func (h *LeaveHandler) CreateLeaveRequest(c *gin.Context) {
 			return
 		}
 
-		if req.EmployeeID != employee.ID {
+		log.Printf("DEBUG: Employee found - employee.ID: %d, req.EmployeeID: %v", employee.ID, req.EmployeeID)
+
+		if req.EmployeeID == nil {
+			req.EmployeeID = &employee.ID
+		} else if *req.EmployeeID != employee.ID {
+			log.Printf("DEBUG: Authorization failed - Employee mismatch. Employee.ID: %d != req.EmployeeID: %d", employee.ID, *req.EmployeeID)
 			c.JSON(http.StatusForbidden, gin.H{
 				"success": false,
 				"error":   "You can only create leave requests for yourself",
 			})
 			return
 		}
+
+		log.Printf("DEBUG: Authorization passed - Employee ID matches")
+	} else if req.EmployeeID == nil {
+		// Admin users: if no employee_id provided, use authenticated user's employee ID
+		employee, err := h.employeeService.GetEmployeeByUserID(userID)
+		if err != nil {
+			log.Printf("DEBUG: Admin user - Failed to get employee by userID %d - Error: %v", userID, err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error":   "employee_id is required or authenticated user must be an employee",
+			})
+			return
+		}
+		req.EmployeeID = &employee.ID
 	}
 
-	// Calculate days between start and end date
-	days := req.EndDate.Sub(req.StartDate).Hours() / 24
+	// Calculate working days between start and end date
+	workingDays, err := h.leaveService.CalculateWorkingDays(req.StartDate, req.EndDate)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to calculate working days: " + err.Error(),
+		})
+		return
+	}
+
+	// Fetch the LeaveType to get the IsPaid value
+	leaveType, err := h.leaveService.GetLeaveTypeByID(req.LeaveTypeID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid leave type ID",
+		})
+		return
+	}
+
+	// Determine initial status based on role
+	initialStatus := domain.LeaveStatusPending
+	if isAdmin(roles) {
+		initialStatus = domain.LeaveStatusApproved
+	}
 
 	// Create LeaveRequest entity
 	leave := &domain.LeaveRequest{
-		EmployeeID:    req.EmployeeID,
+		EmployeeID:    *req.EmployeeID,
 		LeaveTypeID:   req.LeaveTypeID,
 		StartDate:     req.StartDate,
 		EndDate:       req.EndDate,
-		RequestedDays: days,
+		RequestedDays: workingDays,
 		Reason:        req.Reason,
-		Status:        domain.LeaveStatusPending,
-		IsPaid:        req.IsPaid,
+		Status:        initialStatus,
+		IsPaid:        leaveType.IsPaid,
 	}
 
-	if err := h.leaveService.CreateLeave(leave, email, isAdmin(roles)); err != nil {
+	if err := h.leaveService.CreateLeave(leave, userID, isAdmin(roles)); err != nil {
 		status := http.StatusInternalServerError
 		// Check for balance validation errors
 		if strings.Contains(err.Error(), "insufficient leave balance") ||
@@ -464,7 +510,7 @@ func (h *LeaveHandler) CreateLeaveRequest(c *gin.Context) {
 // @Failure 403 {object} APIResponse
 // @Router /leave/requests/{id} [put]
 func (h *LeaveHandler) UpdateLeaveRequest(c *gin.Context) {
-	userID, email, roles, ok := getUserContext(c)
+	userID, _, roles, ok := getUserContext(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -526,23 +572,46 @@ func (h *LeaveHandler) UpdateLeaveRequest(c *gin.Context) {
 		}
 	}
 
-	// Calculate days between start and end date
-	days := req.EndDate.Sub(req.StartDate).Hours() / 24
+	// Calculate working days between start and end date
+	workingDays, err := h.leaveService.CalculateWorkingDays(req.StartDate, req.EndDate)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to calculate working days: " + err.Error(),
+		})
+		return
+	}
+
+	// Fetch the LeaveType to get the IsPaid value
+	leaveType, err := h.leaveService.GetLeaveTypeByID(req.LeaveTypeID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid leave type ID",
+		})
+		return
+	}
 
 	// Create updated LeaveRequest entity
 	leave := &domain.LeaveRequest{
-		EmployeeID:    req.EmployeeID,
+		EmployeeID:    existingLeave.EmployeeID,
 		LeaveTypeID:   req.LeaveTypeID,
 		StartDate:     req.StartDate,
 		EndDate:       req.EndDate,
-		RequestedDays: days,
-		Reason:        req.Reason,
+		RequestedDays: workingDays,
+		Reason:        "",
 		Status:        existingLeave.Status, // Preserve existing status
-		IsPaid:        req.IsPaid,
+		IsPaid:        leaveType.IsPaid,
 	}
+
+	// Set reason if provided
+	if req.Reason != nil {
+		leave.Reason = *req.Reason
+	}
+
 	leave.ID = id
 
-	if err := h.leaveService.UpdateLeave(leave, email); err != nil {
+	if err := h.leaveService.UpdateLeave(leave, userID); err != nil {
 		status := http.StatusInternalServerError
 		if err.Error() == "only pending leave requests can be updated, current status: APPROVED" ||
 			err.Error() == "only pending leave requests can be updated, current status: REJECTED" ||
@@ -771,7 +840,7 @@ func (h *LeaveHandler) GetPendingLeaveRequests(c *gin.Context) {
 // @Failure 403 {object} APIResponse
 // @Router /leave/requests/{id}/approve [post]
 func (h *LeaveHandler) ApproveLeaveRequest(c *gin.Context) {
-	userID, email, roles, ok := getUserContext(c)
+	userID, _, roles, ok := getUserContext(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -797,7 +866,7 @@ func (h *LeaveHandler) ApproveLeaveRequest(c *gin.Context) {
 		return
 	}
 
-	if err := h.leaveService.ApproveLeave(id, userID, email); err != nil {
+	if err := h.leaveService.ApproveLeave(id, userID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   err.Error(),
@@ -826,7 +895,7 @@ func (h *LeaveHandler) ApproveLeaveRequest(c *gin.Context) {
 // @Failure 403 {object} APIResponse
 // @Router /leave/requests/{id}/reject [post]
 func (h *LeaveHandler) RejectLeaveRequest(c *gin.Context) {
-	userID, email, roles, ok := getUserContext(c)
+	userID, _, roles, ok := getUserContext(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -862,7 +931,7 @@ func (h *LeaveHandler) RejectLeaveRequest(c *gin.Context) {
 		return
 	}
 
-	if err := h.leaveService.RejectLeave(id, req.Reason, email, userID); err != nil {
+	if err := h.leaveService.RejectLeave(id, req.Reason, userID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   err.Error(),
@@ -891,7 +960,7 @@ func (h *LeaveHandler) RejectLeaveRequest(c *gin.Context) {
 // @Failure 403 {object} APIResponse
 // @Router /leave/requests/{id}/cancel [post]
 func (h *LeaveHandler) CancelLeaveRequest(c *gin.Context) {
-	userID, email, roles, ok := getUserContext(c)
+	userID, _, roles, ok := getUserContext(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -919,7 +988,7 @@ func (h *LeaveHandler) CancelLeaveRequest(c *gin.Context) {
 		return
 	}
 
-	if err := h.leaveService.CancelLeave(id, req.Reason, email, userID, isAdmin(roles)); err != nil {
+	if err := h.leaveService.CancelLeave(id, req.Reason, userID, isAdmin(roles)); err != nil {
 		status := http.StatusInternalServerError
 		if err.Error() == "you can only cancel your own leave requests" ||
 			err.Error() == "only pending leave requests can be cancelled, current status: PENDING" ||
@@ -989,5 +1058,70 @@ func (h *LeaveHandler) GetMyLeaveBalances(c *gin.Context) {
 		"success": true,
 		"data":    result.Data,
 		"page":    result.Page,
+	})
+}
+
+// CalculateWorkingDays godoc
+// @Summary Calculate working days between two dates
+// @Description Calculate the number of working days (excluding weekends and holidays) between two dates
+// @Tags leave-requests
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body CalculateWorkingDaysRequest true "Date range for calculation"
+// @Success 200 {object} APIResponse{data=CalculateWorkingDaysResponse}
+// @Failure 400 {object} APIResponse
+// @Failure 401 {object} APIResponse
+// @Router /leave/calculate-working-days [post]
+func (h *LeaveHandler) CalculateWorkingDays(c *gin.Context) {
+	_, _, _, ok := getUserContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Authentication required",
+		})
+		return
+	}
+
+	var req CalculateWorkingDaysRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid request format",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Validate dates
+	if req.StartDate.After(req.EndDate) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Start date must be before or equal to end date",
+		})
+		return
+	}
+
+	// Calculate working days using service
+	workingDays, err := h.leaveService.CalculateWorkingDays(req.StartDate, req.EndDate)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	// Calculate calendar days
+	calendarDays := int(req.EndDate.Sub(req.StartDate).Hours()/24) + 1
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": CalculateWorkingDaysResponse{
+			StartDate:    req.StartDate,
+			EndDate:      req.EndDate,
+			WorkingDays:  workingDays,
+			CalendarDays: calendarDays,
+		},
 	})
 }

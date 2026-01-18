@@ -244,6 +244,18 @@ CREATE TABLE IF NOT EXISTS hr_audit_logs (
     FOREIGN KEY (created_by) REFERENCES hr_users(id)
 );
 
+CREATE TABLE hr_holidays (
+                                 id BIGSERIAL PRIMARY KEY,
+                                 holiday_date DATE NOT NULL,
+                                 name VARCHAR(100) NOT NULL,
+                                 is_full_day BOOLEAN NOT NULL,
+                                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                                 deleted BOOLEAN NOT NULL DEFAULT false,
+                                 created_by VARCHAR(50) DEFAULT 'admin@kartezya.com',
+                                 modified_by VARCHAR(50) DEFAULT 'admin@kartezya.com'
+);
+
 -- ================================================
 -- INDEXES FOR PERFORMANCE
 -- ================================================

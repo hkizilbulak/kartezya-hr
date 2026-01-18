@@ -52,6 +52,8 @@ type Employee struct {
 	UserID                   uint       `json:"user_id" gorm:"uniqueIndex;not null"`
 	FirstName                string     `json:"first_name" gorm:"not null"`
 	LastName                 string     `json:"last_name" gorm:"not null"`
+	Email                    string     `json:"email" gorm:"size:255"`
+	CompanyEmail             string     `json:"company_email" gorm:"size:255"`
 	Phone                    string     `json:"phone"`
 	Address                  string     `json:"address"`
 	State                    string     `json:"state" gorm:"size:100"`
@@ -142,9 +144,8 @@ type LeaveType struct {
 // LeaveBalance represents employee's leave balance for each leave type
 type LeaveBalance struct {
 	AuditableModel
-	EmployeeID    uint    `json:"employee_id" gorm:"not null"`
-	LeaveTypeID   uint    `json:"leave_type_id" gorm:"not null"`
-	Year          int     `json:"year" gorm:"not null"`
+	EmployeeID    uint    `json:"employee_id" gorm:"not null;uniqueIndex:idx_employee_leave_type"`
+	LeaveTypeID   uint    `json:"leave_type_id" gorm:"not null;uniqueIndex:idx_employee_leave_type"`
 	TotalDays     float64 `json:"total_days" gorm:"not null"`
 	UsedDays      float64 `json:"used_days" gorm:"default:0"`
 	RemainingDays float64 `json:"remaining_days" gorm:"not null"`
@@ -219,6 +220,18 @@ type LeaveDocument struct {
 
 	// Relationships
 	LeaveRequest LeaveRequest `json:"leave_request,omitempty"`
+}
+
+// Holiday represents public holidays
+type Holiday struct {
+	AuditableModel
+	HolidayDate time.Time `json:"holiday_date" gorm:"not null"`
+	Name        string    `json:"name" gorm:"not null"`
+	IsFullDay   bool      `json:"is_full_day" gorm:"not null;default:true"`
+}
+
+func (Holiday) TableName() string {
+	return "hr_holidays"
 }
 
 // AuditLog represents system audit logs (NO SOFT DELETE - this table is append-only)

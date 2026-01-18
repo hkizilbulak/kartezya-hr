@@ -40,7 +40,7 @@ type CreateEmployeeRequest struct {
 }
 
 type UpdateEmployeeRequest struct {
-	CompanyEmail             string  `json:"company_email" binding:"required,email"`
+	CompanyEmail             string  `json:"company_email" binding:"omitempty,email"`
 	FirstName                string  `json:"first_name" binding:"required"`
 	LastName                 string  `json:"last_name" binding:"required"`
 	Phone                    string  `json:"phone"`
@@ -51,6 +51,21 @@ type UpdateEmployeeRequest struct {
 	DateOfBirth              string  `json:"date_of_birth"`
 	HireDate                 string  `json:"hire_date"`
 	LeaveDate                string  `json:"leave_date"`
+	TotalExperience          float64 `json:"total_experience"`
+	MaritalStatus            string  `json:"marital_status"`
+	EmergencyContact         string  `json:"emergency_contact"`
+	EmergencyContactName     string  `json:"emergency_contact_name"`
+	EmergencyContactRelation string  `json:"emergency_contact_relation"`
+}
+
+type UpdateMyProfileRequest struct {
+	Email                    string  `json:"email"`
+	Phone                    string  `json:"phone"`
+	Address                  string  `json:"address"`
+	State                    string  `json:"state"`
+	City                     string  `json:"city"`
+	Gender                   string  `json:"gender"`
+	DateOfBirth              string  `json:"date_of_birth"`
 	TotalExperience          float64 `json:"total_experience"`
 	MaritalStatus            string  `json:"marital_status"`
 	EmergencyContact         string  `json:"emergency_contact"`
@@ -219,6 +234,11 @@ func (h *EmployeeHandler) UpdateEmployee(c *gin.Context) {
 		return
 	}
 
+	// If company_email is not provided, use the current user's email from context
+	if req.CompanyEmail == "" {
+		req.CompanyEmail = email
+	}
+
 	// Normalize enum values to Turkish
 	req.Gender = types.NormalizeGender(req.Gender)
 	req.MaritalStatus = types.NormalizeMaritalStatus(req.MaritalStatus)
@@ -236,8 +256,19 @@ func (h *EmployeeHandler) UpdateEmployee(c *gin.Context) {
 		return
 	}
 
+	// Get updated employee data to return
+	employee, err := h.employeeService.GetEmployeeByID(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Employee updated but could not fetch updated data",
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
+		"data":    employee,
 		"message": "Employee updated successfully",
 	})
 }
@@ -394,5 +425,69 @@ func (h *EmployeeHandler) GetMyProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data":    employee,
+	})
+}
+
+// UpdateMyProfile godoc
+// @Summary Update my employee profile
+// @Description Update the profile of the authenticated employee (own profile only)
+// @Tags employees
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param employee body UpdateMyProfileRequest true "Updated employee data"
+// @Success 200 {object} map[string]interface{} "success: true, data: Employee"
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
+// @Router /employees/me [put]
+func (h *EmployeeHandler) UpdateMyProfile(c *gin.Context) {
+	userID, _, _, ok := getUserContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Authentication required",
+		})
+		return
+	}
+
+	var req UpdateMyProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid request format",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Normalize enum values to Turkish
+	req.Gender = types.NormalizeGender(req.Gender)
+	req.MaritalStatus = types.NormalizeMaritalStatus(req.MaritalStatus)
+	req.EmergencyContactRelation = types.NormalizeEmergencyContactRelation(req.EmergencyContactRelation)
+
+	// Update only the authenticated user's profile
+	if err := h.employeeService.UpdateMyProfile(userID, req.Email, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.TotalExperience, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	// Get updated employee data to return
+	employee, err := h.employeeService.GetEmployeeByUserID(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Profile updated but could not fetch updated data",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    employee,
+		"message": "Profile updated successfully",
 	})
 }
