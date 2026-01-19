@@ -68,45 +68,6 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	})
 }
 
-// GetProfile godoc
-// @Summary Get user profile
-// @Description Get the profile of the authenticated user
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Success 200 {object} APIResponse{data=domain.User}
-// @Failure 401 {object} APIResponse
-// @Router /auth/profile [get]
-func (h *AuthHandler) GetProfile(c *gin.Context) {
-	userIDInterface, exists := c.Get("userID")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"error":   "User not authenticated",
-		})
-		return
-	}
-
-	userID, ok := userIDInterface.(uint)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "Invalid user ID format",
-		})
-		return
-	}
-
-	// Get user profile (implementation would depend on having a user service)
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"user_id": userID,
-			"message": "Profile retrieved successfully",
-		},
-	})
-}
-
 // Logout godoc
 // @Summary User logout
 // @Description Logout the authenticated user

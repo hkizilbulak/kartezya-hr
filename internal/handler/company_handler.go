@@ -176,33 +176,6 @@ func (h *CompanyHandler) GetCompanies(c *gin.Context) {
 	})
 }
 
-// GetCompaniesLookup godoc
-// @Summary Get companies lookup
-// @Description Get simplified list of companies for dropdown/lookup (Admin only)
-// @Tags companies
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Success 200 {object} APIResponse{data=[]types.CompanyLookup}
-// @Failure 401 {object} APIResponse
-// @Failure 403 {object} APIResponse
-// @Router /companies/lookup [get]
-func (h *CompanyHandler) GetCompaniesLookup(c *gin.Context) {
-	companies, err := h.companyService.GetCompaniesLookup()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    companies,
-	})
-}
-
 // UpdateCompany godoc
 // @Summary Update company
 // @Description Update a company by ID (Admin only)
@@ -317,82 +290,5 @@ func (h *CompanyHandler) DeleteCompany(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "Company deleted successfully",
-	})
-}
-
-// GetCompanyDepartments godoc
-// @Summary Get company departments
-// @Description Get all departments for a specific company (Admin only)
-// @Tags companies
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param id path int true "Company ID"
-// @Success 200 {object} APIResponse{data=[]domain.Department}
-// @Failure 400 {object} APIResponse
-// @Failure 401 {object} APIResponse
-// @Failure 403 {object} APIResponse
-// @Failure 404 {object} APIResponse
-// @Router /companies/{id}/departments [get]
-func (h *CompanyHandler) GetCompanyDepartments(c *gin.Context) {
-	id, err := parseUintParam(c, "id")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid company ID",
-		})
-		return
-	}
-
-	departments, err := h.companyService.GetDepartmentsByCompany(id)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    departments,
-	})
-}
-
-// GetCompanyDepartmentsLookup godoc
-// @Summary Get company departments lookup
-// @Description Get simplified list of departments for a specific company (Admin only)
-// @Tags companies
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param id path int true "Company ID"
-// @Success 200 {object} APIResponse{data=[]types.DepartmentLookup}
-// @Failure 400 {object} APIResponse
-// @Failure 401 {object} APIResponse
-// @Failure 403 {object} APIResponse
-// @Router /companies/{id}/departments/lookup [get]
-func (h *CompanyHandler) GetCompanyDepartmentsLookup(c *gin.Context) {
-	id, err := parseUintParam(c, "id")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid company ID",
-		})
-		return
-	}
-
-	departments, err := h.companyService.GetDepartmentsByCompanyLookup(id)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    departments,
 	})
 }

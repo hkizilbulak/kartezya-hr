@@ -16,6 +16,7 @@ type DepartmentRepository interface {
 	Update(department *domain.Department, modifiedBy string) error
 	Delete(id uint, deletedBy string) error
 	GetByCompanyID(companyID uint) ([]*domain.Department, error)
+	GetTotalCount() (int64, error)
 }
 
 type departmentRepository struct {
@@ -124,4 +125,11 @@ func (r *departmentRepository) Delete(id uint, deletedBy string) error {
 			"deleted":     true,
 			"modified_by": deletedBy,
 		}).Error
+}
+
+// GetTotalCount returns the total number of departments
+func (r *departmentRepository) GetTotalCount() (int64, error) {
+	var count int64
+	err := r.db.Model(&domain.Department{}).Where("deleted = ?", false).Count(&count).Error
+	return count, err
 }

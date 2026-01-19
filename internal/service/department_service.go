@@ -12,9 +12,9 @@ type DepartmentService interface {
 	CreateDepartment(department *domain.Department, userID uint) error
 	GetDepartmentByID(id uint) (*types.DepartmentResponse, error)
 	GetAllDepartments(page, limit int, sortParams types.SortParams) (*PaginatedResponse, error)
-	GetDepartmentsByCompany(companyID uint) ([]types.DepartmentResponse, error)
 	UpdateDepartment(id uint, department *domain.Department, userID uint) error
 	DeleteDepartment(id uint, userID uint) error
+	GetTotalCount() (int64, error)
 }
 
 type departmentService struct {
@@ -161,44 +161,6 @@ func (s *departmentService) GetAllDepartments(page, limit int, sortParams types.
 	}, nil
 }
 
-func (s *departmentService) GetDepartmentsByCompany(companyID uint) ([]types.DepartmentResponse, error) {
-	if companyID == 0 {
-		return nil, errors.New("invalid company ID")
-	}
-
-	// Check if company exists and get company info for the response
-	company, err := s.companyRepo.GetByID(companyID)
-	if err != nil {
-		return nil, errors.New("company not found")
-	}
-
-	departments, err := s.departmentRepo.GetByCompanyID(companyID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Transform domain models to response DTOs with nested company object
-	departmentResponses := make([]types.DepartmentResponse, len(departments))
-	for i, department := range departments {
-		departmentResponses[i] = types.DepartmentResponse{
-			ID:         department.ID,
-			CreatedAt:  department.CreatedAt,
-			UpdatedAt:  department.UpdatedAt,
-			Deleted:    department.Deleted,
-			CreatedBy:  department.CreatedBy,
-			ModifiedBy: department.ModifiedBy,
-			Name:       department.Name,
-			Manager:    department.Manager,
-			Company: types.CompanyLookup{
-				ID:   company.ID,
-				Name: company.Name,
-			},
-		}
-	}
-
-	return departmentResponses, nil
-}
-
 func (s *departmentService) UpdateDepartment(id uint, department *domain.Department, userID uint) error {
 	if id == 0 {
 		return errors.New("invalid department ID")
@@ -294,4 +256,13 @@ func (s *departmentService) DeleteDepartment(id uint, userID uint) error {
 	}
 
 	return nil
+}
+
+// GetTotalCount returns the total number of departments
+func (s *departmentService) GetTotalCount() (int64, error) {
+	count, err := s.departmentRepo.GetTotalCount()
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
 }

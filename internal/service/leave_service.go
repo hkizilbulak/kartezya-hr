@@ -51,7 +51,6 @@ type LeaveService interface {
 	CreateLeaveType(leaveType *domain.LeaveType, userID uint) error
 	GetLeaveTypeByID(id uint) (*types.LeaveTypeResponse, error)
 	GetAllLeaveTypes(page, limit int, sortParams types.SortParams) (*PaginatedResponse, error)
-	GetLeaveTypesLookup() ([]types.LeaveTypeLookup, error)
 	UpdateLeaveType(leaveType *domain.LeaveType, userID uint) error
 	DeleteLeaveType(id uint, userID uint) error
 
@@ -891,24 +890,6 @@ func (s *leaveService) GetAllLeaveTypes(page, limit int, sortParams types.SortPa
 			Direction:  sortParams.Direction,
 		},
 	}, nil
-}
-
-func (s *leaveService) GetLeaveTypesLookup() ([]types.LeaveTypeLookup, error) {
-	leaveTypes, err := s.leaveTypeRepo.GetLookup()
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert to lookup DTOs
-	lookupData := make([]types.LeaveTypeLookup, len(leaveTypes))
-	for i, leaveType := range leaveTypes {
-		lookupData[i] = types.LeaveTypeLookup{
-			ID:   leaveType.ID,
-			Name: leaveType.Name,
-		}
-	}
-
-	return lookupData, nil
 }
 
 func (s *leaveService) UpdateLeaveType(leaveType *domain.LeaveType, userID uint) error {

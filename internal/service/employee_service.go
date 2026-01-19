@@ -8,8 +8,6 @@ import (
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/repository"
 	"kartezya-hr/internal/types"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 type EmployeeService interface {
@@ -20,45 +18,33 @@ type EmployeeService interface {
 	UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string) error
 	DeleteEmployee(id uint, deletedBy string, isAdmin bool) error
 	ListEmployees(limit, offset int, isAdmin bool) ([]*domain.Employee, error)
+	GetTotalCount() (int64, error)
+	GetEmployeeCountByGender() ([]interface{}, error)
+	GetEmployeeCountByPosition() ([]interface{}, error)
+	GetEmployeeCountByCompanyDepartment() ([]interface{}, error)
 }
 
 type employeeService struct {
 	employeeRepo repository.EmployeeRepository
 	userRepo     repository.UserRepository
+	authService  AuthService
 	auditService AuditService
 }
 
-func NewEmployeeService(employeeRepo repository.EmployeeRepository, userRepo repository.UserRepository, auditService AuditService) EmployeeService {
+func NewEmployeeService(employeeRepo repository.EmployeeRepository, userRepo repository.UserRepository, authService AuthService, auditService AuditService) EmployeeService {
 	return &employeeService{
 		employeeRepo: employeeRepo,
 		userRepo:     userRepo,
+		authService:  authService,
 		auditService: auditService,
 	}
 }
 
 func (s *employeeService) CreateEmployee(companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, createdBy string) (*domain.Employee, error) {
-	// Check if user already exists
-	existingUser, err := s.userRepo.GetByEmail(companyEmail)
-	var user *domain.User
-
+	// Delegate user creation to AuthService (respecting domain boundaries)
+	user, err := s.authService.CreateUserForEmployee(companyEmail, createdBy)
 	if err != nil {
-		// User doesn't exist, create new user with default password "employee123"
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte("employee123"), bcrypt.DefaultCost)
-		if err != nil {
-			return nil, fmt.Errorf("failed to hash password: %v", err)
-		}
-
-		user = &domain.User{
-			Email:    companyEmail,
-			Password: string(hashedPassword),
-		}
-
-		err = s.userRepo.Create(user, createdBy)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create user: %v", err)
-		}
-	} else {
-		user = existingUser
+		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
 	// Parse date fields
@@ -104,7 +90,7 @@ func (s *employeeService) CreateEmployee(companyEmail, firstName, lastName, phon
 
 	// Create the employee
 	if err := s.employeeRepo.Create(employee, createdBy); err != nil {
-		return nil, fmt.Errorf("failed to create employee: %v", err)
+		return nil, fmt.Errorf("failed to create employee: %w", err)
 	}
 
 	// Audit the creation
@@ -331,12 +317,6 @@ func (s *employeeService) UpdateMyProfile(userID uint, email, phone, address, st
 		if existingEmailUser, err := s.userRepo.GetByEmail(email); err == nil && existingEmailUser.ID != user.ID {
 			return fmt.Errorf("email %s is already in use by another user", email)
 		}
-
-		// Update user email
-		user.Email = email
-		if err := s.userRepo.Update(user, ""); err != nil {
-			return fmt.Errorf("failed to update user email: %v", err)
-		}
 	}
 
 	// Parse date of birth
@@ -442,4 +422,28 @@ func (s *employeeService) ListEmployees(limit, offset int, isAdmin bool) ([]*dom
 	}
 
 	return employees, nil
+}
+
+// GetTotalCount returns the total number of employees
+func (s *employeeService) GetTotalCount() (int64, error) {
+	count, err := s.employeeRepo.GetTotalCount()
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// GetEmployeeCountByGender returns employee count grouped by gender
+func (s *employeeService) GetEmployeeCountByGender() ([]interface{}, error) {
+	return s.employeeRepo.GetEmployeeCountByGender()
+}
+
+// GetEmployeeCountByPosition returns employee count grouped by job position
+func (s *employeeService) GetEmployeeCountByPosition() ([]interface{}, error) {
+	return s.employeeRepo.GetEmployeeCountByPosition()
+}
+
+// GetEmployeeCountByCompanyDepartment returns employee count grouped by company and department
+func (s *employeeService) GetEmployeeCountByCompanyDepartment() ([]interface{}, error) {
+	return s.employeeRepo.GetEmployeeCountByCompanyDepartment()
 }

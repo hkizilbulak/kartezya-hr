@@ -16,6 +16,7 @@ type CompanyRepository interface {
 	GetLookup() ([]domain.Company, error)
 	Update(company *domain.Company, modifiedBy string) error
 	Delete(id uint, deletedBy string) error
+	GetTotalCount() (int64, error)
 }
 
 type companyRepository struct {
@@ -107,4 +108,11 @@ func (r *companyRepository) Delete(id uint, deletedBy string) error {
 			"deleted":     true,
 			"modified_by": deletedBy,
 		}).Error
+}
+
+// GetTotalCount returns the total number of companies
+func (r *companyRepository) GetTotalCount() (int64, error) {
+	var count int64
+	err := r.db.Model(&domain.Company{}).Where("deleted = ?", false).Count(&count).Error
+	return count, err
 }

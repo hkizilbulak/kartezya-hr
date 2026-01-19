@@ -12,7 +12,6 @@ type JobPositionService interface {
 	CreateJobPosition(jobPosition *domain.JobPosition, userID uint) error
 	GetJobPositionByID(id uint) (*types.JobPositionResponse, error)
 	GetAllJobPositions(page, limit int, sortParams types.SortParams) (*PaginatedResponse, error)
-	GetJobPositionsLookup() ([]types.JobPositionLookup, error)
 	UpdateJobPosition(id uint, title string, userID uint) error
 	DeleteJobPosition(id uint, userID uint) error
 }
@@ -126,24 +125,6 @@ func (s *jobPositionService) GetAllJobPositions(page, limit int, sortParams type
 			Direction:  sortParams.Direction,
 		},
 	}, nil
-}
-
-func (s *jobPositionService) GetJobPositionsLookup() ([]types.JobPositionLookup, error) {
-	jobPositions, err := s.jobPositionRepo.GetLookup()
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert to lookup DTOs
-	lookupData := make([]types.JobPositionLookup, len(jobPositions))
-	for i, jobPosition := range jobPositions {
-		lookupData[i] = types.JobPositionLookup{
-			ID:    jobPosition.ID,
-			Title: jobPosition.Title,
-		}
-	}
-
-	return lookupData, nil
 }
 
 func (s *jobPositionService) UpdateJobPosition(id uint, title string, userID uint) error {

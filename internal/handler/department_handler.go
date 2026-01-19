@@ -168,43 +168,6 @@ func (h *DepartmentHandler) GetDepartments(c *gin.Context) {
 	})
 }
 
-// GetDepartmentsByCompany handles department listing by company ID
-// @Summary List departments by company
-// @Description Get all departments for a specific company (Admin only)
-// @Tags departments
-// @Produce json
-// @Security BearerAuth
-// @Param company_id path int true "Company ID"
-// @Success 200 {object} APIResponse{data=[]types.DepartmentResponse}
-// @Failure 400 {object} APIResponse
-// @Failure 401 {object} APIResponse
-// @Failure 403 {object} APIResponse
-// @Router /companies/{company_id}/departments [get]
-func (h *DepartmentHandler) GetDepartmentsByCompany(c *gin.Context) {
-	companyID, err := parseUintParam(c, "company_id")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid company ID",
-		})
-		return
-	}
-
-	departments, err := h.departmentService.GetDepartmentsByCompany(companyID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    departments,
-	})
-}
-
 // UpdateDepartment handles department updates
 // @Summary Update department
 // @Description Update a department by ID (Admin only)

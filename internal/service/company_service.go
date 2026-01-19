@@ -12,11 +12,10 @@ type CompanyService interface {
 	CreateCompany(company *domain.Company, userID uint) error
 	GetCompanyByID(id uint) (*types.CompanyResponse, error)
 	GetAllCompanies(page, limit int, sortParams types.SortParams) (*PaginatedResponse, error)
-	GetCompaniesLookup() ([]types.CompanyLookup, error)
 	UpdateCompany(id uint, company *domain.Company, userID uint) error
 	DeleteCompany(id uint, userID uint) error
-	GetDepartmentsByCompany(companyID uint) ([]types.DepartmentResponse, error)
 	GetDepartmentsByCompanyLookup(companyID uint) ([]types.DepartmentLookup, error)
+	GetTotalCount() (int64, error)
 }
 
 type companyService struct {
@@ -141,24 +140,6 @@ func (s *companyService) GetAllCompanies(page, limit int, sortParams types.SortP
 	}, nil
 }
 
-func (s *companyService) GetCompaniesLookup() ([]types.CompanyLookup, error) {
-	companies, err := s.companyRepo.GetLookup()
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert to lookup DTOs
-	lookupData := make([]types.CompanyLookup, len(companies))
-	for i, company := range companies {
-		lookupData[i] = types.CompanyLookup{
-			ID:   company.ID,
-			Name: company.Name,
-		}
-	}
-
-	return lookupData, nil
-}
-
 func (s *companyService) UpdateCompany(id uint, company *domain.Company, userID uint) error {
 	if id == 0 {
 		return errors.New("invalid company ID")
@@ -253,11 +234,6 @@ func (s *companyService) DeleteCompany(id uint, userID uint) error {
 	return nil
 }
 
-func (s *companyService) GetDepartmentsByCompany(companyID uint) ([]types.DepartmentResponse, error) {
-	// Department service'ini direkt çağır
-	return s.departmentService.GetDepartmentsByCompany(companyID)
-}
-
 func (s *companyService) GetDepartmentsByCompanyLookup(companyID uint) ([]types.DepartmentLookup, error) {
 	if companyID == 0 {
 		return nil, errors.New("invalid company ID")
@@ -285,4 +261,13 @@ func (s *companyService) GetDepartmentsByCompanyLookup(companyID uint) ([]types.
 	}
 
 	return lookupData, nil
+}
+
+// GetTotalCount returns the total number of companies
+func (s *companyService) GetTotalCount() (int64, error) {
+	count, err := s.companyRepo.GetTotalCount()
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
 }

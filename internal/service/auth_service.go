@@ -17,7 +17,7 @@ type AuthService interface {
 	ValidateToken(tokenString string) (*Claims, error)
 	HashPassword(password string) (string, error)
 	CheckPassword(hashedPassword, password string) error
-	CreateUser(user *domain.User, createdBy string) error
+	CreateUserForEmployee(email string, createdBy string) (*domain.User, error)
 }
 
 type authService struct {
@@ -156,4 +156,43 @@ func (s *authService) CreateUser(user *domain.User, createdBy string) error {
 	}
 
 	return nil
+}
+
+// CreateUserForEmployee creates a user specifically for employee registration
+// Uses default password "employee123" for new employee accounts
+func (s *authService) CreateUserForEmployee(email string, createdBy string) (*domain.User, error) {
+	// Check if user already exists
+	existingUser, err := s.userRepo.GetByEmail(email)
+	if err == nil {
+		// User exists, return existing user
+		return existingUser, nil
+	}
+
+	// Create new user with default password
+	defaultPassword := "employee123"
+	hashedPassword, err := s.HashPassword(defaultPassword)
+	if err != nil {
+		return nil, err
+	}
+
+	newUser := &domain.User{
+		Email:    email,
+		Password: hashedPassword,
+	}
+
+	// Create the user
+	if err := s.userRepo.Create(newUser, createdBy); err != nil {
+		return nil, err
+	}
+
+	// Create a copy for audit without the password
+	userForAudit := *newUser
+	userForAudit.Password = "[REDACTED]"
+
+	// Audit the creation
+	if err := s.auditService.CreateAuditLog("User", newUser.ID, domain.AuditActionCreate, nil, &userForAudit, createdBy); err != nil {
+		// Log error but don't fail the operation
+	}
+
+	return newUser, nil
 }

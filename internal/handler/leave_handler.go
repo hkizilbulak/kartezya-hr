@@ -173,32 +173,6 @@ func (h *LeaveHandler) ListLeaveTypes(c *gin.Context) {
 	})
 }
 
-// GetLeaveTypesLookup godoc
-// @Summary Get leave types lookup
-// @Description Get simplified list of leave types for dropdown/lookup
-// @Tags leave-types
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Success 200 {object} APIResponse{data=[]types.LeaveTypeLookup}
-// @Failure 500 {object} APIResponse
-// @Router /leave/types/lookup [get]
-func (h *LeaveHandler) GetLeaveTypesLookup(c *gin.Context) {
-	leaveTypes, err := h.leaveService.GetLeaveTypesLookup()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    leaveTypes,
-	})
-}
-
 // GetLeaveTypeByID godoc
 // @Summary Get leave type by ID
 // @Description Get a specific leave type by ID (Admin only)

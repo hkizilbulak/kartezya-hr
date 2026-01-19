@@ -74,12 +74,13 @@ func main() {
 	// Initialize services
 	auditService := service.NewAuditService(auditRepo)
 	authService := service.NewAuthService(userRepo, userRoleRepo, roleRepo, auditService, cfg)
-	employeeService := service.NewEmployeeService(employeeRepo, userRepo, auditService)
+	employeeService := service.NewEmployeeService(employeeRepo, userRepo, authService, auditService)
 	leaveService := service.NewLeaveService(leaveRepo, leaveTypeRepo, leaveBalanceRepo, employeeRepo, holidayRepo, auditService)
 	departmentService := service.NewDepartmentService(departmentRepo, companyRepo, auditService)
 	companyService := service.NewCompanyService(companyRepo, departmentRepo, departmentService, auditService)
 	jobPositionService := service.NewJobPositionService(jobPositionRepo, auditService)
 	workInfoService := service.NewWorkInformationService(workInfoRepo, employeeRepo, companyRepo, departmentRepo, jobPositionRepo, auditService)
+	lookupService := service.NewLookupService(companyRepo, departmentRepo, jobPositionRepo, leaveTypeRepo)
 
 	// Initialize handlers
 	authHandler := handler.NewAuthHandler(authService)
@@ -89,6 +90,8 @@ func main() {
 	departmentHandler := handler.NewDepartmentHandler(departmentService)
 	jobPositionHandler := handler.NewJobPositionHandler(jobPositionService)
 	workInfoHandler := handler.NewWorkInformationHandler(workInfoService, employeeService)
+	lookupHandler := handler.NewLookupHandler(lookupService)
+	dashboardHandler := handler.NewDashboardHandler(employeeService, departmentService, companyService, leaveService)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -132,6 +135,16 @@ func main() {
 		auth.POST("/login", authHandler.Login)
 	}
 
+	// Public lookup routes
+	lookup := v1.Group("/lookup")
+	{
+		lookup.GET("/companies", lookupHandler.GetCompaniesLookup)
+		lookup.GET("/departments", lookupHandler.GetDepartmentsLookup)
+		lookup.GET("/departments-by-company", lookupHandler.GetDepartmentsByCompanyLookup)
+		lookup.GET("/job-positions", lookupHandler.GetJobPositionsLookup)
+		lookup.GET("/leave-types", lookupHandler.GetLeaveTypesLookup)
+	}
+
 	// Protected routes (authentication required)
 	protected := v1.Group("")
 	protected.Use(authMiddleware.JWTAuth())
@@ -139,7 +152,6 @@ func main() {
 		// Auth routes
 		authRoutes := protected.Group("/auth")
 		{
-			authRoutes.GET("/profile", authHandler.GetProfile)
 			authRoutes.POST("/logout", authHandler.Logout)
 		}
 
@@ -166,13 +178,13 @@ func main() {
 				requests.POST("", leaveHandler.CreateLeaveRequest)
 				requests.GET("/me", leaveHandler.GetMyLeaveRequests)
 				requests.PUT("/:id", leaveHandler.UpdateLeaveRequest)
+				requests.POST("/:id/cancel", leaveHandler.CancelLeaveRequest)
 
 				// Admin only routes
 				requests.GET("/:id", authMiddleware.RequireAdmin(), leaveHandler.GetLeaveRequestByID)
 				requests.GET("", authMiddleware.RequireAdmin(), leaveHandler.GetAllLeaveRequests)
 				requests.POST("/:id/approve", authMiddleware.RequireAdmin(), leaveHandler.ApproveLeaveRequest)
 				requests.POST("/:id/reject", authMiddleware.RequireAdmin(), leaveHandler.RejectLeaveRequest)
-				requests.POST("/:id/cancel", leaveHandler.CancelLeaveRequest)
 			}
 
 			// Leave balances
@@ -184,7 +196,6 @@ func main() {
 			// Leave types (Admin only)
 			typesRoutes := leaveRoutes.Group("/types")
 			{
-				typesRoutes.GET("/lookup", leaveHandler.GetLeaveTypesLookup)
 				typesRoutes.GET("", authMiddleware.RequireAdmin(), leaveHandler.ListLeaveTypes)
 				typesRoutes.POST("", authMiddleware.RequireAdmin(), leaveHandler.CreateLeaveType)
 				typesRoutes.GET("/:id", authMiddleware.RequireAdmin(), leaveHandler.GetLeaveTypeByID)
@@ -201,10 +212,7 @@ func main() {
 		{
 			// Admin only routes
 			companyRoutes.GET("", authMiddleware.RequireAdmin(), companyHandler.GetCompanies)
-			companyRoutes.GET("/lookup", authMiddleware.RequireAdmin(), companyHandler.GetCompaniesLookup)
 			companyRoutes.GET("/:id", authMiddleware.RequireAdmin(), companyHandler.GetCompany)
-			companyRoutes.GET("/:id/departments", authMiddleware.RequireAdmin(), companyHandler.GetCompanyDepartments)
-			companyRoutes.GET("/:id/departments/lookup", authMiddleware.RequireAdmin(), companyHandler.GetCompanyDepartmentsLookup)
 			companyRoutes.POST("", authMiddleware.RequireAdmin(), companyHandler.CreateCompany)
 			companyRoutes.PUT("/:id", authMiddleware.RequireAdmin(), companyHandler.UpdateCompany)
 			companyRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), companyHandler.DeleteCompany)
@@ -226,7 +234,6 @@ func main() {
 		{
 			// Admin only routes
 			jobPositionRoutes.GET("", authMiddleware.RequireAdmin(), jobPositionHandler.GetJobPositions)
-			jobPositionRoutes.GET("/lookup", authMiddleware.RequireAdmin(), jobPositionHandler.GetJobPositionsLookup)
 			jobPositionRoutes.GET("/:id", authMiddleware.RequireAdmin(), jobPositionHandler.GetJobPosition)
 			jobPositionRoutes.POST("", authMiddleware.RequireAdmin(), jobPositionHandler.CreateJobPosition)
 			jobPositionRoutes.PUT("/:id", authMiddleware.RequireAdmin(), jobPositionHandler.UpdateJobPosition)
@@ -245,6 +252,15 @@ func main() {
 			workInfoRoutes.POST("", authMiddleware.RequireAdmin(), workInfoHandler.CreateWorkInformation)
 			workInfoRoutes.PUT("/:id", authMiddleware.RequireAdmin(), workInfoHandler.UpdateWorkInformation)
 			workInfoRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), workInfoHandler.DeleteWorkInformation)
+		}
+
+		// Dashboard routes
+		dashboardRoutes := protected.Group("/dashboard")
+		{
+			dashboardRoutes.GET("/data", dashboardHandler.GetDashboardData)
+			dashboardRoutes.GET("/employees-by-gender", dashboardHandler.GetEmployeesByGender)
+			dashboardRoutes.GET("/employees-by-position", dashboardHandler.GetEmployeesByPosition)
+			dashboardRoutes.GET("/employees-by-company-department", dashboardHandler.GetEmployeesByCompanyDepartment)
 		}
 	}
 

@@ -114,14 +114,3 @@ func IsAdmin(c *gin.Context) bool {
 	}
 	return false
 }
-
-// GetCurrentUserID extracts user ID from context
-func GetCurrentUserID(c *gin.Context) (uint, bool) {
-	userID, exists := c.Get("userID")
-	if !exists {
-		return 0, false
-	}
-
-	id, ok := userID.(uint)
-	return id, ok
-}

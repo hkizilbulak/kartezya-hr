@@ -162,33 +162,6 @@ func (h *JobPositionHandler) GetJobPositions(c *gin.Context) {
 	})
 }
 
-// GetJobPositionsLookup godoc
-// @Summary Get job positions lookup
-// @Description Get simplified list of job positions for dropdown/lookup (Admin only)
-// @Tags job-positions
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Success 200 {object} APIResponse{data=[]types.JobPositionLookup}
-// @Failure 401 {object} APIResponse
-// @Failure 403 {object} APIResponse
-// @Router /job-positions/lookup [get]
-func (h *JobPositionHandler) GetJobPositionsLookup(c *gin.Context) {
-	jobPositions, err := h.jobPositionService.GetJobPositionsLookup()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    jobPositions,
-	})
-}
-
 // UpdateJobPosition handles job position updates
 // @Summary Update job position
 // @Description Update a job position by ID (Admin only)
