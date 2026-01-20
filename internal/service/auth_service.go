@@ -35,8 +35,11 @@ type LoginResponse struct {
 }
 
 type UserWithRoles struct {
-	*domain.User
-	Roles []string `json:"roles"`
+	ID        uint     `json:"id"`
+	Email     string   `json:"email"`
+	FirstName string   `json:"firstName"`
+	LastName  string   `json:"lastName"`
+	Roles     []string `json:"roles"`
 }
 
 type Claims struct {
@@ -77,6 +80,15 @@ func (s *authService) Login(email, password string) (*LoginResponse, error) {
 		roleNames[i] = role.Name
 	}
 
+	// Get employee information to fetch firstName and lastName
+	employee, err := s.userRepo.GetEmployeeByUserID(user.ID)
+	firstName := ""
+	lastName := ""
+	if err == nil && employee != nil {
+		firstName = employee.FirstName
+		lastName = employee.LastName
+	}
+
 	// Generate JWT token
 	expiresAt := time.Now().Add(s.config.JWT.ExpiryHours)
 	claims := &Claims{
@@ -100,8 +112,11 @@ func (s *authService) Login(email, password string) (*LoginResponse, error) {
 		Token:     tokenString,
 		ExpiresAt: expiresAt,
 		User: &UserWithRoles{
-			User:  user,
-			Roles: roleNames,
+			ID:        user.ID,
+			Email:     user.Email,
+			FirstName: firstName,
+			LastName:  lastName,
+			Roles:     roleNames,
 		},
 	}, nil
 }

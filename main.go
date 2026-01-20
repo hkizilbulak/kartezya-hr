@@ -74,7 +74,7 @@ func main() {
 	// Initialize services
 	auditService := service.NewAuditService(auditRepo)
 	authService := service.NewAuthService(userRepo, userRoleRepo, roleRepo, auditService, cfg)
-	employeeService := service.NewEmployeeService(employeeRepo, userRepo, authService, auditService)
+	employeeService := service.NewEmployeeService(employeeRepo, userRepo, userRoleRepo, roleRepo, authService, auditService, workInfoRepo)
 	leaveService := service.NewLeaveService(leaveRepo, leaveTypeRepo, leaveBalanceRepo, employeeRepo, holidayRepo, auditService)
 	departmentService := service.NewDepartmentService(departmentRepo, companyRepo, auditService)
 	companyService := service.NewCompanyService(companyRepo, departmentRepo, departmentService, auditService)

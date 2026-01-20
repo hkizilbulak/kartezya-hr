@@ -16,6 +16,7 @@ type UserRepository interface {
 	Update(user *domain.User, modifiedBy string) error
 	Delete(id uint, deletedBy string) error
 	GetWithRoles(id uint) (*domain.User, error)
+	GetEmployeeByUserID(userID uint) (*domain.Employee, error)
 }
 
 type userRepository struct {
@@ -108,4 +109,13 @@ func (r *userRepository) GetWithRoles(id uint) (*domain.User, error) {
 		return nil, err
 	}
 	return &user, nil
+}
+
+func (r *userRepository) GetEmployeeByUserID(userID uint) (*domain.Employee, error) {
+	var employee domain.Employee
+	err := r.db.Where("user_id = ? AND deleted = ?", userID, false).First(&employee).Error
+	if err != nil {
+		return nil, err
+	}
+	return &employee, nil
 }

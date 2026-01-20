@@ -21,41 +21,45 @@ func NewEmployeeHandler(employeeService service.EmployeeService) *EmployeeHandle
 }
 
 type CreateEmployeeRequest struct {
-	CompanyEmail             string  `json:"company_email" binding:"required,email"`
-	FirstName                string  `json:"first_name" binding:"required"`
-	LastName                 string  `json:"last_name" binding:"required"`
-	Phone                    string  `json:"phone"`
-	Address                  string  `json:"address"`
-	State                    string  `json:"state"`
-	City                     string  `json:"city"`
-	Gender                   string  `json:"gender"`
-	DateOfBirth              string  `json:"date_of_birth"`
-	HireDate                 string  `json:"hire_date"`
-	LeaveDate                string  `json:"leave_date"`
-	TotalExperience          float64 `json:"total_experience"`
-	MaritalStatus            string  `json:"marital_status"`
-	EmergencyContact         string  `json:"emergency_contact"`
-	EmergencyContactName     string  `json:"emergency_contact_name"`
-	EmergencyContactRelation string  `json:"emergency_contact_relation"`
+	Email                    string   `json:"email" binding:"required,email"`
+	CompanyEmail             string   `json:"company_email" binding:"required,email"`
+	FirstName                string   `json:"first_name" binding:"required"`
+	LastName                 string   `json:"last_name" binding:"required"`
+	Phone                    string   `json:"phone"`
+	Address                  string   `json:"address"`
+	State                    string   `json:"state"`
+	City                     string   `json:"city"`
+	Gender                   string   `json:"gender"`
+	DateOfBirth              string   `json:"date_of_birth"`
+	HireDate                 string   `json:"hire_date"`
+	LeaveDate                string   `json:"leave_date"`
+	TotalExperience          float64  `json:"total_experience"`
+	MaritalStatus            string   `json:"marital_status"`
+	EmergencyContact         string   `json:"emergency_contact"`
+	EmergencyContactName     string   `json:"emergency_contact_name"`
+	EmergencyContactRelation string   `json:"emergency_contact_relation"`
+	Roles                    []string `json:"roles"`
 }
 
 type UpdateEmployeeRequest struct {
-	CompanyEmail             string  `json:"company_email" binding:"omitempty,email"`
-	FirstName                string  `json:"first_name" binding:"required"`
-	LastName                 string  `json:"last_name" binding:"required"`
-	Phone                    string  `json:"phone"`
-	Address                  string  `json:"address"`
-	State                    string  `json:"state"`
-	City                     string  `json:"city"`
-	Gender                   string  `json:"gender"`
-	DateOfBirth              string  `json:"date_of_birth"`
-	HireDate                 string  `json:"hire_date"`
-	LeaveDate                string  `json:"leave_date"`
-	TotalExperience          float64 `json:"total_experience"`
-	MaritalStatus            string  `json:"marital_status"`
-	EmergencyContact         string  `json:"emergency_contact"`
-	EmergencyContactName     string  `json:"emergency_contact_name"`
-	EmergencyContactRelation string  `json:"emergency_contact_relation"`
+	Email                    string   `json:"email" binding:"omitempty,email"`
+	CompanyEmail             string   `json:"company_email" binding:"omitempty,email"`
+	FirstName                string   `json:"first_name" binding:"required"`
+	LastName                 string   `json:"last_name" binding:"required"`
+	Phone                    string   `json:"phone"`
+	Address                  string   `json:"address"`
+	State                    string   `json:"state"`
+	City                     string   `json:"city"`
+	Gender                   string   `json:"gender"`
+	DateOfBirth              string   `json:"date_of_birth"`
+	HireDate                 string   `json:"hire_date"`
+	LeaveDate                string   `json:"leave_date"`
+	TotalExperience          float64  `json:"total_experience"`
+	MaritalStatus            string   `json:"marital_status"`
+	EmergencyContact         string   `json:"emergency_contact"`
+	EmergencyContactName     string   `json:"emergency_contact_name"`
+	EmergencyContactRelation string   `json:"emergency_contact_relation"`
+	Roles                    []string `json:"roles"`
 }
 
 type UpdateMyProfileRequest struct {
@@ -119,7 +123,7 @@ func (h *EmployeeHandler) CreateEmployee(c *gin.Context) {
 	req.MaritalStatus = types.NormalizeMaritalStatus(req.MaritalStatus)
 	req.EmergencyContactRelation = types.NormalizeEmergencyContactRelation(req.EmergencyContactRelation)
 
-	employee, err := h.employeeService.CreateEmployee(req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalExperience, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, email)
+	employee, err := h.employeeService.CreateEmployee(req.Email, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalExperience, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, email, req.Roles)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -244,7 +248,7 @@ func (h *EmployeeHandler) UpdateEmployee(c *gin.Context) {
 	req.MaritalStatus = types.NormalizeMaritalStatus(req.MaritalStatus)
 	req.EmergencyContactRelation = types.NormalizeEmergencyContactRelation(req.EmergencyContactRelation)
 
-	if err := h.employeeService.UpdateEmployee(id, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalExperience, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, email, requestingUserID, isAdmin(roles)); err != nil {
+	if err := h.employeeService.UpdateEmployee(id, req.Email, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalExperience, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, email, requestingUserID, isAdmin(roles), req.Roles); err != nil {
 		status := http.StatusInternalServerError
 		if err.Error() == "unauthorized to update this employee profile" {
 			status = http.StatusForbidden
@@ -335,7 +339,7 @@ func (h *EmployeeHandler) DeleteEmployee(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param limit query int false "Limit number of results (default: 10)"
-// @Param offset query int false "Offset for pagination (default: 0)"
+// @Param page query int false "Page number (default: 1)"
 // @Success 200 {object} APIResponse{data=[]domain.Employee}
 // @Failure 401 {object} APIResponse
 // @Failure 403 {object} APIResponse
@@ -358,8 +362,14 @@ func (h *EmployeeHandler) ListEmployees(c *gin.Context) {
 		return
 	}
 
+	page := 1
 	limit := 10
-	offset := 0
+
+	if p := c.Query("page"); p != "" {
+		if parsed, err := strconv.Atoi(p); err == nil && parsed > 0 {
+			page = parsed
+		}
+	}
 
 	if l := c.Query("limit"); l != "" {
 		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
@@ -367,11 +377,7 @@ func (h *EmployeeHandler) ListEmployees(c *gin.Context) {
 		}
 	}
 
-	if o := c.Query("offset"); o != "" {
-		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
-			offset = parsed
-		}
-	}
+	offset := (page - 1) * limit
 
 	employees, err := h.employeeService.ListEmployees(limit, offset, isAdmin(roles))
 	if err != nil {
@@ -382,14 +388,28 @@ func (h *EmployeeHandler) ListEmployees(c *gin.Context) {
 		return
 	}
 
+	// Get total count for pagination
+	totalCount, err := h.employeeService.GetTotalCount()
+	if err != nil {
+		totalCount = 0
+	}
+
+	totalPages := 1
+	if totalCount > 0 {
+		totalPages = int((totalCount + int64(limit) - 1) / int64(limit))
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    employees,
-		"meta": gin.H{
-			"limit":  limit,
-			"offset": offset,
-			"count":  len(employees),
+		"data": employees,
+		"page": gin.H{
+			"total":       totalCount,
+			"page":        page,
+			"limit":       limit,
+			"total_pages": totalPages,
+			"sort":        "created_at",
+			"direction":   "DESC",
 		},
+		"success": true,
 	})
 }
 

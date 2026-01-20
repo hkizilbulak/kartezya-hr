@@ -26,6 +26,7 @@ func NewUserRoleRepository(db *gorm.DB) UserRoleRepository {
 func (r *userRoleRepository) Create(userRole *domain.UserRole, createdBy string) error {
 	userRole.CreatedBy = createdBy
 	userRole.ModifiedBy = createdBy
+	userRole.Deleted = false
 	return r.db.Create(userRole).Error
 }
 
