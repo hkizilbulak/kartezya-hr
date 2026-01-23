@@ -67,9 +67,19 @@ type Employee struct {
 	EmergencyContact         string     `json:"emergency_contact" gorm:"size:15"`
 	EmergencyContactName     string     `json:"emergency_contact_name" gorm:"size:20"`
 	EmergencyContactRelation string     `json:"emergency_contact_relation" gorm:"type:emergency_contact_relation_enum"`
+	GradeID                  *int64     `json:"grade_id" gorm:"index"`
+	IsGradeUp                bool       `json:"is_grade_up" gorm:"default:false"`
+	ContractNo               string     `json:"contract_no" gorm:"size:255"`
+	ProfessionStartDate      *time.Time `json:"profession_start_date"`
+	Note                     string     `json:"note" gorm:"type:text"`
+	MotherName               string     `json:"mother_name" gorm:"size:255"`
+	FatherName               string     `json:"father_name" gorm:"size:255"`
+	Nationality              string     `json:"nationality" gorm:"size:100"`
+	IdentityNo               string     `json:"identity_no" gorm:"size:50"`
 
 	// Relationships
 	User                    User                      `json:"user,omitempty"`
+	Grade                   *Grade                    `json:"grade,omitempty"`
 	EmployeeWorkInformation []EmployeeWorkInformation `json:"employee_work_information,omitempty"`
 	LeaveBalances           []LeaveBalance            `json:"leave_balances,omitempty"`
 	LeaveRequests           []LeaveRequest            `json:"leave_requests,omitempty"`
@@ -118,6 +128,8 @@ type EmployeeWorkInformation struct {
 	JobPositionID uint       `json:"job_position_id" gorm:"not null"`
 	StartDate     time.Time  `json:"start_date" gorm:"not null"`
 	EndDate       *time.Time `json:"end_date"`
+	PersonnelNo   string     `json:"personnel_no" gorm:"size:100"`
+	WorkEmail     string     `json:"work_email" gorm:"size:255"`
 
 	// Relationships
 	Employee    Employee    `json:"employee,omitempty"`
@@ -232,6 +244,21 @@ type Holiday struct {
 
 func (Holiday) TableName() string {
 	return "hr_holidays"
+}
+
+// Grade represents employee grades/levels
+type Grade struct {
+	AuditableModel
+	Name        string `json:"name" gorm:"not null"`
+	Description string `json:"description"`
+
+	// Relationships
+	Employees []Employee `json:"employees,omitempty"`
+}
+
+// Grade table name
+func (Grade) TableName() string {
+	return "hr_grades"
 }
 
 // AuditLog represents system audit logs (NO SOFT DELETE - this table is append-only)

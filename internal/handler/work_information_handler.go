@@ -29,6 +29,8 @@ type CreateWorkInformationRequest struct {
 	JobPositionID uint   `json:"job_position_id" binding:"required"`
 	StartDate     string `json:"start_date" binding:"required"`
 	EndDate       string `json:"end_date"`
+	PersonnelNo   string `json:"personnel_no"`
+	WorkEmail     string `json:"work_email"`
 }
 
 type UpdateWorkInformationRequest struct {
@@ -38,6 +40,8 @@ type UpdateWorkInformationRequest struct {
 	JobPositionID uint   `json:"job_position_id" binding:"required"`
 	StartDate     string `json:"start_date" binding:"required"`
 	EndDate       string `json:"end_date"`
+	PersonnelNo   string `json:"personnel_no"`
+	WorkEmail     string `json:"work_email"`
 }
 
 // CreateWorkInformation godoc
@@ -81,7 +85,7 @@ func (h *WorkInformationHandler) CreateWorkInformation(c *gin.Context) {
 		return
 	}
 
-	workInfo, err := h.workInfoService.CreateWorkInformation(req.EmployeeID, req.CompanyID, req.DepartmentID, req.JobPositionID, req.StartDate, req.EndDate, email)
+	workInfo, err := h.workInfoService.CreateWorkInformation(req.EmployeeID, req.CompanyID, req.DepartmentID, req.JobPositionID, req.StartDate, req.EndDate, req.PersonnelNo, req.WorkEmail, email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -173,6 +177,7 @@ func (h *WorkInformationHandler) GetMyWorkInformation(c *gin.Context) {
 // @Param limit query int false "Items per page (default: 10)"
 // @Param sort query string false "Sort field (default: id)"
 // @Param direction query string false "Sort direction (default: ASC)"
+// @Param employee_id query int false "Filter by employee ID"
 // @Success 200 {object} APIResponse{data=[]types.WorkInformationResponse}
 // @Failure 400 {object} APIResponse
 // @Failure 401 {object} APIResponse
@@ -207,8 +212,20 @@ func (h *WorkInformationHandler) ListWorkInformation(c *gin.Context) {
 		return
 	}
 
+	// Parse employee_id filter parameter
+	var employeeID *uint
+	if employeeIDStr := c.Query("employee_id"); employeeIDStr != "" {
+		id, err := strconv.ParseUint(employeeIDStr, 10, 32)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid employee_id parameter"})
+			return
+		}
+		empID := uint(id)
+		employeeID = &empID
+	}
+
 	// Get work information list from service
-	response, err := h.workInfoService.GetAllWorkInformations(page, limit, sortParams)
+	response, err := h.workInfoService.GetAllWorkInformations(page, limit, sortParams, employeeID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -268,7 +285,7 @@ func (h *WorkInformationHandler) UpdateWorkInformation(c *gin.Context) {
 		return
 	}
 
-	if err := h.workInfoService.UpdateWorkInformation(id, req.EmployeeID, req.CompanyID, req.DepartmentID, req.JobPositionID, req.StartDate, req.EndDate, email, requestingUserID, isAdmin(roles)); err != nil {
+	if err := h.workInfoService.UpdateWorkInformation(id, req.EmployeeID, req.CompanyID, req.DepartmentID, req.JobPositionID, req.StartDate, req.EndDate, req.PersonnelNo, req.WorkEmail, email, requestingUserID, isAdmin(roles)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   err.Error(),
@@ -276,8 +293,19 @@ func (h *WorkInformationHandler) UpdateWorkInformation(c *gin.Context) {
 		return
 	}
 
+	// Güncellenmiş work information'ı döndür
+	workInfo, err := h.workInfoService.GetWorkInformationByID(id)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "Work information updated successfully",
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
+		"data":    workInfo,
 		"message": "Work information updated successfully",
 	})
 }

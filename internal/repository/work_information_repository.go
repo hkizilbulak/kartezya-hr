@@ -13,7 +13,7 @@ type WorkInformationRepository interface {
 	GetByID(id uint) (*domain.EmployeeWorkInformation, error)
 	GetByEmployeeID(employeeID uint) ([]domain.EmployeeWorkInformation, error)
 	GetByUserID(userID uint) ([]domain.EmployeeWorkInformation, error)
-	GetAll(limit, offset int, sortParams types.SortParams) ([]domain.EmployeeWorkInformation, int64, error)
+	GetAll(limit, offset int, sortParams types.SortParams, employeeID *uint) ([]domain.EmployeeWorkInformation, int64, error)
 	Update(workInfo *domain.EmployeeWorkInformation, modifiedBy string) error
 	Delete(id uint, deletedBy string) error
 }
@@ -60,7 +60,7 @@ func (r *workInformationRepository) GetByUserID(userID uint) ([]domain.EmployeeW
 	return workInfos, err
 }
 
-func (r *workInformationRepository) GetAll(limit, offset int, sortParams types.SortParams) ([]domain.EmployeeWorkInformation, int64, error) {
+func (r *workInformationRepository) GetAll(limit, offset int, sortParams types.SortParams, employeeID *uint) ([]domain.EmployeeWorkInformation, int64, error) {
 	var workInformations []domain.EmployeeWorkInformation
 	var total int64
 
@@ -89,13 +89,27 @@ func (r *workInformationRepository) GetAll(limit, offset int, sortParams types.S
 
 	orderBy := fmt.Sprintf("%s %s", sortField, direction)
 
+	// Build base query
+	query := r.db.Model(&domain.EmployeeWorkInformation{}).Where("deleted = ?", false)
+
+	// Apply employee_id filter if provided
+	if employeeID != nil {
+		query = query.Where("employee_id = ?", *employeeID)
+	}
+
 	// Count total records
-	r.db.Model(&domain.EmployeeWorkInformation{}).Where("deleted = ?", false).Count(&total)
+	query.Count(&total)
 
 	// Get paginated records with sorting
-	err := r.db.Preload("Employee").Preload("Company").Preload("Department").Preload("JobPosition").
-		Where("deleted = ?", false).
-		Order(orderBy).
+	finalQuery := r.db.Preload("Employee").Preload("Company").Preload("Department").Preload("JobPosition").
+		Where("deleted = ?", false)
+
+	// Apply employee_id filter if provided
+	if employeeID != nil {
+		finalQuery = finalQuery.Where("employee_id = ?", *employeeID)
+	}
+
+	err := finalQuery.Order(orderBy).
 		Limit(limit).Offset(offset).Find(&workInformations).Error
 
 	return workInformations, total, err

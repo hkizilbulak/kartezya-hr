@@ -1,11 +1,11 @@
 package handler
 
 import (
-"kartezya-hr/internal/service"
-"net/http"
-"strconv"
+	"kartezya-hr/internal/service"
+	"net/http"
+	"strconv"
 
-"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
 )
 
 type LookupHandler struct {
@@ -29,16 +29,16 @@ func (h *LookupHandler) GetCompaniesLookup(c *gin.Context) {
 	companies, err := h.lookupService.GetCompaniesLookup()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, APIResponse{
-Success: false,
-Error:   err.Error(),
+			Success: false,
+			Error:   err.Error(),
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, APIResponse{
-Success: true,
-Data:    companies,
-})
+		Success: true,
+		Data:    companies,
+	})
 }
 
 // GetDepartmentsLookup godoc
@@ -52,16 +52,16 @@ func (h *LookupHandler) GetDepartmentsLookup(c *gin.Context) {
 	departments, err := h.lookupService.GetDepartmentsLookup()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, APIResponse{
-Success: false,
-Error:   err.Error(),
+			Success: false,
+			Error:   err.Error(),
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, APIResponse{
-Success: true,
-Data:    departments,
-})
+		Success: true,
+		Data:    departments,
+	})
 }
 
 // GetDepartmentsByCompanyLookup godoc
@@ -76,34 +76,34 @@ func (h *LookupHandler) GetDepartmentsByCompanyLookup(c *gin.Context) {
 	companyIDStr := c.Query("company_id")
 	if companyIDStr == "" {
 		c.JSON(http.StatusBadRequest, APIResponse{
-Success: false,
-Error:   "company_id is required",
-})
+			Success: false,
+			Error:   "company_id is required",
+		})
 		return
 	}
 
 	companyID, err := strconv.ParseUint(companyIDStr, 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, APIResponse{
-Success: false,
-Error:   "invalid company_id",
-})
+			Success: false,
+			Error:   "invalid company_id",
+		})
 		return
 	}
 
 	departments, err := h.lookupService.GetDepartmentsByCompanyLookup(uint(companyID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, APIResponse{
-Success: false,
-Error:   err.Error(),
+			Success: false,
+			Error:   err.Error(),
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, APIResponse{
-Success: true,
-Data:    departments,
-})
+		Success: true,
+		Data:    departments,
+	})
 }
 
 // GetJobPositionsLookup godoc
@@ -117,16 +117,16 @@ func (h *LookupHandler) GetJobPositionsLookup(c *gin.Context) {
 	jobPositions, err := h.lookupService.GetJobPositionsLookup()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, APIResponse{
-Success: false,
-Error:   err.Error(),
+			Success: false,
+			Error:   err.Error(),
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, APIResponse{
-Success: true,
-Data:    jobPositions,
-})
+		Success: true,
+		Data:    jobPositions,
+	})
 }
 
 // GetLeaveTypesLookup godoc
@@ -140,14 +140,37 @@ func (h *LookupHandler) GetLeaveTypesLookup(c *gin.Context) {
 	leaveTypes, err := h.lookupService.GetLeaveTypesLookup()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, APIResponse{
-Success: false,
-Error:   err.Error(),
+			Success: false,
+			Error:   err.Error(),
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, APIResponse{
-Success: true,
-Data:    leaveTypes,
-})
+		Success: true,
+		Data:    leaveTypes,
+	})
+}
+
+// GetGradesLookup godoc
+// @Summary Get all grades for lookup
+// @Description Get all grades as lookup data (public API)
+// @Tags Lookup
+// @Produce json
+// @Success 200 {object} APIResponse{data=[]types.GradeLookup}
+// @Router /lookup/grades [get]
+func (h *LookupHandler) GetGradesLookup(c *gin.Context) {
+	grades, err := h.lookupService.GetGradesLookup()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, APIResponse{
+		Success: true,
+		Data:    grades,
+	})
 }

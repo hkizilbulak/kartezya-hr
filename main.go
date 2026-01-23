@@ -70,6 +70,7 @@ func main() {
 	workInfoRepo := repository.NewWorkInformationRepository(db.DB)
 	leaveTypeRepo := repository.NewLeaveTypeRepository(db.DB)
 	holidayRepo := repository.NewHolidayRepository(db.DB)
+	gradeRepo := repository.NewGradeRepository(db.DB)
 
 	// Initialize services
 	auditService := service.NewAuditService(auditRepo)
@@ -80,7 +81,8 @@ func main() {
 	companyService := service.NewCompanyService(companyRepo, departmentRepo, departmentService, auditService)
 	jobPositionService := service.NewJobPositionService(jobPositionRepo, auditService)
 	workInfoService := service.NewWorkInformationService(workInfoRepo, employeeRepo, companyRepo, departmentRepo, jobPositionRepo, auditService)
-	lookupService := service.NewLookupService(companyRepo, departmentRepo, jobPositionRepo, leaveTypeRepo)
+	lookupService := service.NewLookupService(companyRepo, departmentRepo, jobPositionRepo, leaveTypeRepo, gradeRepo)
+	gradeService := service.NewGradeService(gradeRepo, auditService)
 
 	// Initialize handlers
 	authHandler := handler.NewAuthHandler(authService)
@@ -92,6 +94,7 @@ func main() {
 	workInfoHandler := handler.NewWorkInformationHandler(workInfoService, employeeService)
 	lookupHandler := handler.NewLookupHandler(lookupService)
 	dashboardHandler := handler.NewDashboardHandler(employeeService, departmentService, companyService, leaveService)
+	gradeHandler := handler.NewGradeHandler(gradeService)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -143,6 +146,7 @@ func main() {
 		lookup.GET("/departments-by-company", lookupHandler.GetDepartmentsByCompanyLookup)
 		lookup.GET("/job-positions", lookupHandler.GetJobPositionsLookup)
 		lookup.GET("/leave-types", lookupHandler.GetLeaveTypesLookup)
+		lookup.GET("/grades", lookupHandler.GetGradesLookup)
 	}
 
 	// Protected routes (authentication required)
@@ -238,6 +242,17 @@ func main() {
 			jobPositionRoutes.POST("", authMiddleware.RequireAdmin(), jobPositionHandler.CreateJobPosition)
 			jobPositionRoutes.PUT("/:id", authMiddleware.RequireAdmin(), jobPositionHandler.UpdateJobPosition)
 			jobPositionRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), jobPositionHandler.DeleteJobPosition)
+		}
+
+		// Grade management routes
+		gradeRoutes := protected.Group("/grades")
+		{
+			// Admin only routes
+			gradeRoutes.GET("", authMiddleware.RequireAdmin(), gradeHandler.GetGrades)
+			gradeRoutes.GET("/:id", authMiddleware.RequireAdmin(), gradeHandler.GetGrade)
+			gradeRoutes.POST("", authMiddleware.RequireAdmin(), gradeHandler.CreateGrade)
+			gradeRoutes.PUT("/:id", authMiddleware.RequireAdmin(), gradeHandler.UpdateGrade)
+			gradeRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), gradeHandler.DeleteGrade)
 		}
 
 		// Work Information management routes

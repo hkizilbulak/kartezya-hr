@@ -120,12 +120,22 @@ CREATE TABLE IF NOT EXISTS hr_employees (
     emergency_contact VARCHAR(15),
     emergency_contact_name VARCHAR(20),
     emergency_contact_relation emergency_contact_relation_enum,
+    grade_id BIGINT,
+    is_grade_up BOOLEAN DEFAULT false,
+    contract_no VARCHAR(255),
+    profession_start_date DATE,
+    note TEXT,
+    mother_name VARCHAR(255),
+    father_name VARCHAR(255),
+    nationality VARCHAR(100),
+    identity_no VARCHAR(50),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     deleted BOOLEAN NOT NULL DEFAULT false,
     created_by VARCHAR(50),
     modified_by VARCHAR(50),
-    FOREIGN KEY (user_id) REFERENCES hr_users(id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES hr_users(id) ON DELETE CASCADE,
+    FOREIGN KEY (grade_id) REFERENCES hr_grades(id) ON DELETE SET NULL
 );
 
 -- Employee Work Information (updated structure: no salary, no is_active, added company_id and department_id)
@@ -137,6 +147,8 @@ CREATE TABLE IF NOT EXISTS hr_employee_work_information (
     job_position_id INTEGER NOT NULL,
     start_date DATE NOT NULL,
     end_date DATE,
+    personnel_no VARCHAR(100),
+    work_email VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     deleted BOOLEAN NOT NULL DEFAULT false,
@@ -256,6 +268,18 @@ CREATE TABLE hr_holidays (
                                  modified_by VARCHAR(50) DEFAULT 'admin@kartezya.com'
 );
 
+-- Grades table
+CREATE TABLE IF NOT EXISTS hr_grades (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted BOOLEAN NOT NULL DEFAULT false,
+    created_by VARCHAR(50),
+    modified_by VARCHAR(50)
+);
+
 -- ================================================
 -- INDEXES FOR PERFORMANCE
 -- ================================================
@@ -344,5 +368,13 @@ BEGIN
     
     IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_hr_leave_documents_updated_at') THEN
         CREATE TRIGGER update_hr_leave_documents_updated_at BEFORE UPDATE ON hr_leave_documents FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_hr_grades_updated_at') THEN
+        CREATE TRIGGER update_hr_grades_updated_at BEFORE UPDATE ON hr_grades FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_hr_holidays_updated_at') THEN
+        CREATE TRIGGER update_hr_holidays_updated_at BEFORE UPDATE ON hr_holidays FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     END IF;
 END $$;

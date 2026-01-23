@@ -11,12 +11,12 @@ import (
 )
 
 type WorkInformationService interface {
-	CreateWorkInformation(employeeID, companyID, departmentID, jobPositionID uint, startDate, endDate, createdBy string) (*domain.EmployeeWorkInformation, error)
+	CreateWorkInformation(employeeID, companyID, departmentID, jobPositionID uint, startDate, endDate, personnelNo, workEmail, createdBy string) (*domain.EmployeeWorkInformation, error)
 	GetWorkInformationByID(id uint) (*types.WorkInformationResponse, error)
 	GetWorkInformationByUserID(userID uint) ([]*types.WorkInformationWithNames, error)
-	UpdateWorkInformation(id uint, employeeID, companyID, departmentID, jobPositionID uint, startDate, endDate, modifiedBy string, requestingUserID uint, isAdmin bool) error
+	UpdateWorkInformation(id uint, employeeID, companyID, departmentID, jobPositionID uint, startDate, endDate, personnelNo, workEmail, modifiedBy string, requestingUserID uint, isAdmin bool) error
 	DeleteWorkInformation(id uint, deletedBy string) error
-	GetAllWorkInformations(page, limit int, sortParams types.SortParams) (*PaginatedResponse, error)
+	GetAllWorkInformations(page, limit int, sortParams types.SortParams, employeeID *uint) (*PaginatedResponse, error)
 }
 
 type workInformationService struct {
@@ -39,7 +39,7 @@ func NewWorkInformationService(workInfoRepo repository.WorkInformationRepository
 	}
 }
 
-func (s *workInformationService) CreateWorkInformation(employeeID, companyID, departmentID, jobPositionID uint, startDate, endDate, createdBy string) (*domain.EmployeeWorkInformation, error) {
+func (s *workInformationService) CreateWorkInformation(employeeID, companyID, departmentID, jobPositionID uint, startDate, endDate, personnelNo, workEmail, createdBy string) (*domain.EmployeeWorkInformation, error) {
 	// Parse date fields
 	var startDatePtr time.Time
 	var endDatePtr *time.Time
@@ -66,6 +66,8 @@ func (s *workInformationService) CreateWorkInformation(employeeID, companyID, de
 		JobPositionID: jobPositionID,
 		StartDate:     startDatePtr,
 		EndDate:       endDatePtr,
+		PersonnelNo:   personnelNo,
+		WorkEmail:     workEmail,
 	}
 
 	// Create the work information
@@ -93,14 +95,16 @@ func (s *workInformationService) GetWorkInformationByID(id uint) (*types.WorkInf
 	}
 
 	return &types.WorkInformationResponse{
-		ID:         workInfo.ID,
-		CreatedAt:  workInfo.CreatedAt,
-		UpdatedAt:  workInfo.UpdatedAt,
-		Deleted:    workInfo.Deleted,
-		CreatedBy:  workInfo.CreatedBy,
-		ModifiedBy: workInfo.ModifiedBy,
-		StartDate:  workInfo.StartDate,
-		EndDate:    workInfo.EndDate,
+		ID:          workInfo.ID,
+		CreatedAt:   workInfo.CreatedAt,
+		UpdatedAt:   workInfo.UpdatedAt,
+		Deleted:     workInfo.Deleted,
+		CreatedBy:   workInfo.CreatedBy,
+		ModifiedBy:  workInfo.ModifiedBy,
+		StartDate:   workInfo.StartDate,
+		EndDate:     workInfo.EndDate,
+		PersonnelNo: workInfo.PersonnelNo,
+		WorkEmail:   workInfo.WorkEmail,
 		Employee: types.WorkInformationEmployeeLookup{
 			ID:        workInfo.Employee.ID,
 			FirstName: workInfo.Employee.FirstName,
@@ -180,7 +184,7 @@ func (s *workInformationService) GetWorkInformationByUserID(userID uint) ([]*typ
 	return result, nil
 }
 
-func (s *workInformationService) UpdateWorkInformation(id uint, employeeID, companyID, departmentID, jobPositionID uint, startDate, endDate, modifiedBy string, requestingUserID uint, isAdmin bool) error {
+func (s *workInformationService) UpdateWorkInformation(id uint, employeeID, companyID, departmentID, jobPositionID uint, startDate, endDate, personnelNo, workEmail, modifiedBy string, requestingUserID uint, isAdmin bool) error {
 	// Get existing work information for audit trail
 	existingWorkInfo, err := s.workInfoRepo.GetByID(id)
 	if err != nil {
@@ -226,6 +230,8 @@ func (s *workInformationService) UpdateWorkInformation(id uint, employeeID, comp
 		JobPositionID: jobPositionID,
 		StartDate:     startDatePtr,
 		EndDate:       endDatePtr,
+		PersonnelNo:   personnelNo,
+		WorkEmail:     workEmail,
 	}
 
 	// Set the ID after creating the struct
@@ -267,7 +273,7 @@ func (s *workInformationService) DeleteWorkInformation(id uint, deletedBy string
 	return nil
 }
 
-func (s *workInformationService) GetAllWorkInformations(page, limit int, sortParams types.SortParams) (*PaginatedResponse, error) {
+func (s *workInformationService) GetAllWorkInformations(page, limit int, sortParams types.SortParams, employeeID *uint) (*PaginatedResponse, error) {
 
 	if page < 1 {
 		page = 1
@@ -285,7 +291,7 @@ func (s *workInformationService) GetAllWorkInformations(page, limit int, sortPar
 	}
 
 	offset := (page - 1) * limit
-	workInfos, total, err := s.workInfoRepo.GetAll(limit, offset, sortParams)
+	workInfos, total, err := s.workInfoRepo.GetAll(limit, offset, sortParams, employeeID)
 	if err != nil {
 		return nil, err
 	}
@@ -293,14 +299,16 @@ func (s *workInformationService) GetAllWorkInformations(page, limit int, sortPar
 	workInfoResponses := make([]types.WorkInformationResponse, len(workInfos))
 	for i, workInfo := range workInfos {
 		workInfoResponses[i] = types.WorkInformationResponse{
-			ID:         workInfo.ID,
-			CreatedAt:  workInfo.CreatedAt,
-			UpdatedAt:  workInfo.UpdatedAt,
-			Deleted:    workInfo.Deleted,
-			CreatedBy:  workInfo.CreatedBy,
-			ModifiedBy: workInfo.ModifiedBy,
-			StartDate:  workInfo.StartDate,
-			EndDate:    workInfo.EndDate,
+			ID:          workInfo.ID,
+			CreatedAt:   workInfo.CreatedAt,
+			UpdatedAt:   workInfo.UpdatedAt,
+			Deleted:     workInfo.Deleted,
+			CreatedBy:   workInfo.CreatedBy,
+			ModifiedBy:  workInfo.ModifiedBy,
+			StartDate:   workInfo.StartDate,
+			EndDate:     workInfo.EndDate,
+			PersonnelNo: workInfo.PersonnelNo,
+			WorkEmail:   workInfo.WorkEmail,
 			Employee: types.WorkInformationEmployeeLookup{
 				ID:        workInfo.Employee.ID,
 				FirstName: workInfo.Employee.FirstName,

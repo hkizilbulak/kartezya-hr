@@ -13,6 +13,7 @@ type LookupService interface {
 	GetDepartmentsByCompanyLookup(companyID uint) ([]types.DepartmentLookup, error)
 	GetJobPositionsLookup() ([]types.JobPositionLookup, error)
 	GetLeaveTypesLookup() ([]types.LeaveTypeLookup, error)
+	GetGradesLookup() ([]types.GradeLookup, error)
 }
 
 type lookupService struct {
@@ -20,6 +21,7 @@ type lookupService struct {
 	departmentRepo  repository.DepartmentRepository
 	jobPositionRepo repository.JobPositionRepository
 	leaveTypeRepo   repository.LeaveTypeRepository
+	gradeRepo       repository.GradeRepository
 }
 
 func NewLookupService(
@@ -27,12 +29,14 @@ func NewLookupService(
 	departmentRepo repository.DepartmentRepository,
 	jobPositionRepo repository.JobPositionRepository,
 	leaveTypeRepo repository.LeaveTypeRepository,
+	gradeRepo repository.GradeRepository,
 ) LookupService {
 	return &lookupService{
 		companyRepo:     companyRepo,
 		departmentRepo:  departmentRepo,
 		jobPositionRepo: jobPositionRepo,
 		leaveTypeRepo:   leaveTypeRepo,
+		gradeRepo:       gradeRepo,
 	}
 }
 
@@ -122,6 +126,24 @@ func (s *lookupService) GetLeaveTypesLookup() ([]types.LeaveTypeLookup, error) {
 		lookupData[i] = types.LeaveTypeLookup{
 			ID:   leaveType.ID,
 			Name: leaveType.Name,
+		}
+	}
+
+	return lookupData, nil
+}
+
+// GetGradesLookup returns all grades as lookup data
+func (s *lookupService) GetGradesLookup() ([]types.GradeLookup, error) {
+	grades, err := s.gradeRepo.GetLookup()
+	if err != nil {
+		return nil, err
+	}
+
+	lookupData := make([]types.GradeLookup, len(grades))
+	for i, grade := range grades {
+		lookupData[i] = types.GradeLookup{
+			ID:   grade.ID,
+			Name: grade.Name,
 		}
 	}
 

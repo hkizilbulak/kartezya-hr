@@ -11,11 +11,11 @@ import (
 )
 
 type EmployeeService interface {
-	CreateEmployee(email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, createdBy string, roles []string) (*domain.Employee, error)
+	CreateEmployee(email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, isGradeUp bool, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, createdBy string, roles []string) (*domain.Employee, error)
 	GetEmployeeByID(id uint) (*types.EmployeeResponse, error)
 	GetEmployeeByUserID(userID uint) (*types.EmployeeResponse, error)
-	UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, modifiedBy string, requestingUserID uint, isAdmin bool, roles []string) error
-	UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string) error
+	UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, isGradeUp bool, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, modifiedBy string, requestingUserID uint, isAdmin bool, roles []string) error
+	UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, motherName, fatherName, nationality, identityNo string) error
 	DeleteEmployee(id uint, deletedBy string, isAdmin bool) error
 	ListEmployees(limit, offset int, isAdmin bool) ([]*types.EmployeeResponse, error)
 	GetTotalCount() (int64, error)
@@ -46,7 +46,7 @@ func NewEmployeeService(employeeRepo repository.EmployeeRepository, userRepo rep
 	}
 }
 
-func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, createdBy string, roles []string) (*domain.Employee, error) {
+func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, isGradeUp bool, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, createdBy string, roles []string) (*domain.Employee, error) {
 	// Delegate user creation to AuthService (respecting domain boundaries)
 	// companyEmail is used as the user's email in the user table
 	user, err := s.authService.CreateUserForEmployee(companyEmail, createdBy)
@@ -55,7 +55,7 @@ func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastNam
 	}
 
 	// Parse date fields
-	var dateOfBirthPtr, hireDatePtr, leaveDatePtr *time.Time
+	var dateOfBirthPtr, hireDatePtr, leaveDatePtr, professionStartDatePtr *time.Time
 
 	if dateOfBirth != "" {
 		if parsed, err := time.Parse("2006-01-02", dateOfBirth); err == nil {
@@ -72,6 +72,12 @@ func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastNam
 	if leaveDate != "" {
 		if parsed, err := time.Parse("2006-01-02", leaveDate); err == nil {
 			leaveDatePtr = &parsed
+		}
+	}
+
+	if professionStartDate != "" {
+		if parsed, err := time.Parse("2006-01-02", professionStartDate); err == nil {
+			professionStartDatePtr = &parsed
 		}
 	}
 
@@ -97,6 +103,15 @@ func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastNam
 		EmergencyContact:         emergencyContact,
 		EmergencyContactName:     emergencyContactName,
 		EmergencyContactRelation: emergencyContactRelation,
+		GradeID:                  gradeID,
+		IsGradeUp:                isGradeUp,
+		ContractNo:               contractNo,
+		ProfessionStartDate:      professionStartDatePtr,
+		Note:                     note,
+		MotherName:               motherName,
+		FatherName:               fatherName,
+		Nationality:              nationality,
+		IdentityNo:               identityNo,
 	}
 
 	// Create the employee
@@ -162,7 +177,7 @@ func (s *employeeService) GetEmployeeByID(id uint) (*types.EmployeeResponse, err
 	}
 
 	// Convert dates to string format for JSON response
-	var dateOfBirthStr, hireDateStr, leaveDateStr *string
+	var dateOfBirthStr, hireDateStr, leaveDateStr, professionStartDateStr *string
 
 	if employee.DateOfBirth != nil {
 		dateStr := employee.DateOfBirth.Format(time.RFC3339)
@@ -177,6 +192,11 @@ func (s *employeeService) GetEmployeeByID(id uint) (*types.EmployeeResponse, err
 	if employee.LeaveDate != nil {
 		leaveStr := employee.LeaveDate.Format(time.RFC3339)
 		leaveDateStr = &leaveStr
+	}
+
+	if employee.ProfessionStartDate != nil {
+		profStr := employee.ProfessionStartDate.Format(time.RFC3339)
+		professionStartDateStr = &profStr
 	}
 
 	userInfo := types.UserInfo{
@@ -204,6 +224,15 @@ func (s *employeeService) GetEmployeeByID(id uint) (*types.EmployeeResponse, err
 		EmergencyContact:         employee.EmergencyContact,
 		EmergencyContactName:     employee.EmergencyContactName,
 		EmergencyContactRelation: employee.EmergencyContactRelation,
+		GradeID:                  employee.GradeID,
+		IsGradeUp:                employee.IsGradeUp,
+		ContractNo:               employee.ContractNo,
+		ProfessionStartDate:      professionStartDateStr,
+		Note:                     employee.Note,
+		MotherName:               employee.MotherName,
+		FatherName:               employee.FatherName,
+		Nationality:              employee.Nationality,
+		IdentityNo:               employee.IdentityNo,
 		Roles:                    roleNames,
 		WorkInformation:          workInfoLookup,
 	}, nil
@@ -232,7 +261,7 @@ func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeRespo
 	}
 
 	// Convert dates to string format for JSON response
-	var dateOfBirthStr, hireDateStr, leaveDateStr *string
+	var dateOfBirthStr, hireDateStr, leaveDateStr, professionStartDateStr *string
 
 	if employee.DateOfBirth != nil {
 		dateStr := employee.DateOfBirth.Format(time.RFC3339)
@@ -247,6 +276,11 @@ func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeRespo
 	if employee.LeaveDate != nil {
 		leaveStr := employee.LeaveDate.Format(time.RFC3339)
 		leaveDateStr = &leaveStr
+	}
+
+	if employee.ProfessionStartDate != nil {
+		profStr := employee.ProfessionStartDate.Format(time.RFC3339)
+		professionStartDateStr = &profStr
 	}
 
 	userInfo := types.UserInfo{
@@ -274,11 +308,20 @@ func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeRespo
 		EmergencyContact:         employee.EmergencyContact,
 		EmergencyContactName:     employee.EmergencyContactName,
 		EmergencyContactRelation: employee.EmergencyContactRelation,
+		GradeID:                  employee.GradeID,
+		IsGradeUp:                employee.IsGradeUp,
+		ContractNo:               employee.ContractNo,
+		ProfessionStartDate:      professionStartDateStr,
+		Note:                     employee.Note,
+		MotherName:               employee.MotherName,
+		FatherName:               employee.FatherName,
+		Nationality:              employee.Nationality,
+		IdentityNo:               employee.IdentityNo,
 		Roles:                    roleNames,
 	}, nil
 }
 
-func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, modifiedBy string, requestingUserID uint, isAdmin bool, roles []string) error {
+func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, isGradeUp bool, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, modifiedBy string, requestingUserID uint, isAdmin bool, roles []string) error {
 	// Get existing employee for authorization check and audit trail
 	existingEmployee, err := s.employeeRepo.GetByID(id)
 	if err != nil {
@@ -310,7 +353,7 @@ func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName
 	}
 
 	// Parse date fields
-	var dateOfBirthPtr, hireDatePtr, leaveDatePtr *time.Time
+	var dateOfBirthPtr, hireDatePtr, leaveDatePtr, professionStartDatePtr *time.Time
 
 	if dateOfBirth != "" {
 		if parsed, err := time.Parse("2006-01-02", dateOfBirth); err == nil {
@@ -327,6 +370,12 @@ func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName
 	if leaveDate != "" {
 		if parsed, err := time.Parse("2006-01-02", leaveDate); err == nil {
 			leaveDatePtr = &parsed
+		}
+	}
+
+	if professionStartDate != "" {
+		if parsed, err := time.Parse("2006-01-02", professionStartDate); err == nil {
+			professionStartDatePtr = &parsed
 		}
 	}
 
@@ -351,6 +400,15 @@ func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName
 	updatedEmployee.EmergencyContact = emergencyContact
 	updatedEmployee.EmergencyContactName = emergencyContactName
 	updatedEmployee.EmergencyContactRelation = emergencyContactRelation
+	updatedEmployee.GradeID = gradeID
+	updatedEmployee.IsGradeUp = isGradeUp
+	updatedEmployee.ContractNo = contractNo
+	updatedEmployee.ProfessionStartDate = professionStartDatePtr
+	updatedEmployee.Note = note
+	updatedEmployee.MotherName = motherName
+	updatedEmployee.FatherName = fatherName
+	updatedEmployee.Nationality = nationality
+	updatedEmployee.IdentityNo = identityNo
 
 	// Update employee
 	if err := s.employeeRepo.Update(&updatedEmployee, modifiedBy); err != nil {
@@ -376,7 +434,7 @@ func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName
 	return nil
 }
 
-func (s *employeeService) UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string) error {
+func (s *employeeService) UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, motherName, fatherName, nationality, identityNo string) error {
 	// Get employee by user ID
 	employee, err := s.employeeRepo.GetByUserID(userID)
 	if err != nil {
@@ -445,6 +503,18 @@ func (s *employeeService) UpdateMyProfile(userID uint, email, phone, address, st
 	}
 	if emergencyContactRelation != "" {
 		updatedEmployee.EmergencyContactRelation = emergencyContactRelation
+	}
+	if motherName != "" {
+		updatedEmployee.MotherName = motherName
+	}
+	if fatherName != "" {
+		updatedEmployee.FatherName = fatherName
+	}
+	if nationality != "" {
+		updatedEmployee.Nationality = nationality
+	}
+	if identityNo != "" {
+		updatedEmployee.IdentityNo = identityNo
 	}
 
 	// Update employee
@@ -534,7 +604,7 @@ func (s *employeeService) ListEmployees(limit, offset int, isAdmin bool) ([]*typ
 		}
 
 		// Convert dates to string format for JSON response
-		var dateOfBirthStr, hireDateStr, leaveDateStr *string
+		var dateOfBirthStr, hireDateStr, leaveDateStr, professionStartDateStr *string
 
 		if employee.DateOfBirth != nil {
 			dateStr := employee.DateOfBirth.Format(time.RFC3339)
@@ -549,6 +619,11 @@ func (s *employeeService) ListEmployees(limit, offset int, isAdmin bool) ([]*typ
 		if employee.LeaveDate != nil {
 			leaveStr := employee.LeaveDate.Format(time.RFC3339)
 			leaveDateStr = &leaveStr
+		}
+
+		if employee.ProfessionStartDate != nil {
+			profStr := employee.ProfessionStartDate.Format(time.RFC3339)
+			professionStartDateStr = &profStr
 		}
 
 		userInfo := types.UserInfo{
@@ -576,6 +651,15 @@ func (s *employeeService) ListEmployees(limit, offset int, isAdmin bool) ([]*typ
 			EmergencyContact:         employee.EmergencyContact,
 			EmergencyContactName:     employee.EmergencyContactName,
 			EmergencyContactRelation: employee.EmergencyContactRelation,
+			GradeID:                  employee.GradeID,
+			IsGradeUp:                employee.IsGradeUp,
+			ContractNo:               employee.ContractNo,
+			ProfessionStartDate:      professionStartDateStr,
+			Note:                     employee.Note,
+			MotherName:               employee.MotherName,
+			FatherName:               employee.FatherName,
+			Nationality:              employee.Nationality,
+			IdentityNo:               employee.IdentityNo,
 			Roles:                    roleNames,
 			WorkInformation:          workInfoLookup,
 		}

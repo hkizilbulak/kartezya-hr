@@ -13,6 +13,23 @@ type LeaveTypeLookup struct {
 	Name string `json:"name"`
 }
 
+// Grade response DTO
+type GradeResponse struct {
+	ID          uint      `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	Deleted     bool      `json:"deleted"`
+	CreatedBy   string    `json:"created_by"`
+	ModifiedBy  string    `json:"modified_by"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+}
+
+type GradeLookup struct {
+	ID   uint   `json:"id"`
+	Name string `json:"name"`
+}
+
 // Company response DTO without departments relationship
 type CompanyResponse struct {
 	ID         uint      `json:"id"`
@@ -79,6 +96,15 @@ type EmployeeResponse struct {
 	EmergencyContact         string                  `json:"emergency_contact"`
 	EmergencyContactName     string                  `json:"emergency_contact_name"`
 	EmergencyContactRelation string                  `json:"emergency_contact_relation"`
+	GradeID                  *int64                  `json:"grade_id"`
+	IsGradeUp                bool                    `json:"is_grade_up"`
+	ContractNo               string                  `json:"contract_no"`
+	ProfessionStartDate      *string                 `json:"profession_start_date"`
+	Note                     string                  `json:"note"`
+	MotherName               string                  `json:"mother_name"`
+	FatherName               string                  `json:"father_name"`
+	Nationality              string                  `json:"nationality"`
+	IdentityNo               string                  `json:"identity_no"`
 	Roles                    []string                `json:"roles"`
 	WorkInformation          *EmployeeWorkInfoLookup `json:"work_information,omitempty"`
 }
@@ -146,6 +172,8 @@ type WorkInformationResponse struct {
 	ModifiedBy  string                           `json:"modified_by"`
 	StartDate   time.Time                        `json:"start_date"`
 	EndDate     *time.Time                       `json:"end_date"`
+	PersonnelNo string                           `json:"personnel_no"`
+	WorkEmail   string                           `json:"work_email"`
 	Employee    WorkInformationEmployeeLookup    `json:"employee"`
 	Company     WorkInformationCompanyLookup     `json:"company"`
 	Department  WorkInformationDepartmentLookup  `json:"department"`
