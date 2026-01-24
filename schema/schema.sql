@@ -5,10 +5,6 @@
 -- Enable UUID extension for future use
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Create custom enum types
-CREATE TYPE gender_enum AS ENUM ('Erkek', 'Kadın');
-CREATE TYPE emergency_contact_relation_enum AS ENUM ('Anne', 'Baba', 'Eş', 'Kardeş', 'Diğer');
-CREATE TYPE marital_status_enum AS ENUM ('Evli', 'Bekar');
 
 -- ================================================
 -- AUTHENTICATION & AUTHORIZATION TABLES
@@ -111,15 +107,15 @@ CREATE TABLE IF NOT EXISTS hr_employees (
     address TEXT,
     state VARCHAR(100),
     city VARCHAR(30),
-    gender gender_enum,
+    gender VARCHAR(20),
     date_of_birth DATE,
     hire_date DATE,
     leave_date DATE,
     total_experience DOUBLE PRECISION,
-    marital_status marital_status_enum,
+    marital_status VARCHAR(20),
     emergency_contact VARCHAR(15),
     emergency_contact_name VARCHAR(20),
-    emergency_contact_relation emergency_contact_relation_enum,
+    emergency_contact_relation VARCHAR(20),
     grade_id BIGINT,
     is_grade_up BOOLEAN DEFAULT false,
     contract_no VARCHAR(255),

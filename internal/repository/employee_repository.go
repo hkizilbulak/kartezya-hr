@@ -94,7 +94,39 @@ func (r *employeeRepository) GetAll(limit, offset int, sortParams types.SortPara
 
 func (r *employeeRepository) Update(employee *domain.Employee, modifiedBy string) error {
 	employee.ModifiedBy = modifiedBy
-	return r.db.Where("deleted = ?", false).Save(employee).Error
+
+	// Use Updates with a map to explicitly update all fields, including nil dates
+	updates := map[string]interface{}{
+		"email":                      employee.Email,
+		"company_email":              employee.CompanyEmail,
+		"first_name":                 employee.FirstName,
+		"last_name":                  employee.LastName,
+		"phone":                      employee.Phone,
+		"address":                    employee.Address,
+		"state":                      employee.State,
+		"city":                       employee.City,
+		"gender":                     employee.Gender,
+		"date_of_birth":              employee.DateOfBirth,
+		"hire_date":                  employee.HireDate,
+		"leave_date":                 employee.LeaveDate,
+		"total_experience":           employee.TotalExperience,
+		"marital_status":             employee.MaritalStatus,
+		"emergency_contact":          employee.EmergencyContact,
+		"emergency_contact_name":     employee.EmergencyContactName,
+		"emergency_contact_relation": employee.EmergencyContactRelation,
+		"grade_id":                   employee.GradeID,
+		"is_grade_up":                employee.IsGradeUp,
+		"contract_no":                employee.ContractNo,
+		"profession_start_date":      employee.ProfessionStartDate,
+		"note":                       employee.Note,
+		"mother_name":                employee.MotherName,
+		"father_name":                employee.FatherName,
+		"nationality":                employee.Nationality,
+		"identity_no":                employee.IdentityNo,
+		"modified_by":                modifiedBy,
+	}
+
+	return r.db.Where("deleted = ?", false).Model(employee).Updates(updates).Error
 }
 
 func (r *employeeRepository) Delete(id uint, deletedBy string) error {

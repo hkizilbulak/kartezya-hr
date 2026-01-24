@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"kartezya-hr/internal/service"
-	"kartezya-hr/internal/types"
 
 	"github.com/gin-gonic/gin"
 )
@@ -88,6 +87,7 @@ type UpdateMyProfileRequest struct {
 	City                     string  `json:"city"`
 	Gender                   string  `json:"gender"`
 	DateOfBirth              string  `json:"date_of_birth"`
+	ProfessionStartDate      string  `json:"profession_start_date"`
 	TotalExperience          float64 `json:"total_experience"`
 	MaritalStatus            string  `json:"marital_status"`
 	EmergencyContact         string  `json:"emergency_contact"`
@@ -139,11 +139,6 @@ func (h *EmployeeHandler) CreateEmployee(c *gin.Context) {
 		})
 		return
 	}
-
-	// Normalize enum values to Turkish
-	req.Gender = types.NormalizeGender(req.Gender)
-	req.MaritalStatus = types.NormalizeMaritalStatus(req.MaritalStatus)
-	req.EmergencyContactRelation = types.NormalizeEmergencyContactRelation(req.EmergencyContactRelation)
 
 	employee, err := h.employeeService.CreateEmployee(req.Email, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalExperience, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.GradeID, req.IsGradeUp, req.ContractNo, req.ProfessionStartDate, req.Note, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo, email, req.Roles)
 	if err != nil {
@@ -264,11 +259,6 @@ func (h *EmployeeHandler) UpdateEmployee(c *gin.Context) {
 	if req.CompanyEmail == "" {
 		req.CompanyEmail = email
 	}
-
-	// Normalize enum values to Turkish
-	req.Gender = types.NormalizeGender(req.Gender)
-	req.MaritalStatus = types.NormalizeMaritalStatus(req.MaritalStatus)
-	req.EmergencyContactRelation = types.NormalizeEmergencyContactRelation(req.EmergencyContactRelation)
 
 	if err := h.employeeService.UpdateEmployee(id, req.Email, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalExperience, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.GradeID, req.IsGradeUp, req.ContractNo, req.ProfessionStartDate, req.Note, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo, email, requestingUserID, isAdmin(roles), req.Roles); err != nil {
 		status := http.StatusInternalServerError
@@ -503,13 +493,8 @@ func (h *EmployeeHandler) UpdateMyProfile(c *gin.Context) {
 		return
 	}
 
-	// Normalize enum values to Turkish
-	req.Gender = types.NormalizeGender(req.Gender)
-	req.MaritalStatus = types.NormalizeMaritalStatus(req.MaritalStatus)
-	req.EmergencyContactRelation = types.NormalizeEmergencyContactRelation(req.EmergencyContactRelation)
-
 	// Update only the authenticated user's profile
-	if err := h.employeeService.UpdateMyProfile(userID, req.Email, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.TotalExperience, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo); err != nil {
+	if err := h.employeeService.UpdateMyProfile(userID, req.Email, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.ProfessionStartDate, req.TotalExperience, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   err.Error(),

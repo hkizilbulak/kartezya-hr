@@ -256,44 +256,62 @@ type MyLeaveBalanceResponse struct {
 }
 
 // Enum conversion helpers for handling both English and Turkish enum values
-// NormalizeGender converts English gender values to Turkish enum values
-func NormalizeGender(value string) string {
+// NormalizeGender converts gender values to English enum values
+// Returns nil pointer if value is empty string
+func NormalizeGender(value string) *string {
+	if value == "" {
+		return nil
+	}
+	var result string
 	switch value {
 	case "MALE", "Male", "male", "Erkek":
-		return "Erkek"
+		result = "MALE"
 	case "FEMALE", "Female", "female", "Kadın":
-		return "Kadın"
+		result = "FEMALE"
 	default:
-		return value // Return as-is if not recognized, let database validation catch it
+		result = value // Return as-is if not recognized, let database validation catch it
 	}
+	return &result
 }
 
-// NormalizeMaritalStatus converts English marital status values to Turkish enum values
-func NormalizeMaritalStatus(value string) string {
+// NormalizeMaritalStatus converts marital status values to English enum values
+// Returns nil pointer if value is empty string
+func NormalizeMaritalStatus(value string) *string {
+	if value == "" {
+		return nil
+	}
+	var result string
 	switch value {
 	case "MARRIED", "Married", "married", "Evli":
-		return "Evli"
+		result = "MARRIED"
 	case "SINGLE", "Single", "single", "Bekar":
-		return "Bekar"
+		result = "SINGLE"
 	default:
-		return value
+		result = value
 	}
+	return &result
 }
 
-// NormalizeEmergencyContactRelation converts English relation values to Turkish enum values
-func NormalizeEmergencyContactRelation(value string) string {
+// NormalizeEmergencyContactRelation converts relation values to English enum values
+// Returns nil pointer if value is empty string
+func NormalizeEmergencyContactRelation(value string) *string {
+	if value == "" {
+		return nil
+	}
+	var result string
 	switch value {
 	case "MOTHER", "Mother", "mother", "Anne":
-		return "Anne"
+		result = "MOTHER"
 	case "FATHER", "Father", "father", "Baba":
-		return "Baba"
+		result = "FATHER"
 	case "SPOUSE", "Spouse", "spouse", "Eş":
-		return "Eş"
+		result = "SPOUSE"
 	case "SIBLING", "Sibling", "sibling", "Kardeş":
-		return "Kardeş"
+		result = "SIBLING"
 	case "OTHER", "Other", "other", "RELATIVE", "Relative", "relative", "Diğer":
-		return "Diğer"
+		result = "OTHER"
 	default:
-		return value
+		result = value
 	}
+	return &result
 }

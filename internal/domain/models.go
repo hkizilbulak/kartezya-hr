@@ -58,15 +58,15 @@ type Employee struct {
 	Address                  string     `json:"address"`
 	State                    string     `json:"state" gorm:"size:100"`
 	City                     string     `json:"city" gorm:"size:30"`
-	Gender                   string     `json:"gender" gorm:"type:gender_enum"`
+	Gender                   string     `json:"gender" gorm:"size:20"`
 	DateOfBirth              *time.Time `json:"date_of_birth"`
 	HireDate                 *time.Time `json:"hire_date"`
 	LeaveDate                *time.Time `json:"leave_date"`
 	TotalExperience          float64    `json:"total_experience"`
-	MaritalStatus            string     `json:"marital_status" gorm:"type:marital_status_enum"`
+	MaritalStatus            string     `json:"marital_status" gorm:"size:20"`
 	EmergencyContact         string     `json:"emergency_contact" gorm:"size:15"`
 	EmergencyContactName     string     `json:"emergency_contact_name" gorm:"size:20"`
-	EmergencyContactRelation string     `json:"emergency_contact_relation" gorm:"type:emergency_contact_relation_enum"`
+	EmergencyContactRelation string     `json:"emergency_contact_relation" gorm:"size:20"`
 	GradeID                  *int64     `json:"grade_id" gorm:"index"`
 	IsGradeUp                bool       `json:"is_grade_up" gorm:"default:false"`
 	ContractNo               string     `json:"contract_no" gorm:"size:255"`
@@ -275,27 +275,6 @@ type AuditLog struct {
 	// Relationships
 	Creator User `json:"creator,omitempty" gorm:"foreignKey:CreatedBy"`
 }
-
-// Constants for gender
-const (
-	GenderMale   = "Erkek"
-	GenderFemale = "Kadın"
-)
-
-// Constants for emergency contact relation
-const (
-	EmergencyContactMother  = "Anne"
-	EmergencyContactFather  = "Baba"
-	EmergencyContactSpouse  = "Eş"
-	EmergencyContactSibling = "Kardeş"
-	EmergencyContactOther   = "Diğer"
-)
-
-// Constants for marital status
-const (
-	MaritalStatusMarried = "Evli"
-	MaritalStatusSingle  = "Bekar"
-)
 
 // Constants for roles
 const (

@@ -15,7 +15,7 @@ type EmployeeService interface {
 	GetEmployeeByID(id uint) (*types.EmployeeResponse, error)
 	GetEmployeeByUserID(userID uint) (*types.EmployeeResponse, error)
 	UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, isGradeUp bool, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, modifiedBy string, requestingUserID uint, isAdmin bool, roles []string) error
-	UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, motherName, fatherName, nationality, identityNo string) error
+	UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, professionStartDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, motherName, fatherName, nationality, identityNo string) error
 	DeleteEmployee(id uint, deletedBy string, isAdmin bool) error
 	ListEmployees(limit, offset int, isAdmin bool) ([]*types.EmployeeResponse, error)
 	GetTotalCount() (int64, error)
@@ -54,32 +54,11 @@ func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastNam
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
-	// Parse date fields
-	var dateOfBirthPtr, hireDatePtr, leaveDatePtr, professionStartDatePtr *time.Time
-
-	if dateOfBirth != "" {
-		if parsed, err := time.Parse("2006-01-02", dateOfBirth); err == nil {
-			dateOfBirthPtr = &parsed
-		}
-	}
-
-	if hireDate != "" {
-		if parsed, err := time.Parse("2006-01-02", hireDate); err == nil {
-			hireDatePtr = &parsed
-		}
-	}
-
-	if leaveDate != "" {
-		if parsed, err := time.Parse("2006-01-02", leaveDate); err == nil {
-			leaveDatePtr = &parsed
-		}
-	}
-
-	if professionStartDate != "" {
-		if parsed, err := time.Parse("2006-01-02", professionStartDate); err == nil {
-			professionStartDatePtr = &parsed
-		}
-	}
+	// Parse date fields using the new parseDate function
+	dateOfBirthPtr, _ := parseDate(dateOfBirth)
+	hireDatePtr, _ := parseDate(hireDate)
+	leaveDatePtr, _ := parseDate(leaveDate)
+	professionStartDatePtr, _ := parseDate(professionStartDate)
 
 	// Create employee profile
 	// email is stored in employee.email (personal email)
@@ -260,6 +239,20 @@ func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeRespo
 		roleNames[i] = role.Name
 	}
 
+	// Get work information
+	var workInfoLookup *types.EmployeeWorkInfoLookup
+	workInfos, err := s.workInfoRepo.GetByEmployeeID(employee.ID)
+	if err == nil && len(workInfos) > 0 {
+		// Get the latest work information (last one)
+		latestWorkInfo := workInfos[len(workInfos)-1]
+		workInfoLookup = &types.EmployeeWorkInfoLookup{
+			CompanyName:    latestWorkInfo.Company.Name,
+			DepartmentName: latestWorkInfo.Department.Name,
+			Manager:        latestWorkInfo.Department.Manager,
+			JobTitle:       latestWorkInfo.JobPosition.Title,
+		}
+	}
+
 	// Convert dates to string format for JSON response
 	var dateOfBirthStr, hireDateStr, leaveDateStr, professionStartDateStr *string
 
@@ -318,6 +311,7 @@ func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeRespo
 		Nationality:              employee.Nationality,
 		IdentityNo:               employee.IdentityNo,
 		Roles:                    roleNames,
+		WorkInformation:          workInfoLookup,
 	}, nil
 }
 
@@ -352,32 +346,11 @@ func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName
 		}
 	}
 
-	// Parse date fields
-	var dateOfBirthPtr, hireDatePtr, leaveDatePtr, professionStartDatePtr *time.Time
-
-	if dateOfBirth != "" {
-		if parsed, err := time.Parse("2006-01-02", dateOfBirth); err == nil {
-			dateOfBirthPtr = &parsed
-		}
-	}
-
-	if hireDate != "" {
-		if parsed, err := time.Parse("2006-01-02", hireDate); err == nil {
-			hireDatePtr = &parsed
-		}
-	}
-
-	if leaveDate != "" {
-		if parsed, err := time.Parse("2006-01-02", leaveDate); err == nil {
-			leaveDatePtr = &parsed
-		}
-	}
-
-	if professionStartDate != "" {
-		if parsed, err := time.Parse("2006-01-02", professionStartDate); err == nil {
-			professionStartDatePtr = &parsed
-		}
-	}
+	// Parse date fields using the parseDate helper function
+	dateOfBirthPtr, _ := parseDate(dateOfBirth)
+	hireDatePtr, _ := parseDate(hireDate)
+	leaveDatePtr, _ := parseDate(leaveDate)
+	professionStartDatePtr, _ := parseDate(professionStartDate)
 
 	// Clone the existing employee and update only the provided fields
 	updatedEmployee := *existingEmployee
@@ -434,7 +407,7 @@ func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName
 	return nil
 }
 
-func (s *employeeService) UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, motherName, fatherName, nationality, identityNo string) error {
+func (s *employeeService) UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, professionStartDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, motherName, fatherName, nationality, identityNo string) error {
 	// Get employee by user ID
 	employee, err := s.employeeRepo.GetByUserID(userID)
 	if err != nil {
@@ -453,18 +426,17 @@ func (s *employeeService) UpdateMyProfile(userID uint, email, phone, address, st
 		if existingEmailUser, err := s.userRepo.GetByEmail(email); err == nil && existingEmailUser.ID != user.ID {
 			return fmt.Errorf("email %s is already in use by another user", email)
 		}
-	}
 
-	// Parse date of birth
-	var dateOfBirthPtr *time.Time
-
-	if dateOfBirth != "" {
-		if parsed, err := time.Parse("2006-01-02T15:04:05.000Z", dateOfBirth); err == nil {
-			dateOfBirthPtr = &parsed
-		} else if parsed, err := time.Parse("2006-01-02", dateOfBirth); err == nil {
-			dateOfBirthPtr = &parsed
+		// Update user email
+		user.Email = email
+		if err := s.userRepo.Update(user, ""); err != nil {
+			return fmt.Errorf("failed to update user email: %v", err)
 		}
 	}
+
+	// Parse date fields using the new parseDate function
+	dateOfBirthPtr, _ := parseDate(dateOfBirth)
+	professionStartDatePtr, _ := parseDate(professionStartDate)
 
 	// Clone the existing employee and update only the provided fields
 	updatedEmployee := *employee
@@ -515,6 +487,9 @@ func (s *employeeService) UpdateMyProfile(userID uint, email, phone, address, st
 	}
 	if identityNo != "" {
 		updatedEmployee.IdentityNo = identityNo
+	}
+	if professionStartDatePtr != nil {
+		updatedEmployee.ProfessionStartDate = professionStartDatePtr
 	}
 
 	// Update employee

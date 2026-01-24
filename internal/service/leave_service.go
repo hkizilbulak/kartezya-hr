@@ -476,21 +476,6 @@ func (s *leaveService) ApproveLeave(id uint, userID uint) error {
 
 	// For annual leave type, validate balance before approval
 	if leaveType.Name == "Yıllık İzin" || leaveType.Name == "Annual Leave" {
-		balances, err := s.leaveBalanceRepo.GetByEmployeeAndLeaveType(existingLeave.EmployeeID, existingLeave.LeaveTypeID)
-		if err != nil {
-			return fmt.Errorf("failed to get leave balance: %w", err)
-		}
-
-		// Check if sufficient balance exists
-		var totalRemainingDays float64
-		if balances != nil && len(balances) > 0 {
-			totalRemainingDays = balances[0].RemainingDays
-		}
-
-		if totalRemainingDays < existingLeave.RequestedDays {
-			return fmt.Errorf("insufficient leave balance: requested %.1f days, available %.1f days", existingLeave.RequestedDays, totalRemainingDays)
-		}
-
 		// Deduct leave balance for annual leave
 		if err := s.DeductLeaveBalance(existingLeave.EmployeeID, existingLeave.LeaveTypeID, existingLeave.RequestedDays, userID); err != nil {
 			return fmt.Errorf("failed to deduct leave balance: %w", err)
