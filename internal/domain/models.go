@@ -17,8 +17,10 @@ type AuditableModel struct {
 // User represents the authentication entity
 type User struct {
 	AuditableModel
-	Email    string `json:"email" gorm:"uniqueIndex;not null"`
-	Password string `json:"-" gorm:"not null"` // Hide password in JSON responses
+	Email                string     `json:"email" gorm:"uniqueIndex;not null"`
+	Password             string     `json:"-" gorm:"not null"` // Hide password in JSON responses
+	PasswordResetToken   string     `json:"-" gorm:"size:255"` // Token for password reset
+	PasswordResetExpires *time.Time `json:"-"`                 // Expiration time for reset token
 
 	// Relationships
 	UserRoles []UserRole `json:"user_roles,omitempty"`

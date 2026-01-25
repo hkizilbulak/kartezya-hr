@@ -47,7 +47,9 @@ func (r *workInformationRepository) GetByID(id uint) (*domain.EmployeeWorkInform
 func (r *workInformationRepository) GetByEmployeeID(employeeID uint) ([]domain.EmployeeWorkInformation, error) {
 	var workInfos []domain.EmployeeWorkInformation
 	err := r.db.Preload("Employee").Preload("Company").Preload("Department").Preload("JobPosition").
-		Where("employee_id = ? AND deleted = ?", employeeID, false).Find(&workInfos).Error
+		Where("employee_id = ? AND deleted = ?", employeeID, false).
+		Order("start_date DESC").
+		Find(&workInfos).Error
 	return workInfos, err
 }
 
@@ -56,6 +58,7 @@ func (r *workInformationRepository) GetByUserID(userID uint) ([]domain.EmployeeW
 	err := r.db.Preload("Employee").Preload("Company").Preload("Department").Preload("JobPosition").
 		Joins("JOIN hr_employees ON hr_employees.id = hr_employee_work_information.employee_id").
 		Where("hr_employees.user_id = ? AND hr_employee_work_information.deleted = ? AND hr_employees.deleted = ?", userID, false, false).
+		Order("hr_employee_work_information.start_date DESC").
 		Find(&workInfos).Error
 	return workInfos, err
 }

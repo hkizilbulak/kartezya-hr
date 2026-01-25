@@ -12,8 +12,8 @@ import (
 
 type EmployeeService interface {
 	CreateEmployee(email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, isGradeUp bool, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, createdBy string, roles []string) (*domain.Employee, error)
-	GetEmployeeByID(id uint) (*types.EmployeeResponse, error)
-	GetEmployeeByUserID(userID uint) (*types.EmployeeResponse, error)
+	GetEmployeeByID(id uint) (*types.EmployeeDetailResponse, error)
+	GetEmployeeByUserID(userID uint) (*types.EmployeeDetailResponse, error)
 	UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, isGradeUp bool, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, modifiedBy string, requestingUserID uint, isAdmin bool, roles []string) error
 	UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, professionStartDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, motherName, fatherName, nationality, identityNo string) error
 	DeleteEmployee(id uint, deletedBy string, isAdmin bool) error
@@ -32,9 +32,10 @@ type employeeService struct {
 	authService  AuthService
 	auditService AuditService
 	workInfoRepo repository.WorkInformationRepository
+	emailService EmailService
 }
 
-func NewEmployeeService(employeeRepo repository.EmployeeRepository, userRepo repository.UserRepository, userRoleRepo repository.UserRoleRepository, roleRepo repository.RoleRepository, authService AuthService, auditService AuditService, workInfoRepo repository.WorkInformationRepository) EmployeeService {
+func NewEmployeeService(employeeRepo repository.EmployeeRepository, userRepo repository.UserRepository, userRoleRepo repository.UserRoleRepository, roleRepo repository.RoleRepository, authService AuthService, auditService AuditService, workInfoRepo repository.WorkInformationRepository, emailService EmailService) EmployeeService {
 	return &employeeService{
 		employeeRepo: employeeRepo,
 		userRepo:     userRepo,
@@ -43,6 +44,7 @@ func NewEmployeeService(employeeRepo repository.EmployeeRepository, userRepo rep
 		authService:  authService,
 		auditService: auditService,
 		workInfoRepo: workInfoRepo,
+		emailService: emailService,
 	}
 }
 
@@ -111,6 +113,15 @@ func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastNam
 		fmt.Printf("No roles provided for user %d\n", user.ID)
 	}
 
+	// Send password reset email to the newly created user
+	fmt.Printf("Sending password reset email to: %s\n", companyEmail)
+	if err := s.emailService.SendPasswordResetEmail(user, firstName, lastName); err != nil {
+		// Log error but don't fail the operation - employee is already created
+		fmt.Printf("WARNING: failed to send password reset email to %s: %v\n", companyEmail, err)
+	} else {
+		fmt.Printf("Password reset email sent successfully to: %s\n", companyEmail)
+	}
+
 	// Audit the creation
 	if err := s.auditService.CreateAuditLog("Employee", employee.ID, domain.AuditActionCreate, nil, employee, createdBy); err != nil {
 		// Log error but don't fail the operation
@@ -119,7 +130,7 @@ func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastNam
 	return employee, nil
 }
 
-func (s *employeeService) GetEmployeeByID(id uint) (*types.EmployeeResponse, error) {
+func (s *employeeService) GetEmployeeByID(id uint) (*types.EmployeeDetailResponse, error) {
 	employee, err := s.employeeRepo.GetByID(id)
 	if err != nil {
 		return nil, err
@@ -141,17 +152,32 @@ func (s *employeeService) GetEmployeeByID(id uint) (*types.EmployeeResponse, err
 		roleNames[i] = role.Name
 	}
 
-	// Get work information
-	var workInfoLookup *types.EmployeeWorkInfoLookup
+	// Get work information list (sorted by start_date DESC - newest first)
+	var workInfoList []types.EmployeeWorkInformationList
 	workInfos, err := s.workInfoRepo.GetByEmployeeID(employee.ID)
 	if err == nil && len(workInfos) > 0 {
-		// Get the latest work information (last one)
-		latestWorkInfo := workInfos[len(workInfos)-1]
-		workInfoLookup = &types.EmployeeWorkInfoLookup{
-			CompanyName:    latestWorkInfo.Company.Name,
-			DepartmentName: latestWorkInfo.Department.Name,
-			Manager:        latestWorkInfo.Department.Manager,
-			JobTitle:       latestWorkInfo.JobPosition.Title,
+		// Sort by start_date DESC (newest first)
+		workInfoList = make([]types.EmployeeWorkInformationList, len(workInfos))
+		for i, workInfo := range workInfos {
+			endDateStr := (*string)(nil)
+			if workInfo.EndDate != nil {
+				endStr := workInfo.EndDate.Format(time.RFC3339)
+				endDateStr = &endStr
+			}
+
+			workInfoList[i] = types.EmployeeWorkInformationList{
+				ID:             workInfo.ID,
+				CompanyName:    workInfo.Company.Name,
+				DepartmentName: workInfo.Department.Name,
+				Manager:        workInfo.Department.Manager,
+				JobTitle:       workInfo.JobPosition.Title,
+				StartDate:      workInfo.StartDate.Format(time.RFC3339),
+				EndDate:        endDateStr,
+			}
+		}
+		// Reverse to get DESC order
+		for i, j := 0, len(workInfoList)-1; i < j; i, j = i+1, j-1 {
+			workInfoList[i], workInfoList[j] = workInfoList[j], workInfoList[i]
 		}
 	}
 
@@ -183,7 +209,7 @@ func (s *employeeService) GetEmployeeByID(id uint) (*types.EmployeeResponse, err
 		Email: user.Email,
 	}
 
-	return &types.EmployeeResponse{
+	return &types.EmployeeDetailResponse{
 		ID:                       employee.ID,
 		User:                     userInfo,
 		FirstName:                employee.FirstName,
@@ -213,11 +239,11 @@ func (s *employeeService) GetEmployeeByID(id uint) (*types.EmployeeResponse, err
 		Nationality:              employee.Nationality,
 		IdentityNo:               employee.IdentityNo,
 		Roles:                    roleNames,
-		WorkInformation:          workInfoLookup,
+		WorkInformation:          workInfoList,
 	}, nil
 }
 
-func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeResponse, error) {
+func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeDetailResponse, error) {
 	employee, err := s.employeeRepo.GetByUserID(userID)
 	if err != nil {
 		return nil, err
@@ -239,17 +265,28 @@ func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeRespo
 		roleNames[i] = role.Name
 	}
 
-	// Get work information
-	var workInfoLookup *types.EmployeeWorkInfoLookup
+	// Get work information list (sorted by start_date DESC - newest first)
+	var workInfoList []types.EmployeeWorkInformationList
 	workInfos, err := s.workInfoRepo.GetByEmployeeID(employee.ID)
 	if err == nil && len(workInfos) > 0 {
-		// Get the latest work information (last one)
-		latestWorkInfo := workInfos[len(workInfos)-1]
-		workInfoLookup = &types.EmployeeWorkInfoLookup{
-			CompanyName:    latestWorkInfo.Company.Name,
-			DepartmentName: latestWorkInfo.Department.Name,
-			Manager:        latestWorkInfo.Department.Manager,
-			JobTitle:       latestWorkInfo.JobPosition.Title,
+		// Sort by start_date DESC (newest first)
+		workInfoList = make([]types.EmployeeWorkInformationList, len(workInfos))
+		for i, workInfo := range workInfos {
+			endDateStr := (*string)(nil)
+			if workInfo.EndDate != nil {
+				endStr := workInfo.EndDate.Format(time.RFC3339)
+				endDateStr = &endStr
+			}
+
+			workInfoList[i] = types.EmployeeWorkInformationList{
+				ID:             workInfo.ID,
+				CompanyName:    workInfo.Company.Name,
+				DepartmentName: workInfo.Department.Name,
+				Manager:        workInfo.Department.Manager,
+				JobTitle:       workInfo.JobPosition.Title,
+				StartDate:      workInfo.StartDate.Format(time.RFC3339),
+				EndDate:        endDateStr,
+			}
 		}
 	}
 
@@ -281,7 +318,7 @@ func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeRespo
 		Email: user.Email,
 	}
 
-	return &types.EmployeeResponse{
+	return &types.EmployeeDetailResponse{
 		ID:                       employee.ID,
 		User:                     userInfo,
 		FirstName:                employee.FirstName,
@@ -311,7 +348,7 @@ func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeRespo
 		Nationality:              employee.Nationality,
 		IdentityNo:               employee.IdentityNo,
 		Roles:                    roleNames,
-		WorkInformation:          workInfoLookup,
+		WorkInformation:          workInfoList,
 	}, nil
 }
 
@@ -438,59 +475,25 @@ func (s *employeeService) UpdateMyProfile(userID uint, email, phone, address, st
 	dateOfBirthPtr, _ := parseDate(dateOfBirth)
 	professionStartDatePtr, _ := parseDate(professionStartDate)
 
-	// Clone the existing employee and update only the provided fields
+	// Clone the existing employee and update all fields (no empty checks)
 	updatedEmployee := *employee
-	if email != "" {
-		updatedEmployee.Email = email
-	}
-	if phone != "" {
-		updatedEmployee.Phone = phone
-	}
-	if address != "" {
-		updatedEmployee.Address = address
-	}
-	if state != "" {
-		updatedEmployee.State = state
-	}
-	if city != "" {
-		updatedEmployee.City = city
-	}
-	if gender != "" {
-		updatedEmployee.Gender = gender
-	}
-	if dateOfBirthPtr != nil {
-		updatedEmployee.DateOfBirth = dateOfBirthPtr
-	}
-	if totalExperience != 0 {
-		updatedEmployee.TotalExperience = totalExperience
-	}
-	if maritalStatus != "" {
-		updatedEmployee.MaritalStatus = maritalStatus
-	}
-	if emergencyContact != "" {
-		updatedEmployee.EmergencyContact = emergencyContact
-	}
-	if emergencyContactName != "" {
-		updatedEmployee.EmergencyContactName = emergencyContactName
-	}
-	if emergencyContactRelation != "" {
-		updatedEmployee.EmergencyContactRelation = emergencyContactRelation
-	}
-	if motherName != "" {
-		updatedEmployee.MotherName = motherName
-	}
-	if fatherName != "" {
-		updatedEmployee.FatherName = fatherName
-	}
-	if nationality != "" {
-		updatedEmployee.Nationality = nationality
-	}
-	if identityNo != "" {
-		updatedEmployee.IdentityNo = identityNo
-	}
-	if professionStartDatePtr != nil {
-		updatedEmployee.ProfessionStartDate = professionStartDatePtr
-	}
+	updatedEmployee.Email = email
+	updatedEmployee.Phone = phone
+	updatedEmployee.Address = address
+	updatedEmployee.State = state
+	updatedEmployee.City = city
+	updatedEmployee.Gender = gender
+	updatedEmployee.DateOfBirth = dateOfBirthPtr
+	updatedEmployee.TotalExperience = totalExperience
+	updatedEmployee.MaritalStatus = maritalStatus
+	updatedEmployee.EmergencyContact = emergencyContact
+	updatedEmployee.EmergencyContactName = emergencyContactName
+	updatedEmployee.EmergencyContactRelation = emergencyContactRelation
+	updatedEmployee.MotherName = motherName
+	updatedEmployee.FatherName = fatherName
+	updatedEmployee.Nationality = nationality
+	updatedEmployee.IdentityNo = identityNo
+	updatedEmployee.ProfessionStartDate = professionStartDatePtr
 
 	// Update employee
 	if err := s.employeeRepo.Update(&updatedEmployee, ""); err != nil {
@@ -564,12 +567,12 @@ func (s *employeeService) ListEmployees(limit, offset int, isAdmin bool) ([]*typ
 			roleNames[j] = role.Name
 		}
 
-		// Get work information
+		// Get work information - get latest (first one in DESC order)
 		var workInfoLookup *types.EmployeeWorkInfoLookup
 		workInfos, err := s.workInfoRepo.GetByEmployeeID(employee.ID)
 		if err == nil && len(workInfos) > 0 {
-			// Get the latest work information (last one)
-			latestWorkInfo := workInfos[len(workInfos)-1]
+			// Get the latest work information (first one - already DESC sorted by database)
+			latestWorkInfo := workInfos[0]
 			workInfoLookup = &types.EmployeeWorkInfoLookup{
 				CompanyName:    latestWorkInfo.Company.Name,
 				DepartmentName: latestWorkInfo.Department.Name,

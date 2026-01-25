@@ -315,3 +315,48 @@ func NormalizeEmergencyContactRelation(value string) *string {
 	}
 	return &result
 }
+
+// EmployeeWorkInformationList for timeline view
+type EmployeeWorkInformationList struct {
+	ID             uint    `json:"id"`
+	CompanyName    string  `json:"company_name"`
+	DepartmentName string  `json:"department_name"`
+	Manager        string  `json:"manager"`
+	JobTitle       string  `json:"job_title"`
+	StartDate      string  `json:"start_date"`
+	EndDate        *string `json:"end_date"`
+}
+
+// EmployeeDetailResponse for detail endpoint - with work information list
+type EmployeeDetailResponse struct {
+	ID                       uint                          `json:"id"`
+	User                     UserInfo                      `json:"user"`
+	FirstName                string                        `json:"first_name"`
+	LastName                 string                        `json:"last_name"`
+	Email                    string                        `json:"email"`
+	CompanyEmail             string                        `json:"company_email"`
+	Phone                    string                        `json:"phone"`
+	Address                  string                        `json:"address"`
+	State                    string                        `json:"state"`
+	City                     string                        `json:"city"`
+	Gender                   string                        `json:"gender"`
+	DateOfBirth              *string                       `json:"date_of_birth"`
+	HireDate                 *string                       `json:"hire_date"`
+	LeaveDate                *string                       `json:"leave_date,omitempty"`
+	TotalExperience          float64                       `json:"total_experience"`
+	MaritalStatus            string                        `json:"marital_status"`
+	EmergencyContact         string                        `json:"emergency_contact"`
+	EmergencyContactName     string                        `json:"emergency_contact_name"`
+	EmergencyContactRelation string                        `json:"emergency_contact_relation"`
+	GradeID                  *int64                        `json:"grade_id"`
+	IsGradeUp                bool                          `json:"is_grade_up"`
+	ContractNo               string                        `json:"contract_no"`
+	ProfessionStartDate      *string                       `json:"profession_start_date"`
+	Note                     string                        `json:"note"`
+	MotherName               string                        `json:"mother_name"`
+	FatherName               string                        `json:"father_name"`
+	Nationality              string                        `json:"nationality"`
+	IdentityNo               string                        `json:"identity_no"`
+	Roles                    []string                      `json:"roles"`
+	WorkInformation          []EmployeeWorkInformationList `json:"work_information,omitempty"`
+}

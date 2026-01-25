@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/types"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -17,6 +18,9 @@ type UserRepository interface {
 	Delete(id uint, deletedBy string) error
 	GetWithRoles(id uint) (*domain.User, error)
 	GetEmployeeByUserID(userID uint) (*domain.Employee, error)
+	UpdatePasswordResetToken(userID uint, token string, expiresAt *time.Time) error
+	GetByPasswordResetToken(token string) (*domain.User, error)
+	ClearPasswordResetToken(userID uint) error
 }
 
 type userRepository struct {
@@ -118,4 +122,35 @@ func (r *userRepository) GetEmployeeByUserID(userID uint) (*domain.Employee, err
 		return nil, err
 	}
 	return &employee, nil
+}
+
+// UpdatePasswordResetToken updates the password reset token for a user
+func (r *userRepository) UpdatePasswordResetToken(userID uint, token string, expiresAt *time.Time) error {
+	return r.db.Model(&domain.User{}).
+		Where("id = ? AND deleted = ?", userID, false).
+		Updates(map[string]interface{}{
+			"password_reset_token":   token,
+			"password_reset_expires": expiresAt,
+		}).Error
+}
+
+// GetByPasswordResetToken retrieves a user by password reset token
+func (r *userRepository) GetByPasswordResetToken(token string) (*domain.User, error) {
+	var user domain.User
+	err := r.db.Where("password_reset_token = ? AND deleted = ? AND password_reset_expires > ?", token, false, time.Now()).
+		First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+// ClearPasswordResetToken clears the password reset token for a user
+func (r *userRepository) ClearPasswordResetToken(userID uint) error {
+	return r.db.Model(&domain.User{}).
+		Where("id = ? AND deleted = ?", userID, false).
+		Updates(map[string]interface{}{
+			"password_reset_token":   nil,
+			"password_reset_expires": nil,
+		}).Error
 }

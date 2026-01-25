@@ -75,7 +75,8 @@ func main() {
 	// Initialize services
 	auditService := service.NewAuditService(auditRepo)
 	authService := service.NewAuthService(userRepo, userRoleRepo, roleRepo, auditService, cfg)
-	employeeService := service.NewEmployeeService(employeeRepo, userRepo, userRoleRepo, roleRepo, authService, auditService, workInfoRepo)
+	emailService := service.NewEmailService(cfg, userRepo)
+	employeeService := service.NewEmployeeService(employeeRepo, userRepo, userRoleRepo, roleRepo, authService, auditService, workInfoRepo, emailService)
 	leaveService := service.NewLeaveService(leaveRepo, leaveTypeRepo, leaveBalanceRepo, employeeRepo, holidayRepo, auditService)
 	departmentService := service.NewDepartmentService(departmentRepo, companyRepo, auditService)
 	companyService := service.NewCompanyService(companyRepo, departmentRepo, departmentService, auditService)
@@ -85,7 +86,7 @@ func main() {
 	gradeService := service.NewGradeService(gradeRepo, auditService)
 
 	// Initialize handlers
-	authHandler := handler.NewAuthHandler(authService)
+	authHandler := handler.NewAuthHandler(authService, emailService, userRepo)
 	employeeHandler := handler.NewEmployeeHandler(employeeService)
 	leaveHandler := handler.NewLeaveHandler(leaveService, employeeService)
 	companyHandler := handler.NewCompanyHandler(companyService)
@@ -136,6 +137,8 @@ func main() {
 	auth := v1.Group("/auth")
 	{
 		auth.POST("/login", authHandler.Login)
+		auth.POST("/validate-reset-token", authHandler.ValidateResetToken)
+		auth.POST("/reset-password", authHandler.ResetPassword)
 	}
 
 	// Public lookup routes
@@ -157,6 +160,7 @@ func main() {
 		authRoutes := protected.Group("/auth")
 		{
 			authRoutes.POST("/logout", authHandler.Logout)
+			authRoutes.POST("/change-password", authHandler.ChangePassword)
 		}
 
 		// Employee routes
