@@ -6,6 +6,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 
+
 -- ================================================
 -- AUTHENTICATION & AUTHORIZATION TABLES
 -- ================================================
