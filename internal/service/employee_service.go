@@ -451,26 +451,6 @@ func (s *employeeService) UpdateMyProfile(userID uint, email, phone, address, st
 		return fmt.Errorf("employee not found: %v", err)
 	}
 
-	// Get user record
-	user, err := s.userRepo.GetByID(employee.UserID)
-	if err != nil {
-		return fmt.Errorf("user not found: %v", err)
-	}
-
-	// Update user email if it has changed
-	if email != "" && user.Email != email {
-		// Check if new email already exists for another user
-		if existingEmailUser, err := s.userRepo.GetByEmail(email); err == nil && existingEmailUser.ID != user.ID {
-			return fmt.Errorf("email %s is already in use by another user", email)
-		}
-
-		// Update user email
-		user.Email = email
-		if err := s.userRepo.Update(user, ""); err != nil {
-			return fmt.Errorf("failed to update user email: %v", err)
-		}
-	}
-
 	// Parse date fields using the new parseDate function
 	dateOfBirthPtr, _ := parseDate(dateOfBirth)
 	professionStartDatePtr, _ := parseDate(professionStartDate)
