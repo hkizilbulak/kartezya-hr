@@ -91,7 +91,7 @@ type EmployeeResponse struct {
 	DateOfBirth              *string                 `json:"date_of_birth"`
 	HireDate                 *string                 `json:"hire_date"`
 	LeaveDate                *string                 `json:"leave_date,omitempty"`
-	TotalExperience          float64                 `json:"total_experience"`
+	TotalGap                 float64                 `json:"total_gap"`
 	MaritalStatus            string                  `json:"marital_status"`
 	EmergencyContact         string                  `json:"emergency_contact"`
 	EmergencyContactName     string                  `json:"emergency_contact_name"`
@@ -197,22 +197,24 @@ type LeaveTypeResponse struct {
 }
 
 type MyLeaveRequestResponse struct {
-	ID              uint            `json:"id"`
-	CreatedAt       time.Time       `json:"created_at"`
-	UpdatedAt       time.Time       `json:"updated_at"`
-	LeaveType       LeaveTypeLookup `json:"leave_type"`
-	StartDate       time.Time       `json:"start_date"`
-	EndDate         time.Time       `json:"end_date"`
-	RequestedDays   float64         `json:"requested_days"`
-	Reason          string          `json:"reason"`
-	Status          string          `json:"status"`
-	IsPaid          bool            `json:"is_paid"`
-	ApprovedAt      *time.Time      `json:"approved_at"`
-	RejectedAt      *time.Time      `json:"rejected_at"`
-	RejectionReason string          `json:"rejection_reason"`
-	CancelReason    string          `json:"cancel_reason"`
-	CancelledAt     *time.Time      `json:"cancelled_at"`
-	Comments        string          `json:"comments"`
+	ID                  uint            `json:"id"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+	LeaveType           LeaveTypeLookup `json:"leave_type"`
+	StartDate           time.Time       `json:"start_date"`
+	EndDate             time.Time       `json:"end_date"`
+	IsStartDateFullDay  bool            `json:"is_start_date_full_day"`
+	IsFinishDateFullDay bool            `json:"is_finish_date_full_day"`
+	RequestedDays       float64         `json:"requested_days"`
+	Reason              string          `json:"reason"`
+	Status              string          `json:"status"`
+	IsPaid              bool            `json:"is_paid"`
+	ApprovedAt          *time.Time      `json:"approved_at"`
+	RejectedAt          *time.Time      `json:"rejected_at"`
+	RejectionReason     string          `json:"rejection_reason"`
+	CancelReason        string          `json:"cancel_reason"`
+	CancelledAt         *time.Time      `json:"cancelled_at"`
+	Comments            string          `json:"comments"`
 }
 
 type EmployeeLookup struct {
@@ -222,28 +224,30 @@ type EmployeeLookup struct {
 }
 
 type AdminLeaveRequestResponse struct {
-	ID              uint            `json:"id"`
-	CreatedAt       time.Time       `json:"created_at"`
-	UpdatedAt       time.Time       `json:"updated_at"`
-	Deleted         bool            `json:"deleted"`
-	CreatedBy       string          `json:"created_by"`
-	ModifiedBy      string          `json:"modified_by"`
-	Employee        EmployeeLookup  `json:"employee"`
-	LeaveType       LeaveTypeLookup `json:"leave_type"`
-	StartDate       time.Time       `json:"start_date"`
-	EndDate         time.Time       `json:"end_date"`
-	RequestedDays   float64         `json:"requested_days"`
-	RemainingDays   *float64        `json:"remaining_days"` // Leave balance remaining days (only for annual leave)
-	Reason          string          `json:"reason"`
-	Status          string          `json:"status"`
-	IsPaid          bool            `json:"is_paid"`
-	ApprovedBy      *uint           `json:"approved_by"`
-	ApprovedAt      *time.Time      `json:"approved_at"`
-	RejectedAt      *time.Time      `json:"rejected_at"`
-	RejectionReason string          `json:"rejection_reason"`
-	CancelReason    string          `json:"cancel_reason"`
-	CancelledAt     *time.Time      `json:"cancelled_at"`
-	Comments        string          `json:"comments"`
+	ID                  uint            `json:"id"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+	Deleted             bool            `json:"deleted"`
+	CreatedBy           string          `json:"created_by"`
+	ModifiedBy          string          `json:"modified_by"`
+	Employee            EmployeeLookup  `json:"employee"`
+	LeaveType           LeaveTypeLookup `json:"leave_type"`
+	StartDate           time.Time       `json:"start_date"`
+	EndDate             time.Time       `json:"end_date"`
+	IsStartDateFullDay  bool            `json:"is_start_date_full_day"`
+	IsFinishDateFullDay bool            `json:"is_finish_date_full_day"`
+	RequestedDays       float64         `json:"requested_days"`
+	RemainingDays       *float64        `json:"remaining_days"` // Leave balance remaining days (only for annual leave)
+	Reason              string          `json:"reason"`
+	Status              string          `json:"status"`
+	IsPaid              bool            `json:"is_paid"`
+	ApprovedBy          *uint           `json:"approved_by"`
+	ApprovedAt          *time.Time      `json:"approved_at"`
+	RejectedAt          *time.Time      `json:"rejected_at"`
+	RejectionReason     string          `json:"rejection_reason"`
+	CancelReason        string          `json:"cancel_reason"`
+	CancelledAt         *time.Time      `json:"cancelled_at"`
+	Comments            string          `json:"comments"`
 }
 
 // LeaveBalance response DTO for My Leave Balances
@@ -343,7 +347,7 @@ type EmployeeDetailResponse struct {
 	DateOfBirth              *string                       `json:"date_of_birth"`
 	HireDate                 *string                       `json:"hire_date"`
 	LeaveDate                *string                       `json:"leave_date,omitempty"`
-	TotalExperience          float64                       `json:"total_experience"`
+	TotalGap                 float64                       `json:"total_gap"`
 	MaritalStatus            string                        `json:"marital_status"`
 	EmergencyContact         string                        `json:"emergency_contact"`
 	EmergencyContactName     string                        `json:"emergency_contact_name"`

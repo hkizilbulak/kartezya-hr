@@ -205,6 +205,8 @@ CREATE TABLE IF NOT EXISTS hr_leave_requests (
     leave_type_id INTEGER NOT NULL,
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
+    is_start_date_full_day BOOLEAN NOT NULL DEFAULT true,
+    is_finish_date_full_day BOOLEAN NOT NULL DEFAULT true,
     requested_days DOUBLE PRECISION NOT NULL,
     reason TEXT,
     status VARCHAR(20) DEFAULT 'PENDING',

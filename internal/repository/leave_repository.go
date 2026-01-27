@@ -20,6 +20,8 @@ type LeaveRepository interface {
 	GetByEmployeeID(employeeID uint, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error)
 	GetByStatus(status string, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error)
 	GetByDateRange(startDate, endDate string) ([]*domain.LeaveRequest, error)
+	GetApprovedBirthdayLeaveInYear(employeeID uint, leaveTypeID uint, year int) ([]*domain.LeaveRequest, error)
+	GetPendingLeaveByEmployeeAndLeaveType(employeeID uint, leaveTypeID uint) (*domain.LeaveRequest, error)
 }
 
 // LeaveTypeRepository interface for leave types
@@ -265,6 +267,35 @@ func (r *leaveRepository) GetAllWithStatus(limit, offset int, sortParams types.S
 
 	err := mainQuery.Find(&leaves).Error
 	return leaves, total, err
+}
+
+// GetApprovedBirthdayLeaveInYear checks if there's an approved birthday leave in the given year
+func (r *leaveRepository) GetApprovedBirthdayLeaveInYear(employeeID uint, leaveTypeID uint, year int) ([]*domain.LeaveRequest, error) {
+	var leaves []*domain.LeaveRequest
+	// Get all approved birthday leaves for the employee in the given year
+	err := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").
+		Where("employee_id = ? AND leave_type_id = ? AND status = ? AND EXTRACT(YEAR FROM start_date) = ? AND deleted = ?",
+			employeeID, leaveTypeID, "APPROVED", year, false).
+		Find(&leaves).Error
+	return leaves, err
+}
+
+// GetPendingLeaveByEmployeeAndLeaveType checks if there's a pending leave request for the same leave type
+func (r *leaveRepository) GetPendingLeaveByEmployeeAndLeaveType(employeeID uint, leaveTypeID uint) (*domain.LeaveRequest, error) {
+	var leave domain.LeaveRequest
+	err := r.db.Preload("LeaveType").
+		Where("employee_id = ? AND leave_type_id = ? AND status = ? AND deleted = ?",
+			employeeID, leaveTypeID, "PENDING", false).
+		First(&leave).Error
+
+	// Return nil if not found (not an error for our use case)
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &leave, nil
 }
 
 // Leave Type Repository implementation

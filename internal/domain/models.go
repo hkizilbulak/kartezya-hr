@@ -64,7 +64,7 @@ type Employee struct {
 	DateOfBirth              *time.Time `json:"date_of_birth"`
 	HireDate                 *time.Time `json:"hire_date"`
 	LeaveDate                *time.Time `json:"leave_date"`
-	TotalExperience          float64    `json:"total_experience"`
+	TotalGap                 float64    `json:"total_gap"`
 	MaritalStatus            string     `json:"marital_status" gorm:"size:20"`
 	EmergencyContact         string     `json:"emergency_contact" gorm:"size:15"`
 	EmergencyContactName     string     `json:"emergency_contact_name" gorm:"size:20"`
@@ -172,21 +172,23 @@ type LeaveBalance struct {
 // LeaveRequest represents employee leave requests
 type LeaveRequest struct {
 	AuditableModel
-	EmployeeID      uint       `json:"employee_id" gorm:"not null"`
-	LeaveTypeID     uint       `json:"leave_type_id" gorm:"not null"`
-	StartDate       time.Time  `json:"start_date" gorm:"not null"`
-	EndDate         time.Time  `json:"end_date" gorm:"not null"`
-	RequestedDays   float64    `json:"requested_days" gorm:"not null"`
-	Reason          string     `json:"reason"`
-	Status          string     `json:"status" gorm:"default:'PENDING'"` // PENDING, APPROVED, REJECTED, CANCELLED
-	IsPaid          bool       `json:"is_paid" gorm:"not null"`
-	ApprovedBy      *uint      `json:"approved_by"`
-	ApprovedAt      *time.Time `json:"approved_at"`
-	RejectedAt      *time.Time `json:"rejected_at"`
-	RejectionReason string     `json:"rejection_reason"`
-	CancelReason    string     `json:"cancel_reason"`
-	CancelledAt     *time.Time `json:"cancelled_at"`
-	Comments        string     `json:"comments" gorm:"type:text"`
+	EmployeeID          uint       `json:"employee_id" gorm:"not null"`
+	LeaveTypeID         uint       `json:"leave_type_id" gorm:"not null"`
+	StartDate           time.Time  `json:"start_date" gorm:"not null"`
+	EndDate             time.Time  `json:"end_date" gorm:"not null"`
+	IsStartDateFullDay  bool       `json:"is_start_date_full_day" gorm:"default:true"`  // true = tam gün, false = yarım gün
+	IsFinishDateFullDay bool       `json:"is_finish_date_full_day" gorm:"default:true"` // true = tam gün, false = yarım gün
+	RequestedDays       float64    `json:"requested_days" gorm:"not null"`
+	Reason              string     `json:"reason"`
+	Status              string     `json:"status" gorm:"default:'PENDING'"` // PENDING, APPROVED, REJECTED, CANCELLED
+	IsPaid              bool       `json:"is_paid" gorm:"not null"`
+	ApprovedBy          *uint      `json:"approved_by"`
+	ApprovedAt          *time.Time `json:"approved_at"`
+	RejectedAt          *time.Time `json:"rejected_at"`
+	RejectionReason     string     `json:"rejection_reason"`
+	CancelReason        string     `json:"cancel_reason"`
+	CancelledAt         *time.Time `json:"cancelled_at"`
+	Comments            string     `json:"comments" gorm:"type:text"`
 	// Relationships
 	Employee       Employee        `json:"employee,omitempty"`
 	LeaveType      LeaveType       `json:"leave_type,omitempty"`
@@ -196,26 +198,28 @@ type LeaveRequest struct {
 
 // Leave represents a unified leave entity for backward compatibility (maps to leave_requests table)
 type Leave struct {
-	ID          uint       `gorm:"primaryKey;column:id" json:"id"`
-	EmployeeID  uint       `json:"employee_id" gorm:"not null;column:employee_id"`
-	Employee    Employee   `gorm:"foreignKey:EmployeeID" json:"employee,omitempty"`
-	LeaveTypeID uint       `json:"leave_type_id" gorm:"not null;column:leave_type_id"`
-	LeaveType   LeaveType  `gorm:"foreignKey:LeaveTypeID" json:"leave_type,omitempty"`
-	StartDate   time.Time  `json:"start_date" gorm:"not null;column:start_date"`
-	EndDate     time.Time  `json:"end_date" gorm:"not null;column:end_date"`
-	Days        float64    `json:"days" gorm:"not null;column:requested_days"`
-	Status      string     `json:"status" gorm:"default:'PENDING';column:status"`
-	Reason      string     `json:"reason" gorm:"type:text;column:reason"`
-	ApproverID  *uint      `json:"approver_id" gorm:"column:approved_by"`
-	Approver    *User      `gorm:"foreignKey:ApproverID;references:ID" json:"approver,omitempty"`
-	ApprovedAt  *time.Time `json:"approved_at" gorm:"column:approved_at"`
-	RejectedAt  *time.Time `json:"rejected_at"`
-	Comments    string     `json:"comments" gorm:"type:text;column:rejection_reason"`
-	CreatedAt   time.Time  `json:"created_at" gorm:"autoCreateTime;column:created_at"`
-	UpdatedAt   time.Time  `json:"updated_at" gorm:"autoUpdateTime;column:updated_at"`
-	CreatedBy   string     `json:"created_by" gorm:"not null;column:created_by"`
-	ModifiedBy  string     `json:"modified_by" gorm:"not null;column:modified_by"`
-	Deleted     bool       `json:"-" gorm:"default:false;column:deleted"`
+	ID                  uint       `gorm:"primaryKey;column:id" json:"id"`
+	EmployeeID          uint       `json:"employee_id" gorm:"not null;column:employee_id"`
+	Employee            Employee   `gorm:"foreignKey:EmployeeID" json:"employee,omitempty"`
+	LeaveTypeID         uint       `json:"leave_type_id" gorm:"not null;column:leave_type_id"`
+	LeaveType           LeaveType  `gorm:"foreignKey:LeaveTypeID" json:"leave_type,omitempty"`
+	StartDate           time.Time  `json:"start_date" gorm:"not null;column:start_date"`
+	EndDate             time.Time  `json:"end_date" gorm:"not null;column:end_date"`
+	IsStartDateFullDay  bool       `json:"is_start_date_full_day" gorm:"default:true;column:is_start_date_full_day"`
+	IsFinishDateFullDay bool       `json:"is_finish_date_full_day" gorm:"default:true;column:is_finish_date_full_day"`
+	Days                float64    `json:"days" gorm:"not null;column:requested_days"`
+	Status              string     `json:"status" gorm:"default:'PENDING';column:status"`
+	Reason              string     `json:"reason" gorm:"type:text;column:reason"`
+	ApproverID          *uint      `json:"approver_id" gorm:"column:approved_by"`
+	Approver            *User      `gorm:"foreignKey:ApproverID;references:ID" json:"approver,omitempty"`
+	ApprovedAt          *time.Time `json:"approved_at" gorm:"column:approved_at"`
+	RejectedAt          *time.Time `json:"rejected_at"`
+	Comments            string     `json:"comments" gorm:"type:text;column:rejection_reason"`
+	CreatedAt           time.Time  `json:"created_at" gorm:"autoCreateTime;column:created_at"`
+	UpdatedAt           time.Time  `json:"updated_at" gorm:"autoUpdateTime;column:updated_at"`
+	CreatedBy           string     `json:"created_by" gorm:"not null;column:created_by"`
+	ModifiedBy          string     `json:"modified_by" gorm:"not null;column:modified_by"`
+	Deleted             bool       `json:"-" gorm:"default:false;column:deleted"`
 }
 
 // TableName maps the Leave model to the hr_leave_requests table

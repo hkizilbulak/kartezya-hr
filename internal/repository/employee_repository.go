@@ -109,7 +109,7 @@ func (r *employeeRepository) Update(employee *domain.Employee, modifiedBy string
 		"date_of_birth":              employee.DateOfBirth,
 		"hire_date":                  employee.HireDate,
 		"leave_date":                 employee.LeaveDate,
-		"total_experience":           employee.TotalExperience,
+		"total_gap":                  employee.TotalGap,
 		"marital_status":             employee.MaritalStatus,
 		"emergency_contact":          employee.EmergencyContact,
 		"emergency_contact_name":     employee.EmergencyContactName,

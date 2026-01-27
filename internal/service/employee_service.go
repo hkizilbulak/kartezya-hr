@@ -11,11 +11,11 @@ import (
 )
 
 type EmployeeService interface {
-	CreateEmployee(email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, isGradeUp bool, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, createdBy string, roles []string) (*domain.Employee, error)
+	CreateEmployee(email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalGap float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, isGradeUp bool, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, createdBy string, roles []string) (*domain.Employee, error)
 	GetEmployeeByID(id uint) (*types.EmployeeDetailResponse, error)
 	GetEmployeeByUserID(userID uint) (*types.EmployeeDetailResponse, error)
-	UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, isGradeUp bool, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, modifiedBy string, requestingUserID uint, isAdmin bool, roles []string) error
-	UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, professionStartDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, motherName, fatherName, nationality, identityNo string) error
+	UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalGap float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, isGradeUp bool, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, modifiedBy string, requestingUserID uint, isAdmin bool, roles []string) error
+	UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, professionStartDate string, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, motherName, fatherName, nationality, identityNo string) error
 	DeleteEmployee(id uint, deletedBy string, isAdmin bool) error
 	ListEmployees(limit, offset int, isAdmin bool) ([]*types.EmployeeResponse, error)
 	GetTotalCount() (int64, error)
@@ -48,7 +48,7 @@ func NewEmployeeService(employeeRepo repository.EmployeeRepository, userRepo rep
 	}
 }
 
-func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, isGradeUp bool, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, createdBy string, roles []string) (*domain.Employee, error) {
+func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalGap float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, isGradeUp bool, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, createdBy string, roles []string) (*domain.Employee, error) {
 	// Delegate user creation to AuthService (respecting domain boundaries)
 	// companyEmail is used as the user's email in the user table
 	user, err := s.authService.CreateUserForEmployee(companyEmail, createdBy)
@@ -79,7 +79,7 @@ func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastNam
 		DateOfBirth:              dateOfBirthPtr,
 		HireDate:                 hireDatePtr,
 		LeaveDate:                leaveDatePtr,
-		TotalExperience:          totalExperience,
+		TotalGap:                 totalGap,
 		MaritalStatus:            maritalStatus,
 		EmergencyContact:         emergencyContact,
 		EmergencyContactName:     emergencyContactName,
@@ -224,7 +224,7 @@ func (s *employeeService) GetEmployeeByID(id uint) (*types.EmployeeDetailRespons
 		DateOfBirth:              dateOfBirthStr,
 		HireDate:                 hireDateStr,
 		LeaveDate:                leaveDateStr,
-		TotalExperience:          employee.TotalExperience,
+		TotalGap:                 employee.TotalGap,
 		MaritalStatus:            employee.MaritalStatus,
 		EmergencyContact:         employee.EmergencyContact,
 		EmergencyContactName:     employee.EmergencyContactName,
@@ -333,7 +333,7 @@ func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeDetai
 		DateOfBirth:              dateOfBirthStr,
 		HireDate:                 hireDateStr,
 		LeaveDate:                leaveDateStr,
-		TotalExperience:          employee.TotalExperience,
+		TotalGap:                 employee.TotalGap,
 		MaritalStatus:            employee.MaritalStatus,
 		EmergencyContact:         employee.EmergencyContact,
 		EmergencyContactName:     employee.EmergencyContactName,
@@ -352,7 +352,7 @@ func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeDetai
 	}, nil
 }
 
-func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, isGradeUp bool, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, modifiedBy string, requestingUserID uint, isAdmin bool, roles []string) error {
+func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalGap float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, isGradeUp bool, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, modifiedBy string, requestingUserID uint, isAdmin bool, roles []string) error {
 	// Get existing employee for authorization check and audit trail
 	existingEmployee, err := s.employeeRepo.GetByID(id)
 	if err != nil {
@@ -391,9 +391,7 @@ func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName
 
 	// Clone the existing employee and update only the provided fields
 	updatedEmployee := *existingEmployee
-	if email != "" {
-		updatedEmployee.Email = email
-	}
+	updatedEmployee.Email = email
 	updatedEmployee.CompanyEmail = companyEmail
 	updatedEmployee.FirstName = firstName
 	updatedEmployee.LastName = lastName
@@ -405,7 +403,7 @@ func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName
 	updatedEmployee.DateOfBirth = dateOfBirthPtr
 	updatedEmployee.HireDate = hireDatePtr
 	updatedEmployee.LeaveDate = leaveDatePtr
-	updatedEmployee.TotalExperience = totalExperience
+	updatedEmployee.TotalGap = totalGap
 	updatedEmployee.MaritalStatus = maritalStatus
 	updatedEmployee.EmergencyContact = emergencyContact
 	updatedEmployee.EmergencyContactName = emergencyContactName
@@ -444,7 +442,7 @@ func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName
 	return nil
 }
 
-func (s *employeeService) UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, professionStartDate string, totalExperience float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, motherName, fatherName, nationality, identityNo string) error {
+func (s *employeeService) UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, professionStartDate string, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, motherName, fatherName, nationality, identityNo string) error {
 	// Get employee by user ID
 	employee, err := s.employeeRepo.GetByUserID(userID)
 	if err != nil {
@@ -464,7 +462,6 @@ func (s *employeeService) UpdateMyProfile(userID uint, email, phone, address, st
 	updatedEmployee.City = city
 	updatedEmployee.Gender = gender
 	updatedEmployee.DateOfBirth = dateOfBirthPtr
-	updatedEmployee.TotalExperience = totalExperience
 	updatedEmployee.MaritalStatus = maritalStatus
 	updatedEmployee.EmergencyContact = emergencyContact
 	updatedEmployee.EmergencyContactName = emergencyContactName
@@ -604,7 +601,7 @@ func (s *employeeService) ListEmployees(limit, offset int, isAdmin bool) ([]*typ
 			DateOfBirth:              dateOfBirthStr,
 			HireDate:                 hireDateStr,
 			LeaveDate:                leaveDateStr,
-			TotalExperience:          employee.TotalExperience,
+			TotalGap:                 employee.TotalGap,
 			MaritalStatus:            employee.MaritalStatus,
 			EmergencyContact:         employee.EmergencyContact,
 			EmergencyContactName:     employee.EmergencyContactName,

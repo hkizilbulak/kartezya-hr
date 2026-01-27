@@ -36,18 +36,22 @@ type CreateLeaveTypeRequest struct {
 }
 
 type CreateLeaveRequestRequest struct {
-	EmployeeID  *uint     `json:"employee_id"`
-	LeaveTypeID uint      `json:"leave_type_id" binding:"required"`
-	StartDate   time.Time `json:"start_date" binding:"required"`
-	EndDate     time.Time `json:"end_date" binding:"required"`
-	Reason      string    `json:"reason"`
+	EmployeeID          *uint     `json:"employee_id"`
+	LeaveTypeID         uint      `json:"leave_type_id" binding:"required"`
+	StartDate           time.Time `json:"start_date" binding:"required"`
+	EndDate             time.Time `json:"end_date" binding:"required"`
+	IsStartDateFullDay  bool      `json:"is_start_date_full_day" binding:""`
+	IsFinishDateFullDay bool      `json:"is_finish_date_full_day" binding:""`
+	Reason              string    `json:"reason"`
 }
 
 type UpdateLeaveRequestRequest struct {
-	LeaveTypeID uint      `json:"leave_type_id" binding:"required"`
-	StartDate   time.Time `json:"start_date" binding:"required"`
-	EndDate     time.Time `json:"end_date" binding:"required"`
-	Reason      *string   `json:"reason"`
+	LeaveTypeID         uint      `json:"leave_type_id" binding:"required"`
+	StartDate           time.Time `json:"start_date" binding:"required"`
+	EndDate             time.Time `json:"end_date" binding:"required"`
+	IsStartDateFullDay  bool      `json:"is_start_date_full_day" binding:""`
+	IsFinishDateFullDay bool      `json:"is_finish_date_full_day" binding:""`
+	Reason              string    `json:"reason"`
 }
 
 type ApproveRejectRequest struct {
@@ -59,8 +63,10 @@ type CancelLeaveRequest struct {
 }
 
 type CalculateWorkingDaysRequest struct {
-	StartDate time.Time `json:"start_date" binding:"required"`
-	EndDate   time.Time `json:"end_date" binding:"required"`
+	StartDate           time.Time `json:"start_date" binding:"required"`
+	EndDate             time.Time `json:"end_date" binding:"required"`
+	IsStartDateFullDay  bool      `json:"is_start_date_full_day" binding:""`
+	IsFinishDateFullDay bool      `json:"is_finish_date_full_day" binding:""`
 }
 
 type CalculateWorkingDaysResponse struct {
@@ -412,7 +418,7 @@ func (h *LeaveHandler) CreateLeaveRequest(c *gin.Context) {
 	}
 
 	// Calculate working days between start and end date
-	workingDays, err := h.leaveService.CalculateWorkingDays(req.StartDate, req.EndDate)
+	workingDays, err := h.leaveService.CalculateWorkingDays(req.StartDate, req.EndDate, req.IsStartDateFullDay, req.IsFinishDateFullDay)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -439,14 +445,16 @@ func (h *LeaveHandler) CreateLeaveRequest(c *gin.Context) {
 
 	// Create LeaveRequest entity
 	leave := &domain.LeaveRequest{
-		EmployeeID:    *req.EmployeeID,
-		LeaveTypeID:   req.LeaveTypeID,
-		StartDate:     req.StartDate,
-		EndDate:       req.EndDate,
-		RequestedDays: workingDays,
-		Reason:        req.Reason,
-		Status:        initialStatus,
-		IsPaid:        leaveType.IsPaid,
+		EmployeeID:          *req.EmployeeID,
+		LeaveTypeID:         req.LeaveTypeID,
+		StartDate:           req.StartDate,
+		EndDate:             req.EndDate,
+		IsStartDateFullDay:  req.IsStartDateFullDay,
+		IsFinishDateFullDay: req.IsFinishDateFullDay,
+		RequestedDays:       workingDays,
+		Reason:              req.Reason,
+		Status:              initialStatus,
+		IsPaid:              leaveType.IsPaid,
 	}
 
 	if err := h.leaveService.CreateLeave(leave, userID, isAdmin(roles)); err != nil {
@@ -547,7 +555,7 @@ func (h *LeaveHandler) UpdateLeaveRequest(c *gin.Context) {
 	}
 
 	// Calculate working days between start and end date
-	workingDays, err := h.leaveService.CalculateWorkingDays(req.StartDate, req.EndDate)
+	workingDays, err := h.leaveService.CalculateWorkingDays(req.StartDate, req.EndDate, req.IsStartDateFullDay, req.IsFinishDateFullDay)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -568,21 +576,18 @@ func (h *LeaveHandler) UpdateLeaveRequest(c *gin.Context) {
 
 	// Create updated LeaveRequest entity
 	leave := &domain.LeaveRequest{
-		EmployeeID:    existingLeave.EmployeeID,
-		LeaveTypeID:   req.LeaveTypeID,
-		StartDate:     req.StartDate,
-		EndDate:       req.EndDate,
-		RequestedDays: workingDays,
-		Reason:        "",
-		Status:        existingLeave.Status, // Preserve existing status
-		IsPaid:        leaveType.IsPaid,
+		EmployeeID:          existingLeave.EmployeeID,
+		LeaveTypeID:         req.LeaveTypeID,
+		StartDate:           req.StartDate,
+		EndDate:             req.EndDate,
+		IsStartDateFullDay:  req.IsStartDateFullDay,
+		IsFinishDateFullDay: req.IsFinishDateFullDay,
+		RequestedDays:       workingDays,
+		Reason:              existingLeave.Reason, // Preserve existing reason initially
+		Status:              existingLeave.Status, // Preserve existing status
+		IsPaid:              leaveType.IsPaid,
 	}
-
-	// Set reason if provided
-	if req.Reason != nil {
-		leave.Reason = *req.Reason
-	}
-
+	leave.Reason = req.Reason
 	leave.ID = id
 
 	if err := h.leaveService.UpdateLeave(leave, userID); err != nil {
@@ -1077,7 +1082,7 @@ func (h *LeaveHandler) CalculateWorkingDays(c *gin.Context) {
 	}
 
 	// Calculate working days using service
-	workingDays, err := h.leaveService.CalculateWorkingDays(req.StartDate, req.EndDate)
+	workingDays, err := h.leaveService.CalculateWorkingDays(req.StartDate, req.EndDate, req.IsStartDateFullDay, req.IsFinishDateFullDay)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,

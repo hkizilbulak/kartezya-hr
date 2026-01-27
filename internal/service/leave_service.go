@@ -55,7 +55,7 @@ type LeaveService interface {
 	DeleteLeaveType(id uint, userID uint) error
 
 	// Working days calculation
-	CalculateWorkingDays(startDate, endDate time.Time) (float64, error)
+	CalculateWorkingDays(startDate, endDate time.Time, isStartDateFullDay, isFinishDateFullDay bool) (float64, error)
 }
 
 type leaveService struct {
@@ -106,6 +106,35 @@ func (s *leaveService) CreateLeave(leave *domain.LeaveRequest, userID uint, isAd
 	}
 	if leave.RequestedDays < 1 {
 		return errors.New("selected date range does not include any working days")
+	}
+
+	// Get leave type to check if it's birthday leave
+	leaveType, err := s.leaveTypeRepo.GetByID(leave.LeaveTypeID)
+	if err != nil {
+		return fmt.Errorf("failed to get leave type: %w", err)
+	}
+
+	// Check if there's already a pending leave request for the same leave type
+	pendingLeave, err := s.leaveRepo.GetPendingLeaveByEmployeeAndLeaveType(leave.EmployeeID, leave.LeaveTypeID)
+	if err != nil {
+		return fmt.Errorf("failed to check pending leave: %w", err)
+	}
+	if pendingLeave != nil {
+		return fmt.Errorf("Bekleyen %s talebiniz olduğundan yeni talebiniz için izin girişi yapamazsınız", leaveType.Name)
+	}
+
+	// Check for birthday leave restrictions (Doğum Günü İzni)
+	if leaveType.Name == "Doğum Günü İzni" || leaveType.Name == "Birthday Leave" {
+		// Check if requested days exceeds 1 day limit
+		if leave.RequestedDays > 1 {
+			return errors.New("Doğum günü izni en fazla 1 gün girilebilir")
+		}
+		// Check if there's already an approved birthday leave in this year
+		year := leave.StartDate.Year()
+		existingBirthdayLeaves, err := s.leaveRepo.GetApprovedBirthdayLeaveInYear(leave.EmployeeID, leave.LeaveTypeID, year)
+		if err == nil && len(existingBirthdayLeaves) > 0 {
+			return errors.New("Bir takvim yılı içerisinde en fazla 1 kez doğum günü izni girebilirsiniz")
+		}
 	}
 
 	// Validate leave balance for non-admin users
@@ -162,19 +191,21 @@ func (s *leaveService) GetLeaveByIDFormatted(id uint) (*types.AdminLeaveRequestR
 			ID:   leave.LeaveType.ID,
 			Name: leave.LeaveType.Name,
 		},
-		StartDate:       leave.StartDate,
-		EndDate:         leave.EndDate,
-		RequestedDays:   leave.RequestedDays,
-		Reason:          leave.Reason,
-		Status:          leave.Status,
-		IsPaid:          leave.IsPaid,
-		ApprovedBy:      leave.ApprovedBy,
-		ApprovedAt:      leave.ApprovedAt,
-		RejectedAt:      leave.RejectedAt,
-		RejectionReason: leave.RejectionReason,
-		CancelReason:    leave.CancelReason,
-		CancelledAt:     leave.CancelledAt,
-		Comments:        leave.Comments,
+		StartDate:           leave.StartDate,
+		EndDate:             leave.EndDate,
+		IsStartDateFullDay:  leave.IsStartDateFullDay,
+		IsFinishDateFullDay: leave.IsFinishDateFullDay,
+		RequestedDays:       leave.RequestedDays,
+		Reason:              leave.Reason,
+		Status:              leave.Status,
+		IsPaid:              leave.IsPaid,
+		ApprovedBy:          leave.ApprovedBy,
+		ApprovedAt:          leave.ApprovedAt,
+		RejectedAt:          leave.RejectedAt,
+		RejectionReason:     leave.RejectionReason,
+		CancelReason:        leave.CancelReason,
+		CancelledAt:         leave.CancelledAt,
+		Comments:            leave.Comments,
 	}, nil
 }
 
@@ -233,19 +264,71 @@ func (s *leaveService) UpdateLeave(leave *domain.LeaveRequest, userID uint) erro
 		return fmt.Errorf("only pending leave requests can be updated, current status: %s", existingLeave.Status)
 	}
 
-	if leave.RequestedDays < 1 {
-		return errors.New("selected date range does not include any working days")
+	// Validate that start date is not in the past
+	today := time.Now().Truncate(24 * time.Hour)
+	startDateNormalized := leave.StartDate.Truncate(24 * time.Hour)
+	if startDateNormalized.Before(today) {
+		return errors.New("start date cannot be in the past")
+	}
+
+	// Get the leave type to get the IsPaid value
+	leaveType, err := s.leaveTypeRepo.GetByID(leave.LeaveTypeID)
+	if err != nil {
+		return fmt.Errorf("failed to get leave type: %w", err)
+	}
+
+	// If leave type is being changed, check if there's a pending leave request for the new leave type
+	if existingLeave.LeaveTypeID != leave.LeaveTypeID {
+		pendingLeave, err := s.leaveRepo.GetPendingLeaveByEmployeeAndLeaveType(leave.EmployeeID, leave.LeaveTypeID)
+		if err != nil {
+			return fmt.Errorf("failed to check pending leave: %w", err)
+		}
+		if pendingLeave != nil {
+			return fmt.Errorf("Bekleyen %s talebiniz olduğundan yeni talebiniz için izin girişi yapamazsınız", leaveType.Name)
+		}
+	} else {
+		// Even if not changing leave type, check if there are other pending leave requests (excluding this one)
+		allPendingLeaves, _, err := s.leaveRepo.GetByEmployeeIDWithLeaveTypeAndStatus(leave.EmployeeID, 1000, 0, types.SortParams{}, LeaveStatusPending)
+		if err != nil {
+			return fmt.Errorf("failed to check pending leaves: %w", err)
+		}
+
+		// Check if there's another pending leave request (not the current one being updated)
+		for _, pendingLeave := range allPendingLeaves {
+			if pendingLeave.ID != leave.ID {
+				return fmt.Errorf("Başka bir bekleyen izin talebiniz bulunmaktadır, lütfen o talebi sonlandırdıktan sonra yeni bir talib oluşturunuz")
+			}
+		}
+	}
+
+	// Check for birthday leave restrictions if leave type is being changed to birthday leave (Doğum Günü İzni)
+	if (leaveType.Name == "Doğum Günü İzni" || leaveType.Name == "Birthday Leave") &&
+		existingLeave.LeaveTypeID != leave.LeaveTypeID {
+		// Check if there's already an approved birthday leave in this year
+		year := leave.StartDate.Year()
+		existingBirthdayLeaves, err := s.leaveRepo.GetApprovedBirthdayLeaveInYear(leave.EmployeeID, leave.LeaveTypeID, year)
+		if err == nil && len(existingBirthdayLeaves) > 0 {
+			return errors.New("Bir takvim yılı içerisinde en fazla 1 kez doğum günü izin girebilirsiniz")
+		}
 	}
 
 	// Clone the existing leave and update only the provided fields
 	updatedLeave := *existingLeave
 	updatedLeave.LeaveTypeID = leave.LeaveTypeID
+	updatedLeave.LeaveType = *leaveType // Set the LeaveType object
 	updatedLeave.StartDate = leave.StartDate
 	updatedLeave.EndDate = leave.EndDate
+	updatedLeave.IsStartDateFullDay = leave.IsStartDateFullDay
+	updatedLeave.IsFinishDateFullDay = leave.IsFinishDateFullDay
 	updatedLeave.RequestedDays = leave.RequestedDays
 	updatedLeave.Reason = leave.Reason
+	updatedLeave.IsPaid = leaveType.IsPaid
 	updatedLeave.UpdatedAt = time.Now()
 	updatedLeave.ModifiedBy = strconv.FormatUint(uint64(userID), 10)
+
+	// Log the request before update
+	fmt.Printf("UpdateLeave - Request to update: ID=%d, Reason=%s, LeaveTypeID=%d, StartDate=%v, EndDate=%v, RequestedDays=%v\n",
+		updatedLeave.ID, updatedLeave.Reason, updatedLeave.LeaveTypeID, updatedLeave.StartDate, updatedLeave.EndDate, updatedLeave.RequestedDays)
 
 	// Update the leave
 	if err := s.leaveRepo.Update(&updatedLeave); err != nil {
@@ -345,18 +428,20 @@ func (s *leaveService) GetMyLeaveRequestsPaginated(userID uint, page, limit int,
 				ID:   leave.LeaveType.ID,
 				Name: leave.LeaveType.Name,
 			},
-			StartDate:       leave.StartDate,
-			EndDate:         leave.EndDate,
-			RequestedDays:   leave.RequestedDays,
-			Reason:          leave.Reason,
-			Status:          leave.Status,
-			IsPaid:          leave.IsPaid,
-			ApprovedAt:      leave.ApprovedAt,
-			RejectedAt:      leave.RejectedAt,
-			RejectionReason: leave.RejectionReason,
-			CancelReason:    leave.CancelReason,
-			CancelledAt:     leave.CancelledAt,
-			Comments:        leave.Comments,
+			StartDate:           leave.StartDate,
+			EndDate:             leave.EndDate,
+			IsStartDateFullDay:  leave.IsStartDateFullDay,
+			IsFinishDateFullDay: leave.IsFinishDateFullDay,
+			RequestedDays:       leave.RequestedDays,
+			Reason:              leave.Reason,
+			Status:              leave.Status,
+			IsPaid:              leave.IsPaid,
+			ApprovedAt:          leave.ApprovedAt,
+			RejectedAt:          leave.RejectedAt,
+			RejectionReason:     leave.RejectionReason,
+			CancelReason:        leave.CancelReason,
+			CancelledAt:         leave.CancelledAt,
+			Comments:            leave.Comments,
 		})
 	}
 
@@ -423,20 +508,22 @@ func (s *leaveService) GetAllLeaveRequestsPaginated(page, limit int, sortParams 
 				ID:   leave.LeaveType.ID,
 				Name: leave.LeaveType.Name,
 			},
-			StartDate:       leave.StartDate,
-			EndDate:         leave.EndDate,
-			RequestedDays:   leave.RequestedDays,
-			RemainingDays:   remainingDays,
-			Reason:          leave.Reason,
-			Status:          leave.Status,
-			IsPaid:          leave.IsPaid,
-			ApprovedBy:      leave.ApprovedBy,
-			ApprovedAt:      leave.ApprovedAt,
-			RejectedAt:      leave.RejectedAt,
-			RejectionReason: leave.RejectionReason,
-			CancelReason:    leave.CancelReason,
-			CancelledAt:     leave.CancelledAt,
-			Comments:        leave.Comments,
+			StartDate:           leave.StartDate,
+			EndDate:             leave.EndDate,
+			IsStartDateFullDay:  leave.IsStartDateFullDay,
+			IsFinishDateFullDay: leave.IsFinishDateFullDay,
+			RequestedDays:       leave.RequestedDays,
+			RemainingDays:       remainingDays,
+			Reason:              leave.Reason,
+			Status:              leave.Status,
+			IsPaid:              leave.IsPaid,
+			ApprovedBy:          leave.ApprovedBy,
+			ApprovedAt:          leave.ApprovedAt,
+			RejectedAt:          leave.RejectedAt,
+			RejectionReason:     leave.RejectionReason,
+			CancelReason:        leave.CancelReason,
+			CancelledAt:         leave.CancelledAt,
+			Comments:            leave.Comments,
 		})
 	}
 
@@ -741,7 +828,7 @@ func (s *leaveService) ReverseLeaveBalance(employeeID, leaveTypeID uint, request
 		return fmt.Errorf("failed to get leave balance: %w", err)
 	}
 
-	if result == nil || len(result) == 0 {
+	if len(result) == 0 {
 		// If no balance record exists, nothing to reverse
 		return nil
 	}
@@ -948,8 +1035,10 @@ func (s *leaveService) DeleteLeaveType(id uint, userID uint) error {
 }
 
 // CalculateWorkingDays calculates the actual number of working days excluding holidays
-// It takes into account weekends and public holidays
-func (s *leaveService) CalculateWorkingDays(startDate, endDate time.Time) (float64, error) {
+// It takes into account weekends, public holidays, and half-day leaves
+// Full day holidays count as 0 days, half day holidays count as 0.5 days
+// isStartDateFullDay and isFinishDateFullDay parameters indicate if the start/end dates are full or half days
+func (s *leaveService) CalculateWorkingDays(startDate, endDate time.Time, isStartDateFullDay, isFinishDateFullDay bool) (float64, error) {
 	if startDate.After(endDate) {
 		return 0, errors.New("start date must be before or equal to end date")
 	}
@@ -964,10 +1053,15 @@ func (s *leaveService) CalculateWorkingDays(startDate, endDate time.Time) (float
 		return 0, fmt.Errorf("failed to get holidays: %w", err)
 	}
 
-	// Create a map of holiday dates for fast lookup
-	holidayMap := make(map[string]bool)
+	// Create a map of holiday dates and their values for fast lookup
+	// Full day holiday = 0 days worked, Half day holiday = 0.5 days worked
+	holidayMap := make(map[string]float64)
 	for _, holiday := range holidays {
-		holidayMap[holiday.HolidayDate.Format("2006-01-02")] = true
+		if holiday.IsFullDay {
+			holidayMap[holiday.HolidayDate.Format("2006-01-02")] = 0.0
+		} else {
+			holidayMap[holiday.HolidayDate.Format("2006-01-02")] = 0.5
+		}
 	}
 
 	// Count working days (excluding weekends and holidays)
@@ -981,11 +1075,28 @@ func (s *leaveService) CalculateWorkingDays(startDate, endDate time.Time) (float
 		isWeekend := dayOfWeek == time.Saturday || dayOfWeek == time.Sunday
 
 		// Check if it's a holiday
-		isHoliday := holidayMap[currentDate.Format("2006-01-02")]
+		holidayValue, isHoliday := holidayMap[currentDate.Format("2006-01-02")]
 
-		// Count as working day if it's neither a weekend nor a holiday
-		if !isWeekend && !isHoliday {
-			workingDays += 1.0
+		// Count working days if it's not a weekend
+		if !isWeekend {
+			dayValue := 1.0 // Default to full day
+
+			// Apply half-day rules for start and end dates
+			if currentDate.Equal(startDate) && !isStartDateFullDay {
+				dayValue = 0.5
+			} else if currentDate.Equal(endDate) && !isFinishDateFullDay {
+				dayValue = 0.5
+			}
+
+			if !isHoliday {
+				// Regular working day - count the day value (could be 1.0 or 0.5)
+				workingDays += dayValue
+			} else {
+				// Holiday on a working day - count the holiday value
+				// Full day holiday (isFullDay=true) counts as 0 days
+				// Half day holiday (isFullDay=false) counts as 0.5 days
+				workingDays += holidayValue
+			}
 		}
 
 		// If we've reached the end date, break the loop

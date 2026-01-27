@@ -32,7 +32,7 @@ type CreateEmployeeRequest struct {
 	DateOfBirth              string   `json:"date_of_birth"`
 	HireDate                 string   `json:"hire_date"`
 	LeaveDate                string   `json:"leave_date"`
-	TotalExperience          float64  `json:"total_experience"`
+	TotalGap                 float64  `json:"total_gap"`
 	MaritalStatus            string   `json:"marital_status"`
 	EmergencyContact         string   `json:"emergency_contact"`
 	EmergencyContactName     string   `json:"emergency_contact_name"`
@@ -62,7 +62,7 @@ type UpdateEmployeeRequest struct {
 	DateOfBirth              string   `json:"date_of_birth"`
 	HireDate                 string   `json:"hire_date"`
 	LeaveDate                string   `json:"leave_date"`
-	TotalExperience          float64  `json:"total_experience"`
+	TotalGap                 float64  `json:"total_gap"`
 	MaritalStatus            string   `json:"marital_status"`
 	EmergencyContact         string   `json:"emergency_contact"`
 	EmergencyContactName     string   `json:"emergency_contact_name"`
@@ -80,23 +80,22 @@ type UpdateEmployeeRequest struct {
 }
 
 type UpdateMyProfileRequest struct {
-	Email                    string  `json:"email"`
-	Phone                    string  `json:"phone"`
-	Address                  string  `json:"address"`
-	State                    string  `json:"state"`
-	City                     string  `json:"city"`
-	Gender                   string  `json:"gender"`
-	DateOfBirth              string  `json:"date_of_birth"`
-	ProfessionStartDate      string  `json:"profession_start_date"`
-	TotalExperience          float64 `json:"total_experience"`
-	MaritalStatus            string  `json:"marital_status"`
-	EmergencyContact         string  `json:"emergency_contact"`
-	EmergencyContactName     string  `json:"emergency_contact_name"`
-	EmergencyContactRelation string  `json:"emergency_contact_relation"`
-	MotherName               string  `json:"mother_name"`
-	FatherName               string  `json:"father_name"`
-	Nationality              string  `json:"nationality"`
-	IdentityNo               string  `json:"identity_no"`
+	Email                    string `json:"email"`
+	Phone                    string `json:"phone"`
+	Address                  string `json:"address"`
+	State                    string `json:"state"`
+	City                     string `json:"city"`
+	Gender                   string `json:"gender"`
+	DateOfBirth              string `json:"date_of_birth"`
+	ProfessionStartDate      string `json:"profession_start_date"`
+	MaritalStatus            string `json:"marital_status"`
+	EmergencyContact         string `json:"emergency_contact"`
+	EmergencyContactName     string `json:"emergency_contact_name"`
+	EmergencyContactRelation string `json:"emergency_contact_relation"`
+	MotherName               string `json:"mother_name"`
+	FatherName               string `json:"father_name"`
+	Nationality              string `json:"nationality"`
+	IdentityNo               string `json:"identity_no"`
 }
 
 // CreateEmployee godoc
@@ -140,7 +139,7 @@ func (h *EmployeeHandler) CreateEmployee(c *gin.Context) {
 		return
 	}
 
-	employee, err := h.employeeService.CreateEmployee(req.Email, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalExperience, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.GradeID, req.IsGradeUp, req.ContractNo, req.ProfessionStartDate, req.Note, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo, email, req.Roles)
+	employee, err := h.employeeService.CreateEmployee(req.Email, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalGap, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.GradeID, req.IsGradeUp, req.ContractNo, req.ProfessionStartDate, req.Note, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo, email, req.Roles)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -260,7 +259,7 @@ func (h *EmployeeHandler) UpdateEmployee(c *gin.Context) {
 		req.CompanyEmail = email
 	}
 
-	if err := h.employeeService.UpdateEmployee(id, req.Email, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalExperience, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.GradeID, req.IsGradeUp, req.ContractNo, req.ProfessionStartDate, req.Note, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo, email, requestingUserID, isAdmin(roles), req.Roles); err != nil {
+	if err := h.employeeService.UpdateEmployee(id, req.Email, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalGap, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.GradeID, req.IsGradeUp, req.ContractNo, req.ProfessionStartDate, req.Note, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo, email, requestingUserID, isAdmin(roles), req.Roles); err != nil {
 		status := http.StatusInternalServerError
 		if err.Error() == "unauthorized to update this employee profile" {
 			status = http.StatusForbidden
@@ -494,7 +493,7 @@ func (h *EmployeeHandler) UpdateMyProfile(c *gin.Context) {
 	}
 
 	// Update only the authenticated user's profile
-	if err := h.employeeService.UpdateMyProfile(userID, req.Email, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.ProfessionStartDate, req.TotalExperience, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo); err != nil {
+	if err := h.employeeService.UpdateMyProfile(userID, req.Email, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.ProfessionStartDate, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   err.Error(),
