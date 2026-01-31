@@ -2,6 +2,8 @@ package main
 
 import (
 	"log"
+	"net/http"
+	"time"
 
 	"kartezya-hr/internal/config"
 	"kartezya-hr/internal/database"
@@ -84,6 +86,7 @@ func main() {
 	workInfoService := service.NewWorkInformationService(workInfoRepo, employeeRepo, companyRepo, departmentRepo, jobPositionRepo, auditService)
 	lookupService := service.NewLookupService(companyRepo, departmentRepo, jobPositionRepo, leaveTypeRepo, gradeRepo)
 	gradeService := service.NewGradeService(gradeRepo, auditService)
+	reportService := service.NewReportService(employeeRepo, workInfoRepo, leaveRepo, holidayRepo, leaveService)
 
 	// Initialize handlers
 	authHandler := handler.NewAuthHandler(authService, emailService, userRepo)
@@ -96,6 +99,7 @@ func main() {
 	lookupHandler := handler.NewLookupHandler(lookupService)
 	dashboardHandler := handler.NewDashboardHandler(employeeService, departmentService, companyService, leaveService)
 	gradeHandler := handler.NewGradeHandler(gradeService)
+	reportHandler := handler.NewReportHandler(reportService)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -161,6 +165,7 @@ func main() {
 		{
 			authRoutes.POST("/logout", authHandler.Logout)
 			authRoutes.POST("/change-password", authHandler.ChangePassword)
+			authRoutes.POST("/send-password-reset-email-batch", authHandler.SendPasswordResetEmailBatch)
 		}
 
 		// Employee routes
@@ -281,14 +286,30 @@ func main() {
 			dashboardRoutes.GET("/employees-by-position", dashboardHandler.GetEmployeesByPosition)
 			dashboardRoutes.GET("/employees-by-company-department", dashboardHandler.GetEmployeesByCompanyDepartment)
 		}
+
+		// Report routes (Admin only)
+		reportRoutes := protected.Group("/reports")
+		{
+			reportRoutes.GET("/work-day", authMiddleware.RequireAdmin(), reportHandler.GetWorkDayReport)
+		}
 	}
 
 	// Swagger endpoint
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	// Start server
+	// Start server with custom timeout settings
 	log.Printf("Starting %s v%s on port %s", cfg.App.Name, cfg.App.Version, cfg.Server.Port)
-	if err := router.Run(":" + cfg.Server.Port); err != nil {
+
+	// Create HTTP server with 60 second timeout
+	server := &http.Server{
+		Addr:         ":" + cfg.Server.Port,
+		Handler:      router,
+		ReadTimeout:  60 * time.Second,
+		WriteTimeout: 60 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+
+	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }

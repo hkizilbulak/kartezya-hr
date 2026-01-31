@@ -18,7 +18,9 @@ type EmployeeService interface {
 	UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, professionStartDate string, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, motherName, fatherName, nationality, identityNo string) error
 	DeleteEmployee(id uint, deletedBy string, isAdmin bool) error
 	ListEmployees(limit, offset int, isAdmin bool) ([]*types.EmployeeResponse, error)
+	ListEmployeesWithFilters(limit, offset int, sortField, sortDirection string, filters map[string]interface{}, isAdmin bool) ([]*types.EmployeeResponse, error)
 	GetTotalCount() (int64, error)
+	GetTotalCountWithFilters(filters map[string]interface{}) (int64, error)
 	GetEmployeeCountByGender() ([]interface{}, error)
 	GetEmployeeCountByPosition() ([]interface{}, error)
 	GetEmployeeCountByCompanyDepartment() ([]interface{}, error)
@@ -623,9 +625,133 @@ func (s *employeeService) ListEmployees(limit, offset int, isAdmin bool) ([]*typ
 	return responses, nil
 }
 
+// ListEmployeesWithFilters returns filtered employees with pagination and sorting
+func (s *employeeService) ListEmployeesWithFilters(limit, offset int, sortField, sortDirection string, filters map[string]interface{}, isAdmin bool) ([]*types.EmployeeResponse, error) {
+	if !isAdmin {
+		return nil, errors.New("only administrators can list all employees")
+	}
+
+	sortParams := types.SortParams{
+		Sort:      sortField,
+		Direction: sortDirection,
+	}
+
+	employees, _, err := s.employeeRepo.GetAllWithFilters(limit, offset, sortParams, filters)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert domain.Employee to EmployeeResponse with roles and work information
+	responses := make([]*types.EmployeeResponse, len(employees))
+	for i, employee := range employees {
+		user, err := s.userRepo.GetByID(employee.UserID)
+		if err != nil {
+			fmt.Printf("Warning: failed to get user %d: %v\n", employee.UserID, err)
+			continue
+		}
+
+		// Get user roles
+		userRoles, err := s.userRoleRepo.GetRolesByUserID(user.ID)
+		if err != nil {
+			fmt.Printf("Warning: failed to get roles for user %d: %v\n", user.ID, err)
+		}
+
+		roleNames := make([]string, len(userRoles))
+		for j, role := range userRoles {
+			roleNames[j] = role.Name
+		}
+
+		// Get work information - get latest (first one in DESC order)
+		var workInfoLookup *types.EmployeeWorkInfoLookup
+		workInfos, err := s.workInfoRepo.GetByEmployeeID(employee.ID)
+		if err == nil && len(workInfos) > 0 {
+			// Get the latest work information (first one - already DESC sorted by database)
+			latestWorkInfo := workInfos[0]
+			workInfoLookup = &types.EmployeeWorkInfoLookup{
+				CompanyName:    latestWorkInfo.Company.Name,
+				DepartmentName: latestWorkInfo.Department.Name,
+				Manager:        latestWorkInfo.Department.Manager,
+				JobTitle:       latestWorkInfo.JobPosition.Title,
+			}
+		}
+
+		// Convert dates to string format for JSON response
+		var dateOfBirthStr, hireDateStr, leaveDateStr, professionStartDateStr *string
+
+		if employee.DateOfBirth != nil {
+			dateStr := employee.DateOfBirth.Format(time.RFC3339)
+			dateOfBirthStr = &dateStr
+		}
+
+		if employee.HireDate != nil {
+			hireStr := employee.HireDate.Format(time.RFC3339)
+			hireDateStr = &hireStr
+		}
+
+		if employee.LeaveDate != nil {
+			leaveStr := employee.LeaveDate.Format(time.RFC3339)
+			leaveDateStr = &leaveStr
+		}
+
+		if employee.ProfessionStartDate != nil {
+			profStr := employee.ProfessionStartDate.Format(time.RFC3339)
+			professionStartDateStr = &profStr
+		}
+
+		userInfo := types.UserInfo{
+			ID:    user.ID,
+			Email: user.Email,
+		}
+
+		responses[i] = &types.EmployeeResponse{
+			ID:                       employee.ID,
+			User:                     userInfo,
+			FirstName:                employee.FirstName,
+			LastName:                 employee.LastName,
+			Email:                    employee.Email,
+			CompanyEmail:             employee.CompanyEmail,
+			Phone:                    employee.Phone,
+			Address:                  employee.Address,
+			State:                    employee.State,
+			City:                     employee.City,
+			Gender:                   employee.Gender,
+			DateOfBirth:              dateOfBirthStr,
+			HireDate:                 hireDateStr,
+			LeaveDate:                leaveDateStr,
+			TotalGap:                 employee.TotalGap,
+			MaritalStatus:            employee.MaritalStatus,
+			EmergencyContact:         employee.EmergencyContact,
+			EmergencyContactName:     employee.EmergencyContactName,
+			EmergencyContactRelation: employee.EmergencyContactRelation,
+			GradeID:                  employee.GradeID,
+			IsGradeUp:                employee.IsGradeUp,
+			ContractNo:               employee.ContractNo,
+			ProfessionStartDate:      professionStartDateStr,
+			Note:                     employee.Note,
+			MotherName:               employee.MotherName,
+			FatherName:               employee.FatherName,
+			Nationality:              employee.Nationality,
+			IdentityNo:               employee.IdentityNo,
+			Roles:                    roleNames,
+			WorkInformation:          workInfoLookup,
+		}
+	}
+
+	return responses, nil
+}
+
 // GetTotalCount returns the total number of employees
 func (s *employeeService) GetTotalCount() (int64, error) {
 	count, err := s.employeeRepo.GetTotalCount()
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// GetTotalCountWithFilters returns the total number of employees with filters applied
+func (s *employeeService) GetTotalCountWithFilters(filters map[string]interface{}) (int64, error) {
+	count, err := s.employeeRepo.GetTotalCountWithFilters(filters)
 	if err != nil {
 		return 0, err
 	}

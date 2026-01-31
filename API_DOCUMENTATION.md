@@ -56,10 +56,13 @@ A complete Postman collection is provided at `postman/kartezya-hr-complete-api.p
 
 ## API Endpoints Summary
 
-### Authentication (3 endpoints)
+### Authentication (5 endpoints)
 - `POST /auth/login` - User login
-- `GET /auth/profile` - Get user profile  
 - `POST /auth/logout` - User logout
+- `POST /auth/change-password` - Change user password (authenticated)
+- `POST /auth/validate-reset-token` - Validate password reset token
+- `POST /auth/reset-password` - Reset user password with token
+- `POST /auth/send-password-reset-email-batch` - Send password reset emails to multiple users (authenticated)
 
 ### Companies (5 endpoints)
 - `POST /companies` - Create company

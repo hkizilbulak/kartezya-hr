@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"kartezya-hr/internal/service"
 
@@ -344,13 +345,25 @@ func (h *EmployeeHandler) DeleteEmployee(c *gin.Context) {
 
 // ListEmployees godoc
 // @Summary List all employees
-// @Description Get paginated list of all employees (Admin only)
+// @Description Get paginated list of all employees with filtering (Admin only)
 // @Tags employees
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param limit query int false "Limit number of results (default: 10)"
 // @Param page query int false "Page number (default: 1)"
+// @Param sort query string false "Sort field"
+// @Param direction query string false "Sort direction (ASC/DESC)"
+// @Param id query int false "Filter by employee ID"
+// @Param first_name query string false "Filter by first name"
+// @Param email query string false "Filter by email"
+// @Param company_id query int false "Filter by company ID"
+// @Param department_id query int false "Filter by department ID"
+// @Param manager query string false "Filter by manager"
+// @Param identity_no query string false "Filter by identity number"
+// @Param gender query string false "Filter by gender"
+// @Param marital_status query string false "Filter by marital status"
+// @Param grade_id query int false "Filter by grade ID"
 // @Success 200 {object} APIResponse{data=[]domain.Employee}
 // @Failure 401 {object} APIResponse
 // @Failure 403 {object} APIResponse
@@ -388,9 +401,88 @@ func (h *EmployeeHandler) ListEmployees(c *gin.Context) {
 		}
 	}
 
+	// Parse filter parameters
+	filters := make(map[string]interface{})
+
+	if id := c.Query("id"); id != "" {
+		if parsed, err := strconv.Atoi(id); err == nil && parsed > 0 {
+			filters["id"] = parsed
+		}
+	}
+
+	if firstName := c.Query("first_name"); firstName != "" {
+		filters["first_name"] = firstName
+	}
+
+	if email := c.Query("email"); email != "" {
+		filters["email"] = email
+	}
+
+	if companyID := c.Query("company_id"); companyID != "" {
+		if parsed, err := strconv.Atoi(companyID); err == nil && parsed > 0 {
+			filters["company_id"] = parsed
+		}
+	}
+
+	if departmentIDs := c.Query("department_ids"); departmentIDs != "" {
+		// Parse comma-separated department IDs
+		departmentIDList := strings.Split(departmentIDs, ",")
+		var validDepartmentIDs []int
+		for _, deptIDStr := range departmentIDList {
+			deptIDStr = strings.TrimSpace(deptIDStr)
+			if parsed, err := strconv.Atoi(deptIDStr); err == nil && parsed > 0 {
+				validDepartmentIDs = append(validDepartmentIDs, parsed)
+			}
+		}
+		if len(validDepartmentIDs) > 0 {
+			filters["department_ids"] = validDepartmentIDs
+		}
+	} else if departmentID := c.Query("department_id"); departmentID != "" {
+		// Keep backward compatibility with single department_id
+		if parsed, err := strconv.Atoi(departmentID); err == nil && parsed > 0 {
+			filters["department_id"] = parsed
+		}
+	}
+
+	if manager := c.Query("manager"); manager != "" {
+		filters["manager"] = manager
+	}
+
+	if identityNo := c.Query("identity_no"); identityNo != "" {
+		filters["identity_no"] = identityNo
+	}
+
+	if gender := c.Query("gender"); gender != "" {
+		filters["gender"] = gender
+	}
+
+	if maritalStatus := c.Query("marital_status"); maritalStatus != "" {
+		filters["marital_status"] = maritalStatus
+	}
+
+	if gradeID := c.Query("grade_id"); gradeID != "" {
+		if parsed, err := strconv.Atoi(gradeID); err == nil && parsed > 0 {
+			filters["grade_id"] = parsed
+		}
+	}
+
+	// Parse sorting parameters
+	sortField := c.Query("sort")
+	sortDirection := c.Query("direction")
+
+	// Set default sorting to first_name, last_name ASC if no sort field is provided
+	if sortField == "" {
+		sortField = "first_name"
+	}
+
+	// Default direction is ASC
+	if sortDirection != "ASC" && sortDirection != "DESC" {
+		sortDirection = "ASC"
+	}
+
 	offset := (page - 1) * limit
 
-	employees, err := h.employeeService.ListEmployees(limit, offset, isAdmin(roles))
+	employees, err := h.employeeService.ListEmployeesWithFilters(limit, offset, sortField, sortDirection, filters, isAdmin(roles))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -399,8 +491,8 @@ func (h *EmployeeHandler) ListEmployees(c *gin.Context) {
 		return
 	}
 
-	// Get total count for pagination
-	totalCount, err := h.employeeService.GetTotalCount()
+	// Get total count for pagination with filters
+	totalCount, err := h.employeeService.GetTotalCountWithFilters(filters)
 	if err != nil {
 		totalCount = 0
 	}
@@ -417,8 +509,8 @@ func (h *EmployeeHandler) ListEmployees(c *gin.Context) {
 			"page":        page,
 			"limit":       limit,
 			"total_pages": totalPages,
-			"sort":        "created_at",
-			"direction":   "DESC",
+			"sort":        sortField,
+			"direction":   sortDirection,
 		},
 		"success": true,
 	})

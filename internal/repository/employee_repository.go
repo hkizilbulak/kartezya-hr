@@ -13,9 +13,11 @@ type EmployeeRepository interface {
 	GetByID(id uint) (*domain.Employee, error)
 	GetByUserID(userID uint) (*domain.Employee, error)
 	GetAll(limit, offset int, sortParams types.SortParams) ([]*domain.Employee, int64, error)
+	GetAllWithFilters(limit, offset int, sortParams types.SortParams, filters map[string]interface{}) ([]*domain.Employee, int64, error)
 	Update(employee *domain.Employee, modifiedBy string) error
 	Delete(id uint, deletedBy string) error
 	GetTotalCount() (int64, error)
+	GetTotalCountWithFilters(filters map[string]interface{}) (int64, error)
 	GetEmployeeCountByGender() ([]interface{}, error)
 	GetEmployeeCountByPosition() ([]interface{}, error)
 	GetEmployeeCountByCompanyDepartment() ([]interface{}, error)
@@ -90,6 +92,318 @@ func (r *employeeRepository) GetAll(limit, offset int, sortParams types.SortPara
 		Find(&employees).Error
 
 	return employees, total, err
+}
+
+// GetAllWithFilters returns filtered employees with pagination and sorting
+func (r *employeeRepository) GetAllWithFilters(limit, offset int, sortParams types.SortParams, filters map[string]interface{}) ([]*domain.Employee, int64, error) {
+	var employees []*domain.Employee
+	var total int64
+
+	// Build the query with filters - explicitly specify table name for deleted column
+	query := r.db.Model(&domain.Employee{}).Where("hr_employees.deleted = ?", false)
+
+	// Apply filters
+	if filters != nil {
+		// ID filter
+		if id, ok := filters["id"]; ok {
+			query = query.Where("hr_employees.id = ?", id)
+		}
+
+		// First name filter (LIKE search)
+		if firstName, ok := filters["first_name"]; ok {
+			query = query.Where("LOWER(hr_employees.first_name) LIKE LOWER(?)", "%"+fmt.Sprintf("%v", firstName)+"%")
+		}
+
+		// Email filter (LIKE search for both personal and company email)
+		if email, ok := filters["email"]; ok {
+			emailStr := fmt.Sprintf("%v", email)
+			query = query.Where("LOWER(hr_employees.email) LIKE LOWER(?) OR LOWER(hr_employees.company_email) LIKE LOWER(?)", "%"+emailStr+"%", "%"+emailStr+"%")
+		}
+
+		// Identity number filter
+		if identityNo, ok := filters["identity_no"]; ok {
+			query = query.Where("hr_employees.identity_no LIKE ?", "%"+fmt.Sprintf("%v", identityNo)+"%")
+		}
+
+		// Gender filter
+		if gender, ok := filters["gender"]; ok {
+			query = query.Where("hr_employees.gender = ?", gender)
+		}
+
+		// Marital status filter
+		if maritalStatus, ok := filters["marital_status"]; ok {
+			query = query.Where("hr_employees.marital_status = ?", maritalStatus)
+		}
+
+		// Grade ID filter
+		if gradeID, ok := filters["grade_id"]; ok {
+			query = query.Where("hr_employees.grade_id = ?", gradeID)
+		}
+
+		// Company and Department filters need JOIN with work information
+		if companyID, ok := filters["company_id"]; ok {
+			query = query.Joins(`JOIN hr_employee_work_information ON hr_employee_work_information.employee_id = hr_employees.id 
+				AND hr_employee_work_information.deleted = false 
+				AND hr_employee_work_information.id = (
+					SELECT id FROM hr_employee_work_information 
+					WHERE employee_id = hr_employees.id 
+					AND deleted = false 
+					ORDER BY start_date DESC 
+					LIMIT 1
+				)`).
+				Joins("JOIN hr_departments ON hr_departments.id = hr_employee_work_information.department_id AND hr_departments.deleted = false").
+				Where("hr_departments.company_id = ?", companyID)
+		}
+
+		// Handle multiple department IDs - only check current/latest department
+		if departmentIDs, ok := filters["department_ids"]; ok {
+			if departmentIDSlice, ok := departmentIDs.([]int); ok && len(departmentIDSlice) > 0 {
+				// If we haven't joined yet (no company filter), do the join with latest work information
+				if _, hasCompany := filters["company_id"]; !hasCompany {
+					query = query.Joins(`JOIN hr_employee_work_information ON hr_employee_work_information.employee_id = hr_employees.id 
+						AND hr_employee_work_information.deleted = false 
+						AND hr_employee_work_information.id = (
+							SELECT id FROM hr_employee_work_information 
+							WHERE employee_id = hr_employees.id 
+							AND deleted = false 
+							ORDER BY start_date DESC 
+							LIMIT 1
+						)`)
+				}
+				query = query.Where("hr_employee_work_information.department_id IN ?", departmentIDSlice)
+			}
+		} else if departmentID, ok := filters["department_id"]; ok {
+			// Handle single department ID for backward compatibility - only check current/latest department
+			// If we haven't joined yet (no company filter), do the join with latest work information
+			if _, hasCompany := filters["company_id"]; !hasCompany {
+				query = query.Joins(`JOIN hr_employee_work_information ON hr_employee_work_information.employee_id = hr_employees.id 
+					AND hr_employee_work_information.deleted = false 
+					AND hr_employee_work_information.id = (
+						SELECT id FROM hr_employee_work_information 
+						WHERE employee_id = hr_employees.id 
+						AND deleted = false 
+						ORDER BY start_date DESC 
+						LIMIT 1
+					)`)
+			}
+			query = query.Where("hr_employee_work_information.department_id = ?", departmentID)
+		}
+
+		// Manager filter needs JOIN with departments - only check current/latest department
+		if manager, ok := filters["manager"]; ok {
+			// Always ensure we have the necessary JOINs for manager filter
+			hasWorkInfoJoin := false
+			hasDepartmentJoin := false
+
+			// Check if we already have work info join from previous filters
+			if _, hasCompany := filters["company_id"]; hasCompany {
+				hasWorkInfoJoin = true
+				hasDepartmentJoin = true
+			} else if _, hasDept := filters["department_id"]; hasDept {
+				hasWorkInfoJoin = true
+			} else if _, hasDeptIDs := filters["department_ids"]; hasDeptIDs {
+				hasWorkInfoJoin = true
+			}
+
+			// Add work info join if not already present
+			if !hasWorkInfoJoin {
+				query = query.Joins(`JOIN hr_employee_work_information ON hr_employee_work_information.employee_id = hr_employees.id 
+						AND hr_employee_work_information.deleted = false 
+						AND hr_employee_work_information.id = (
+							SELECT id FROM hr_employee_work_information 
+							WHERE employee_id = hr_employees.id 
+							AND deleted = false 
+							ORDER BY start_date DESC 
+							LIMIT 1
+						)`)
+			}
+
+			// Add department join if not already present
+			if !hasDepartmentJoin {
+				query = query.Joins("JOIN hr_departments ON hr_departments.id = hr_employee_work_information.department_id AND hr_departments.deleted = false")
+			}
+
+			// Apply manager filter
+			query = query.Where("LOWER(hr_departments.manager) LIKE LOWER(?)", "%"+fmt.Sprintf("%v", manager)+"%")
+		}
+	}
+
+	// Count total records with filters
+	query.Count(&total)
+
+	// Validate and sanitize sort field
+	validSortFields := map[string]bool{
+		"id":            true,
+		"user_id":       true,
+		"employee_id":   true,
+		"first_name":    true,
+		"last_name":     true,
+		"phone":         true,
+		"address":       true,
+		"date_of_birth": true,
+		"hire_date":     true,
+		"created_at":    true,
+		"updated_at":    true,
+	}
+
+	sortField := "id"
+	if validSortFields[sortParams.Sort] {
+		sortField = sortParams.Sort
+	}
+
+	direction := "ASC"
+	if sortParams.Direction == "DESC" {
+		direction = "DESC"
+	}
+
+	orderBy := fmt.Sprintf("hr_employees.%s %s", sortField, direction)
+
+	// Get paginated records with sorting and preloading
+	err := query.Preload("User").
+		Select("DISTINCT hr_employees.*").
+		Order(orderBy).
+		Limit(limit).
+		Offset(offset).
+		Find(&employees).Error
+
+	return employees, total, err
+}
+
+// GetTotalCountWithFilters returns the total number of employees with filters applied
+func (r *employeeRepository) GetTotalCountWithFilters(filters map[string]interface{}) (int64, error) {
+	var count int64
+
+	// Build the query with filters - explicitly specify table name for deleted column
+	query := r.db.Model(&domain.Employee{}).Where("hr_employees.deleted = ?", false)
+
+	// Apply filters (same logic as GetAllWithFilters)
+	if filters != nil {
+		// ID filter
+		if id, ok := filters["id"]; ok {
+			query = query.Where("hr_employees.id = ?", id)
+		}
+
+		// First name filter (LIKE search)
+		if firstName, ok := filters["first_name"]; ok {
+			query = query.Where("LOWER(hr_employees.first_name) LIKE LOWER(?)", "%"+fmt.Sprintf("%v", firstName)+"%")
+		}
+
+		// Email filter (LIKE search for both personal and company email)
+		if email, ok := filters["email"]; ok {
+			emailStr := fmt.Sprintf("%v", email)
+			query = query.Where("LOWER(hr_employees.email) LIKE LOWER(?) OR LOWER(hr_employees.company_email) LIKE LOWER(?)", "%"+emailStr+"%", "%"+emailStr+"%")
+		}
+
+		// Identity number filter
+		if identityNo, ok := filters["identity_no"]; ok {
+			query = query.Where("hr_employees.identity_no LIKE ?", "%"+fmt.Sprintf("%v", identityNo)+"%")
+		}
+
+		// Gender filter
+		if gender, ok := filters["gender"]; ok {
+			query = query.Where("hr_employees.gender = ?", gender)
+		}
+
+		// Marital status filter
+		if maritalStatus, ok := filters["marital_status"]; ok {
+			query = query.Where("hr_employees.marital_status = ?", maritalStatus)
+		}
+
+		// Grade ID filter
+		if gradeID, ok := filters["grade_id"]; ok {
+			query = query.Where("hr_employees.grade_id = ?", gradeID)
+		}
+
+		// Company and Department filters need JOIN with work information
+		if companyID, ok := filters["company_id"]; ok {
+			query = query.Joins(`JOIN hr_employee_work_information ON hr_employee_work_information.employee_id = hr_employees.id 
+				AND hr_employee_work_information.deleted = false 
+				AND hr_employee_work_information.id = (
+					SELECT id FROM hr_employee_work_information 
+					WHERE employee_id = hr_employees.id 
+					AND deleted = false 
+					ORDER BY start_date DESC 
+					LIMIT 1
+				)`).
+				Joins("JOIN hr_departments ON hr_departments.id = hr_employee_work_information.department_id AND hr_departments.deleted = false").
+				Where("hr_departments.company_id = ?", companyID)
+		}
+
+		// Handle multiple department IDs - only check current/latest department
+		if departmentIDs, ok := filters["department_ids"]; ok {
+			if departmentIDSlice, ok := departmentIDs.([]int); ok && len(departmentIDSlice) > 0 {
+				// If we haven't joined yet (no company filter), do the join with latest work information
+				if _, hasCompany := filters["company_id"]; !hasCompany {
+					query = query.Joins(`JOIN hr_employee_work_information ON hr_employee_work_information.employee_id = hr_employees.id 
+						AND hr_employee_work_information.deleted = false 
+						AND hr_employee_work_information.id = (
+							SELECT id FROM hr_employee_work_information 
+							WHERE employee_id = hr_employees.id 
+							AND deleted = false 
+							ORDER BY start_date DESC 
+							LIMIT 1
+						)`)
+				}
+				query = query.Where("hr_employee_work_information.department_id IN ?", departmentIDSlice)
+			}
+		} else if departmentID, ok := filters["department_id"]; ok {
+			// Handle single department ID for backward compatibility - only check current/latest department
+			// If we haven't joined yet (no company filter), do the join with latest work information
+			if _, hasCompany := filters["company_id"]; !hasCompany {
+				query = query.Joins(`JOIN hr_employee_work_information ON hr_employee_work_information.employee_id = hr_employees.id 
+					AND hr_employee_work_information.deleted = false 
+					AND hr_employee_work_information.id = (
+						SELECT id FROM hr_employee_work_information 
+						WHERE employee_id = hr_employees.id 
+						AND deleted = false 
+						ORDER BY start_date DESC 
+						LIMIT 1
+					)`)
+			}
+			query = query.Where("hr_employee_work_information.department_id = ?", departmentID)
+		}
+
+		// Manager filter needs JOIN with departments - only check current/latest department
+		if manager, ok := filters["manager"]; ok {
+			// Always ensure we have the necessary JOINs for manager filter
+			hasWorkInfoJoin := false
+			hasDepartmentJoin := false
+
+			// Check if we already have work info join from previous filters
+			if _, hasCompany := filters["company_id"]; hasCompany {
+				hasWorkInfoJoin = true
+				hasDepartmentJoin = true
+			} else if _, hasDept := filters["department_id"]; hasDept {
+				hasWorkInfoJoin = true
+			} else if _, hasDeptIDs := filters["department_ids"]; hasDeptIDs {
+				hasWorkInfoJoin = true
+			}
+
+			// Add work info join if not already present
+			if !hasWorkInfoJoin {
+				query = query.Joins(`JOIN hr_employee_work_information ON hr_employee_work_information.employee_id = hr_employees.id 
+						AND hr_employee_work_information.deleted = false 
+						AND hr_employee_work_information.id = (
+							SELECT id FROM hr_employee_work_information 
+							WHERE employee_id = hr_employees.id 
+							AND deleted = false 
+							ORDER BY start_date DESC 
+							LIMIT 1
+						)`)
+			}
+
+			// Add department join if not already present
+			if !hasDepartmentJoin {
+				query = query.Joins("JOIN hr_departments ON hr_departments.id = hr_employee_work_information.department_id AND hr_departments.deleted = false")
+			}
+
+			// Apply manager filter
+			query = query.Where("LOWER(hr_departments.manager) LIKE LOWER(?)", "%"+fmt.Sprintf("%v", manager)+"%")
+		}
+	}
+
+	err := query.Count(&count).Error
+	return count, err
 }
 
 func (r *employeeRepository) Update(employee *domain.Employee, modifiedBy string) error {

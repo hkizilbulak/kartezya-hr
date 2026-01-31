@@ -364,3 +364,36 @@ type EmployeeDetailResponse struct {
 	Roles                    []string                      `json:"roles"`
 	WorkInformation          []EmployeeWorkInformationList `json:"work_information,omitempty"`
 }
+
+// WorkDayReportFilter represents the filter criteria for work day report
+type WorkDayReportFilter struct {
+	StartDate    time.Time `json:"start_date"`
+	EndDate      time.Time `json:"end_date"`
+	CompanyID    *uint     `json:"company_id"`
+	DepartmentID *uint     `json:"department_id"`
+	IsActive     bool      `json:"is_active"`
+}
+
+// WorkDayReportRow represents a single row in the work day report
+type WorkDayReportRow struct {
+	ID             uint    `json:"id"`
+	FirstName      string  `json:"first_name"`
+	LastName       string  `json:"last_name"`
+	IdentityNo     string  `json:"identity_no"`
+	CompanyName    string  `json:"company_name"`
+	DepartmentName string  `json:"department_name"`
+	Manager        string  `json:"manager"`
+	WorkDays       float64 `json:"work_days"`
+	HolidayDays    float64 `json:"holiday_days"`
+	UsedLeaveDays  float64 `json:"used_leave_days"`
+	WorkedDays     float64 `json:"worked_days"`
+}
+
+// WorkDayReportResponse represents the complete work day report response
+type WorkDayReportResponse struct {
+	StartDate        time.Time          `json:"start_date"`
+	EndDate          time.Time          `json:"end_date"`
+	TotalWorkDays    float64            `json:"total_work_days"`
+	TotalHolidayDays float64            `json:"total_holiday_days"`
+	Rows             []WorkDayReportRow `json:"rows"`
+}

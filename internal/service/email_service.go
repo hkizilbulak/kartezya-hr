@@ -19,6 +19,7 @@ import (
 // EmailService interface for sending emails
 type EmailService interface {
 	SendPasswordResetEmail(user *domain.User, firstName string, lastName string) error
+	SendPasswordResetEmailWithUserId(userId uint, email string, firstName string, lastName string) error
 	GeneratePasswordResetToken(userID uint) (string, error)
 	ResetPassword(token string, newPassword string, authService AuthService) error
 	ValidatePasswordResetToken(token string) (*domain.User, error)
@@ -121,6 +122,28 @@ func (s *emailService) SendPasswordResetEmail(user *domain.User, firstName strin
 
 	// Send email
 	if err := s.sendSMTPEmail(user.Email, emailContent.Subject, emailContent.Body); err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+
+	return nil
+}
+
+// SendPasswordResetEmail sends a password reset email to the user
+func (s *emailService) SendPasswordResetEmailWithUserId(userId uint, email string, firstName string, lastName string) error {
+	// Generate reset token
+	resetToken, err := s.GeneratePasswordResetToken(userId)
+	if err != nil {
+		return fmt.Errorf("failed to generate reset token: %w", err)
+	}
+
+	// Build reset URL
+	resetURL := fmt.Sprintf("%s/reset-password?token=%s&email=%s", s.config.Email.FrontendURL, resetToken, email)
+
+	// Build email content using template
+	emailContent := templates.PasswordResetEmailTemplate(firstName, lastName, resetURL)
+
+	// Send email
+	if err := s.sendSMTPEmail(email, emailContent.Subject, emailContent.Body); err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 

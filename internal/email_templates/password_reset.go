@@ -288,19 +288,7 @@ func PasswordResetEmailTemplate(firstName, lastName, resetURL string) EmailConte
             
             <!-- Introduction -->
             <div class="intro-text">
-                Kartezya Teknoloji ailesine hoş geldin! İK süreçlerini daha modern, verimli ve şeffaf hale getirmek için yeni bir sistem hayata geçirdik. Artık tüm İK hizmetlerine tek bir platformdan erişebileceksin.
-            </div>
-            
-            <!-- Benefits Section -->
-            <div class="benefits-section">
-                <div class="benefits-title">🎯 Sistemin Sunduğu Olanaklar</div>
-                <ul class="benefits-list">
-                    <li><span style="color:#624bff;font-weight:bold;margin-right:8px;">✓</span> Kişisel bilgilerinizi kolayca takip ve güncelleyebileceksin</li>
-                    <li><span style="color:#624bff;font-weight:bold;margin-right:8px;">✓</span> İzin taleplerini dijital ortamda hızlıca yönetebileceksin</li>
-                    <li><span style="color:#624bff;font-weight:bold;margin-right:8px;">✓</span> İzin bakiyelerinizi gerçek zamanlı olarak görebileceksin</li>
-                    <li><span style="color:#624bff;font-weight:bold;margin-right:8px;">✓</span> Kariyer geçmişinize ve iş bilgilerinize erişebileceksin</li>
-                    <li><span style="color:#624bff;font-weight:bold;margin-right:8px;">✓</span> Tüm talep ve işlemlerinizi tek bir yerden takip edebileceksin</li>
-                </ul>
+                Kartezya Teknoloji HR Portal'ine hoş geldin! İK ile ilgili tüm işlemlerini bu portal üzerinden kolay ve hızlı bir şekilde yapabilirsin.
             </div>
             
             <!-- Action Section -->
@@ -313,21 +301,16 @@ func PasswordResetEmailTemplate(firstName, lastName, resetURL string) EmailConte
                 </a>
             </div>
             
-            <!-- Important Note -->
-            <div class="important-note">
-                <strong>⚠️ Önemli:</strong> Bu işlem, sisteme ilk kez giriş yapmak için zorunludur. Şifre belirleme bağlantısı belirli bir süre için geçerlidir.
-            </div>
-            
         </div>
         
         <!-- Support Section -->
         <div class="support-section">
-            <div class="support-title">Herhangi bir sorunuz mu var?</div>
+            <div class="support-title">Herhangi bir sorun mu var?</div>
             <div class="support-text">
-                Teknik destek için bizimle iletişime geçebilirsin:
+                Teknik destek için bizimle iletişime geçebilirsin
             </div>
             <div class="support-text">
-                📧 <a href="mailto:info@kartezya.com" class="support-link">info@kartezya.com</a>
+                ✉️ <a href="mailto:hr@kartezya.com" class="support-link">hr@kartezya.com</a>
             </div>
         </div>
         
