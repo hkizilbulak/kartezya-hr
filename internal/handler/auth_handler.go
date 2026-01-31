@@ -45,6 +45,31 @@ type ValidateResetTokenRequest struct {
 	Email string `json:"email" binding:"required,email"`
 }
 
+type SendPasswordResetEmailRequest struct {
+	UserID    uint   `json:"user_id" binding:"required"`
+	Email     string `json:"email" binding:"required,email"`
+	FirstName string `json:"first_name" binding:"required"`
+	LastName  string `json:"last_name" binding:"required"`
+}
+
+type SendPasswordResetEmailBatchRequest struct {
+	Users []SendPasswordResetEmailRequest `json:"users" binding:"required"`
+}
+
+type SendPasswordResetEmailBatchResponse struct {
+	TotalCount   int                                     `json:"total_count"`
+	SuccessCount int                                     `json:"success_count"`
+	FailureCount int                                     `json:"failure_count"`
+	Results      []SendPasswordResetEmailBatchResultItem `json:"results"`
+}
+
+type SendPasswordResetEmailBatchResultItem struct {
+	UserID  uint   `json:"user_id"`
+	Email   string `json:"email"`
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+}
+
 type APIResponse struct {
 	Success bool        `json:"success"`
 	Data    interface{} `json:"data,omitempty"`
@@ -299,6 +324,78 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "Password changed successfully",
+	})
+}
+
+// SendPasswordResetEmailBatch godoc
+// @Summary Send password reset emails to multiple users
+// @Description Send password reset emails to a batch of users
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param batchRequest body SendPasswordResetEmailBatchRequest true "Batch password reset email request"
+// @Success 200 {object} APIResponse{data=SendPasswordResetEmailBatchResponse}
+// @Failure 400 {object} APIResponse
+// @Failure 401 {object} APIResponse
+// @Router /auth/send-password-reset-email-batch [post]
+func (h *AuthHandler) SendPasswordResetEmailBatch(c *gin.Context) {
+	// Check if user is authenticated
+	_, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "User not authenticated",
+		})
+		return
+	}
+
+	var req SendPasswordResetEmailBatchRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid request format",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Process each user in the batch
+	response := SendPasswordResetEmailBatchResponse{
+		TotalCount: len(req.Users),
+		Results:    make([]SendPasswordResetEmailBatchResultItem, 0),
+	}
+
+	for _, user := range req.Users {
+		result := SendPasswordResetEmailBatchResultItem{
+			UserID: user.UserID,
+			Email:  user.Email,
+		}
+
+		// Send password reset email
+		err := h.emailService.SendPasswordResetEmailWithUserId(
+			user.UserID,
+			user.Email,
+			user.FirstName,
+			user.LastName,
+		)
+
+		if err != nil {
+			result.Success = false
+			result.Error = err.Error()
+			response.FailureCount++
+		} else {
+			result.Success = true
+			response.SuccessCount++
+		}
+
+		response.Results = append(response.Results, result)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    response,
+		"message": "Batch password reset emails processed",
 	})
 }
 

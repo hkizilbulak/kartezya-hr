@@ -1034,9 +1034,8 @@ func (s *leaveService) DeleteLeaveType(id uint, userID uint) error {
 	return nil
 }
 
-// CalculateWorkingDays calculates the actual number of working days excluding holidays
-// It takes into account weekends, public holidays, and half-day leaves
-// Full day holidays count as 0 days, half day holidays count as 0.5 days
+// CalculateWorkingDays calculates the actual number of working days excluding weekends
+// It takes into account weekends and half-day leaves
 // isStartDateFullDay and isFinishDateFullDay parameters indicate if the start/end dates are full or half days
 func (s *leaveService) CalculateWorkingDays(startDate, endDate time.Time, isStartDateFullDay, isFinishDateFullDay bool) (float64, error) {
 	if startDate.After(endDate) {
@@ -1047,24 +1046,7 @@ func (s *leaveService) CalculateWorkingDays(startDate, endDate time.Time, isStar
 	startDate = time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, startDate.Location())
 	endDate = time.Date(endDate.Year(), endDate.Month(), endDate.Day(), 0, 0, 0, 0, endDate.Location())
 
-	// Get all holidays between start and end dates
-	holidays, err := s.holidayRepo.GetByDateRange(startDate, endDate)
-	if err != nil {
-		return 0, fmt.Errorf("failed to get holidays: %w", err)
-	}
-
-	// Create a map of holiday dates and their values for fast lookup
-	// Full day holiday = 0 days worked, Half day holiday = 0.5 days worked
-	holidayMap := make(map[string]float64)
-	for _, holiday := range holidays {
-		if holiday.IsFullDay {
-			holidayMap[holiday.HolidayDate.Format("2006-01-02")] = 0.0
-		} else {
-			holidayMap[holiday.HolidayDate.Format("2006-01-02")] = 0.5
-		}
-	}
-
-	// Count working days (excluding weekends and holidays)
+	// Count working days (excluding weekends only)
 	workingDays := 0.0
 	currentDate := startDate
 
@@ -1073,9 +1055,6 @@ func (s *leaveService) CalculateWorkingDays(startDate, endDate time.Time, isStar
 		// Check if it's a weekend (Saturday = 6, Sunday = 0)
 		dayOfWeek := currentDate.Weekday()
 		isWeekend := dayOfWeek == time.Saturday || dayOfWeek == time.Sunday
-
-		// Check if it's a holiday
-		holidayValue, isHoliday := holidayMap[currentDate.Format("2006-01-02")]
 
 		// Count working days if it's not a weekend
 		if !isWeekend {
@@ -1088,15 +1067,8 @@ func (s *leaveService) CalculateWorkingDays(startDate, endDate time.Time, isStar
 				dayValue = 0.5
 			}
 
-			if !isHoliday {
-				// Regular working day - count the day value (could be 1.0 or 0.5)
-				workingDays += dayValue
-			} else {
-				// Holiday on a working day - count the holiday value
-				// Full day holiday (isFullDay=true) counts as 0 days
-				// Half day holiday (isFullDay=false) counts as 0.5 days
-				workingDays += holidayValue
-			}
+			// Count the day value (could be 1.0 or 0.5)
+			workingDays += dayValue
 		}
 
 		// If we've reached the end date, break the loop
