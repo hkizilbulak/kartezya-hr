@@ -44,6 +44,9 @@ func main() {
 	// Load configuration
 	cfg := config.Load()
 
+	// Set config for domain models (for dynamic table naming)
+	domain.SetConfig(cfg)
+
 	// Initialize database
 	db := database.NewDatabase(cfg)
 	defer db.Close()

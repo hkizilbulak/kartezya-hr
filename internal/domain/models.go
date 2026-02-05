@@ -2,7 +2,25 @@ package domain
 
 import (
 	"time"
+
+	"kartezya-hr/internal/config"
 )
+
+// Global config variable for table naming
+var globalConfig *config.Config
+
+// SetConfig sets the global config for table naming
+func SetConfig(cfg *config.Config) {
+	globalConfig = cfg
+}
+
+// getTableName is a helper function to get table name with prefix
+func getTableName(tableName string) string {
+	if globalConfig != nil {
+		return globalConfig.GetTableName(tableName)
+	}
+	return tableName
+}
 
 // AuditableModel with audit and soft-delete fields for all entities except AuditLog
 type AuditableModel struct {
@@ -224,7 +242,7 @@ type Leave struct {
 
 // TableName maps the Leave model to the hr_leave_requests table
 func (Leave) TableName() string {
-	return "hr_leave_requests"
+	return getTableName("hr_leave_requests")
 }
 
 // LeaveDocument represents documents attached to leave requests
@@ -249,7 +267,7 @@ type Holiday struct {
 }
 
 func (Holiday) TableName() string {
-	return "hr_holidays"
+	return getTableName("hr_holidays")
 }
 
 // Grade represents employee grades/levels
@@ -264,7 +282,7 @@ type Grade struct {
 
 // Grade table name
 func (Grade) TableName() string {
-	return "hr_grades"
+	return getTableName("hr_grades")
 }
 
 // AuditLog represents system audit logs (NO SOFT DELETE - this table is append-only)
@@ -307,65 +325,65 @@ const (
 
 // User table name
 func (User) TableName() string {
-	return "hr_users"
+	return getTableName("hr_users")
 }
 
 // Role table name
 func (Role) TableName() string {
-	return "hr_roles"
+	return getTableName("hr_roles")
 }
 
 // UserRole table name
 func (UserRole) TableName() string {
-	return "hr_user_roles"
+	return getTableName("hr_user_roles")
 }
 
 // Employee table name
 func (Employee) TableName() string {
-	return "hr_employees"
+	return getTableName("hr_employees")
 }
 
 // Company table name
 func (Company) TableName() string {
-	return "hr_companies"
+	return getTableName("hr_companies")
 }
 
 // Department table name
 func (Department) TableName() string {
-	return "hr_departments"
+	return getTableName("hr_departments")
 }
 
 // JobPosition table name
 func (JobPosition) TableName() string {
-	return "hr_job_positions"
+	return getTableName("hr_job_positions")
 }
 
 // EmployeeWorkInformation table name
 func (EmployeeWorkInformation) TableName() string {
-	return "hr_employee_work_information"
+	return getTableName("hr_employee_work_information")
 }
 
 // LeaveType table name
 func (LeaveType) TableName() string {
-	return "hr_leave_types"
+	return getTableName("hr_leave_types")
 }
 
 // LeaveBalance table name
 func (LeaveBalance) TableName() string {
-	return "hr_leave_balances"
+	return getTableName("hr_leave_balances")
 }
 
 // LeaveRequest table name
 func (LeaveRequest) TableName() string {
-	return "hr_leave_requests"
+	return getTableName("hr_leave_requests")
 }
 
 // LeaveDocument table name
 func (LeaveDocument) TableName() string {
-	return "hr_leave_documents"
+	return getTableName("hr_leave_documents")
 }
 
 // AuditLog table name
 func (AuditLog) TableName() string {
-	return "hr_audit_logs"
+	return getTableName("hr_audit_logs")
 }
