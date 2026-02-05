@@ -65,6 +65,10 @@ definitions:
         type: string
       city:
         type: string
+      company_email:
+        type: string
+      contract_no:
+        type: string
       created_at:
         type: string
       created_by:
@@ -73,6 +77,8 @@ definitions:
         type: string
       deleted:
         type: boolean
+      email:
+        type: string
       emergency_contact:
         type: string
       emergency_contact_name:
@@ -83,14 +89,24 @@ definitions:
         items:
           $ref: '#/definitions/domain.EmployeeWorkInformation'
         type: array
+      father_name:
+        type: string
       first_name:
         type: string
       gender:
         type: string
+      grade:
+        $ref: '#/definitions/domain.Grade'
+      grade_id:
+        type: integer
       hire_date:
         type: string
       id:
         type: integer
+      identity_no:
+        type: string
+      is_grade_up:
+        type: boolean
       last_name:
         type: string
       leave_balances:
@@ -107,11 +123,19 @@ definitions:
         type: string
       modified_by:
         type: string
+      mother_name:
+        type: string
+      nationality:
+        type: string
+      note:
+        type: string
       phone:
+        type: string
+      profession_start_date:
         type: string
       state:
         type: string
-      total_experience:
+      total_gap:
         type: number
       updated_at:
         type: string
@@ -154,7 +178,35 @@ definitions:
         type: integer
       modified_by:
         type: string
+      personnel_no:
+        type: string
       start_date:
+        type: string
+      updated_at:
+        type: string
+      work_email:
+        type: string
+    type: object
+  domain.Grade:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      description:
+        type: string
+      employees:
+        description: Relationships
+        items:
+          $ref: '#/definitions/domain.Employee'
+        type: array
+      id:
+        type: integer
+      modified_by:
+        type: string
+      name:
         type: string
       updated_at:
         type: string
@@ -211,8 +263,6 @@ definitions:
         type: string
       used_days:
         type: number
-      year:
-        type: integer
     type: object
   domain.LeaveDocument:
     properties:
@@ -273,7 +323,13 @@ definitions:
         type: string
       id:
         type: integer
+      is_finish_date_full_day:
+        description: true = tam gün, false = yarım gün
+        type: boolean
       is_paid:
+        type: boolean
+      is_start_date_full_day:
+        description: true = tam gün, false = yarım gün
         type: boolean
       leave_documents:
         items:
@@ -423,12 +479,56 @@ definitions:
       reason:
         type: string
     type: object
+  handler.CalculateWorkingDaysRequest:
+    properties:
+      end_date:
+        type: string
+      is_finish_date_full_day:
+        type: boolean
+      is_start_date_full_day:
+        type: boolean
+      start_date:
+        type: string
+    required:
+    - end_date
+    - start_date
+    type: object
+  handler.CalculateWorkingDaysResponse:
+    properties:
+      calendar_days:
+        type: integer
+      end_date:
+        type: string
+      start_date:
+        type: string
+      working_days:
+        type: number
+    type: object
   handler.CancelLeaveRequest:
     properties:
       reason:
         type: string
     required:
     - reason
+    type: object
+  handler.ChangePasswordRequest:
+    properties:
+      current_password:
+        type: string
+      new_password:
+        type: string
+    required:
+    - current_password
+    - new_password
+    type: object
+  handler.CompanyDepartmentChartData:
+    properties:
+      company_name:
+        type: string
+      count:
+        type: integer
+      department_name:
+        type: string
     type: object
   handler.CreateCompanyRequest:
     properties:
@@ -465,7 +565,11 @@ definitions:
         type: string
       company_email:
         type: string
+      contract_no:
+        type: string
       date_of_birth:
+        type: string
+      email:
         type: string
       emergency_contact:
         type: string
@@ -473,28 +577,58 @@ definitions:
         type: string
       emergency_contact_relation:
         type: string
+      father_name:
+        type: string
       first_name:
         type: string
       gender:
         type: string
+      grade_id:
+        type: integer
       hire_date:
         type: string
+      identity_no:
+        type: string
+      is_grade_up:
+        type: boolean
       last_name:
         type: string
       leave_date:
         type: string
       marital_status:
         type: string
+      mother_name:
+        type: string
+      nationality:
+        type: string
+      note:
+        type: string
       phone:
         type: string
+      profession_start_date:
+        type: string
+      roles:
+        items:
+          type: string
+        type: array
       state:
         type: string
-      total_experience:
+      total_gap:
         type: number
     required:
     - company_email
+    - email
     - first_name
     - last_name
+    type: object
+  handler.CreateGradeRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+    required:
+    - name
     type: object
   handler.CreateJobPositionRequest:
     properties:
@@ -509,7 +643,9 @@ definitions:
         type: integer
       end_date:
         type: string
-      is_paid:
+      is_finish_date_full_day:
+        type: boolean
+      is_start_date_full_day:
         type: boolean
       leave_type_id:
         type: integer
@@ -518,10 +654,8 @@ definitions:
       start_date:
         type: string
     required:
-    - employee_id
     - end_date
     - leave_type_id
-    - reason
     - start_date
     type: object
   handler.CreateLeaveTypeRequest:
@@ -553,7 +687,11 @@ definitions:
         type: string
       job_position_id:
         type: integer
+      personnel_no:
+        type: string
       start_date:
+        type: string
+      work_email:
         type: string
     required:
     - company_id
@@ -561,6 +699,24 @@ definitions:
     - employee_id
     - job_position_id
     - start_date
+    type: object
+  handler.DashboardDataResponse:
+    properties:
+      pending_leave_requests:
+        type: integer
+      total_companies:
+        type: integer
+      total_departments:
+        type: integer
+      total_employees:
+        type: integer
+    type: object
+  handler.GenderChartData:
+    properties:
+      count:
+        type: integer
+      gender:
+        type: string
     type: object
   handler.LoginRequest:
     properties:
@@ -571,6 +727,75 @@ definitions:
     required:
     - email
     - password
+    type: object
+  handler.PositionChartData:
+    properties:
+      count:
+        type: integer
+      position_title:
+        type: string
+    type: object
+  handler.ResetPasswordRequest:
+    properties:
+      email:
+        type: string
+      new_password:
+        type: string
+      token:
+        type: string
+    required:
+    - email
+    - new_password
+    - token
+    type: object
+  handler.SendPasswordResetEmailBatchRequest:
+    properties:
+      users:
+        items:
+          $ref: '#/definitions/handler.SendPasswordResetEmailRequest'
+        type: array
+    required:
+    - users
+    type: object
+  handler.SendPasswordResetEmailBatchResponse:
+    properties:
+      failure_count:
+        type: integer
+      results:
+        items:
+          $ref: '#/definitions/handler.SendPasswordResetEmailBatchResultItem'
+        type: array
+      success_count:
+        type: integer
+      total_count:
+        type: integer
+    type: object
+  handler.SendPasswordResetEmailBatchResultItem:
+    properties:
+      email:
+        type: string
+      error:
+        type: string
+      success:
+        type: boolean
+      user_id:
+        type: integer
+    type: object
+  handler.SendPasswordResetEmailRequest:
+    properties:
+      email:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      user_id:
+        type: integer
+    required:
+    - email
+    - first_name
+    - last_name
+    - user_id
     type: object
   handler.UpdateCompanyRequest:
     properties:
@@ -607,7 +832,11 @@ definitions:
         type: string
       company_email:
         type: string
+      contract_no:
+        type: string
       date_of_birth:
+        type: string
+      email:
         type: string
       emergency_contact:
         type: string
@@ -615,28 +844,56 @@ definitions:
         type: string
       emergency_contact_relation:
         type: string
+      father_name:
+        type: string
       first_name:
         type: string
       gender:
         type: string
+      grade_id:
+        type: integer
       hire_date:
         type: string
+      identity_no:
+        type: string
+      is_grade_up:
+        type: boolean
       last_name:
         type: string
       leave_date:
         type: string
       marital_status:
         type: string
+      mother_name:
+        type: string
+      nationality:
+        type: string
+      note:
+        type: string
       phone:
         type: string
+      profession_start_date:
+        type: string
+      roles:
+        items:
+          type: string
+        type: array
       state:
         type: string
-      total_experience:
+      total_gap:
         type: number
     required:
-    - company_email
     - first_name
     - last_name
+    type: object
+  handler.UpdateGradeRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+    required:
+    - name
     type: object
   handler.UpdateJobPositionRequest:
     properties:
@@ -647,11 +904,11 @@ definitions:
     type: object
   handler.UpdateLeaveRequestRequest:
     properties:
-      employee_id:
-        type: integer
       end_date:
         type: string
-      is_paid:
+      is_finish_date_full_day:
+        type: boolean
+      is_start_date_full_day:
         type: boolean
       leave_type_id:
         type: integer
@@ -660,11 +917,44 @@ definitions:
       start_date:
         type: string
     required:
-    - employee_id
     - end_date
     - leave_type_id
-    - reason
     - start_date
+    type: object
+  handler.UpdateMyProfileRequest:
+    properties:
+      address:
+        type: string
+      city:
+        type: string
+      date_of_birth:
+        type: string
+      email:
+        type: string
+      emergency_contact:
+        type: string
+      emergency_contact_name:
+        type: string
+      emergency_contact_relation:
+        type: string
+      father_name:
+        type: string
+      gender:
+        type: string
+      identity_no:
+        type: string
+      marital_status:
+        type: string
+      mother_name:
+        type: string
+      nationality:
+        type: string
+      phone:
+        type: string
+      profession_start_date:
+        type: string
+      state:
+        type: string
     type: object
   handler.UpdateWorkInformationRequest:
     properties:
@@ -678,7 +968,11 @@ definitions:
         type: string
       job_position_id:
         type: integer
+      personnel_no:
+        type: string
       start_date:
+        type: string
+      work_email:
         type: string
     required:
     - company_id
@@ -686,6 +980,16 @@ definitions:
     - employee_id
     - job_position_id
     - start_date
+    type: object
+  handler.ValidateResetTokenRequest:
+    properties:
+      email:
+        type: string
+      token:
+        type: string
+    required:
+    - email
+    - token
     type: object
   service.LoginResponse:
     properties:
@@ -719,30 +1023,17 @@ definitions:
     type: object
   service.UserWithRoles:
     properties:
-      created_at:
-        type: string
-      created_by:
-        type: string
-      deleted:
-        type: boolean
       email:
         type: string
-      employee:
-        $ref: '#/definitions/domain.Employee'
+      firstName:
+        type: string
       id:
         type: integer
-      modified_by:
+      lastName:
         type: string
       roles:
         items:
           type: string
-        type: array
-      updated_at:
-        type: string
-      user_roles:
-        description: Relationships
-        items:
-          $ref: '#/definitions/domain.UserRole'
         type: array
     type: object
   types.AdminLeaveRequestResponse:
@@ -769,7 +1060,11 @@ definitions:
         type: string
       id:
         type: integer
+      is_finish_date_full_day:
+        type: boolean
       is_paid:
+        type: boolean
+      is_start_date_full_day:
         type: boolean
       leave_type:
         $ref: '#/definitions/types.LeaveTypeLookup'
@@ -781,6 +1076,9 @@ definitions:
         type: string
       rejection_reason:
         type: string
+      remaining_days:
+        description: Leave balance remaining days (only for annual leave)
+        type: number
       requested_days:
         type: number
       start_date:
@@ -861,6 +1159,32 @@ definitions:
       last_name:
         type: string
     type: object
+  types.GradeLookup:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  types.GradeResponse:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      description:
+        type: string
+      id:
+        type: integer
+      modified_by:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
   types.JobPositionLookup:
     properties:
       id:
@@ -918,7 +1242,11 @@ definitions:
         type: string
       id:
         type: integer
+      is_finish_date_full_day:
+        type: boolean
       is_paid:
+        type: boolean
+      is_start_date_full_day:
         type: boolean
       leave_type:
         $ref: '#/definitions/types.LeaveTypeLookup'
@@ -936,6 +1264,46 @@ definitions:
         type: string
       updated_at:
         type: string
+    type: object
+  types.WorkDayReportResponse:
+    properties:
+      end_date:
+        type: string
+      rows:
+        items:
+          $ref: '#/definitions/types.WorkDayReportRow'
+        type: array
+      start_date:
+        type: string
+      total_holiday_days:
+        type: number
+      total_work_days:
+        type: number
+    type: object
+  types.WorkDayReportRow:
+    properties:
+      company_name:
+        type: string
+      department_name:
+        type: string
+      first_name:
+        type: string
+      holiday_days:
+        type: number
+      id:
+        type: integer
+      identity_no:
+        type: string
+      last_name:
+        type: string
+      manager:
+        type: string
+      used_leave_days:
+        type: number
+      work_days:
+        type: number
+      worked_days:
+        type: number
     type: object
   types.WorkInformationCompanyLookup:
     properties:
@@ -991,9 +1359,13 @@ definitions:
         $ref: '#/definitions/types.WorkInformationJobPositionLookup'
       modified_by:
         type: string
+      personnel_no:
+        type: string
       start_date:
         type: string
       updated_at:
+        type: string
+      work_email:
         type: string
     type: object
   types.WorkInformationWithNames:
@@ -1027,6 +1399,38 @@ info:
   title: Kartezya HR Management System API
   version: "1.0"
 paths:
+  /auth/change-password:
+    post:
+      consumes:
+      - application/json
+      description: Change password for the authenticated user
+      parameters:
+      - description: Password change request
+        in: body
+        name: changePasswordRequest
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ChangePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Change user password (authenticated)
+      tags:
+      - auth
   /auth/login:
     post:
       consumes:
@@ -1079,11 +1483,48 @@ paths:
       summary: User logout
       tags:
       - auth
-  /auth/profile:
-    get:
+  /auth/reset-password:
+    post:
       consumes:
       - application/json
-      description: Get the profile of the authenticated user
+      description: Reset user password using a valid password reset token
+      parameters:
+      - description: Password reset request
+        in: body
+        name: resetPasswordRequest
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ResetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      summary: Reset user password with token
+      tags:
+      - auth
+  /auth/send-password-reset-email-batch:
+    post:
+      consumes:
+      - application/json
+      description: Send password reset emails to a batch of users
+      parameters:
+      - description: Batch password reset email request
+        in: body
+        name: batchRequest
+        required: true
+        schema:
+          $ref: '#/definitions/handler.SendPasswordResetEmailBatchRequest'
       produces:
       - application/json
       responses:
@@ -1094,15 +1535,102 @@ paths:
             - $ref: '#/definitions/handler.APIResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/domain.User'
+                  $ref: '#/definitions/handler.SendPasswordResetEmailBatchResponse'
               type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
         "401":
           description: Unauthorized
           schema:
             $ref: '#/definitions/handler.APIResponse'
       security:
       - BearerAuth: []
-      summary: Get user profile
+      summary: Send password reset emails to multiple users
+      tags:
+      - auth
+  /auth/validate-reset-token:
+    post:
+      consumes:
+      - application/json
+      description: Validate if a password reset token is valid and not expired
+      parameters:
+      - description: Token validation request
+        in: body
+        name: validateResetTokenRequest
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ValidateResetTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      summary: Validate password reset token
+      tags:
+      - auth
+  /auth/yandex/callback:
+    get:
+      consumes:
+      - application/json
+      description: Handles the OAuth callback from Yandex and authenticates the user
+      parameters:
+      - description: Authorization code from Yandex
+        in: query
+        name: code
+        required: true
+        type: string
+      - description: State parameter for CSRF protection
+        in: query
+        name: state
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/service.LoginResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      summary: Handle Yandex OAuth callback
+      tags:
+      - auth
+  /auth/yandex/login:
+    get:
+      consumes:
+      - application/json
+      description: Redirects the user to Yandex OAuth authorization page
+      produces:
+      - application/json
+      responses:
+        "302":
+          description: Redirect to Yandex OAuth
+          schema:
+            type: string
+      summary: Initiate Yandex OAuth login
       tags:
       - auth
   /companies:
@@ -1198,46 +1726,6 @@ paths:
       summary: Create company
       tags:
       - companies
-  /companies/{company_id}/departments:
-    get:
-      description: Get all departments for a specific company (Admin only)
-      parameters:
-      - description: Company ID
-        in: path
-        name: company_id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/handler.APIResponse'
-            - properties:
-                data:
-                  items:
-                    $ref: '#/definitions/types.DepartmentResponse'
-                  type: array
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handler.APIResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handler.APIResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/handler.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: List departments by company
-      tags:
-      - departments
   /companies/{id}:
     delete:
       consumes:
@@ -1364,17 +1852,41 @@ paths:
       summary: Update company
       tags:
       - companies
-  /companies/{id}/departments:
+  /dashboard/data:
     get:
       consumes:
       - application/json
-      description: Get all departments for a specific company (Admin only)
-      parameters:
-      - description: Company ID
-        in: path
-        name: id
-        required: true
-        type: integer
+      description: Get all dashboard statistics in a single request
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.DashboardDataResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get dashboard data
+      tags:
+      - dashboard
+  /dashboard/employees-by-company-department:
+    get:
+      consumes:
+      - application/json
+      description: Get employee statistics grouped by company and department
       produces:
       - application/json
       responses:
@@ -1386,42 +1898,27 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/domain.Department'
+                    $ref: '#/definitions/handler.CompanyDepartmentChartData'
                   type: array
               type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handler.APIResponse'
         "401":
           description: Unauthorized
           schema:
             $ref: '#/definitions/handler.APIResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/handler.APIResponse'
-        "404":
-          description: Not Found
+        "500":
+          description: Internal Server Error
           schema:
             $ref: '#/definitions/handler.APIResponse'
       security:
       - BearerAuth: []
-      summary: Get company departments
+      summary: Get employees count by company and department
       tags:
-      - companies
-  /companies/{id}/departments/lookup:
+      - dashboard
+  /dashboard/employees-by-gender:
     get:
       consumes:
       - application/json
-      description: Get simplified list of departments for a specific company (Admin
-        only)
-      parameters:
-      - description: Company ID
-        in: path
-        name: id
-        required: true
-        type: integer
+      description: Get employee statistics grouped by gender
       produces:
       - application/json
       responses:
@@ -1433,31 +1930,27 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/types.DepartmentLookup'
+                    $ref: '#/definitions/handler.GenderChartData'
                   type: array
               type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handler.APIResponse'
         "401":
           description: Unauthorized
           schema:
             $ref: '#/definitions/handler.APIResponse'
-        "403":
-          description: Forbidden
+        "500":
+          description: Internal Server Error
           schema:
             $ref: '#/definitions/handler.APIResponse'
       security:
       - BearerAuth: []
-      summary: Get company departments lookup
+      summary: Get employees count by gender
       tags:
-      - companies
-  /companies/lookup:
+      - dashboard
+  /dashboard/employees-by-position:
     get:
       consumes:
       - application/json
-      description: Get simplified list of companies for dropdown/lookup (Admin only)
+      description: Get employee statistics grouped by job position
       produces:
       - application/json
       responses:
@@ -1469,22 +1962,22 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/types.CompanyLookup'
+                    $ref: '#/definitions/handler.PositionChartData'
                   type: array
               type: object
         "401":
           description: Unauthorized
           schema:
             $ref: '#/definitions/handler.APIResponse'
-        "403":
-          description: Forbidden
+        "500":
+          description: Internal Server Error
           schema:
             $ref: '#/definitions/handler.APIResponse'
       security:
       - BearerAuth: []
-      summary: Get companies lookup
+      summary: Get employees count by position
       tags:
-      - companies
+      - dashboard
   /departments:
     get:
       description: Get all departments with pagination (Admin only)
@@ -1700,15 +2193,63 @@ paths:
     get:
       consumes:
       - application/json
-      description: Get paginated list of all employees (Admin only)
+      description: Get paginated list of all employees with filtering (Admin only)
       parameters:
       - description: 'Limit number of results (default: 10)'
         in: query
         name: limit
         type: integer
-      - description: 'Offset for pagination (default: 0)'
+      - description: 'Page number (default: 1)'
         in: query
-        name: offset
+        name: page
+        type: integer
+      - description: Sort field
+        in: query
+        name: sort
+        type: string
+      - description: Sort direction (ASC/DESC)
+        in: query
+        name: direction
+        type: string
+      - description: Filter by employee ID
+        in: query
+        name: id
+        type: integer
+      - description: Filter by first name
+        in: query
+        name: first_name
+        type: string
+      - description: Filter by email
+        in: query
+        name: email
+        type: string
+      - description: Filter by company ID
+        in: query
+        name: company_id
+        type: integer
+      - description: Filter by department ID
+        in: query
+        name: department_id
+        type: integer
+      - description: Filter by manager
+        in: query
+        name: manager
+        type: string
+      - description: Filter by identity number
+        in: query
+        name: identity_no
+        type: string
+      - description: Filter by gender
+        in: query
+        name: gender
+        type: string
+      - description: Filter by marital status
+        in: query
+        name: marital_status
+        type: string
+      - description: Filter by grade ID
+        in: query
+        name: grade_id
         type: integer
       produces:
       - application/json
@@ -1917,6 +2458,264 @@ paths:
       summary: Get my employee profile
       tags:
       - employees
+    put:
+      consumes:
+      - application/json
+      description: Update the profile of the authenticated employee (own profile only)
+      parameters:
+      - description: Updated employee data
+        in: body
+        name: employee
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateMyProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'success: true, data: Employee'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update my employee profile
+      tags:
+      - employees
+  /grades:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated list of grades with sorting (Admin only)
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10)'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Sort field (default: id)'
+        in: query
+        name: sort
+        type: string
+      - description: 'Sort direction (default: ASC)'
+        in: query
+        name: direction
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.GradeResponse'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get grades with pagination
+      tags:
+      - grades
+    post:
+      consumes:
+      - application/json
+      description: Create a new grade (Admin only)
+      parameters:
+      - description: Grade data
+        in: body
+        name: grade
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateGradeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.GradeResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create grade
+      tags:
+      - grades
+  /grades/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a grade by ID (Admin only)
+      parameters:
+      - description: Grade ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete grade
+      tags:
+      - grades
+    get:
+      consumes:
+      - application/json
+      description: Get a specific grade by ID (Admin only)
+      parameters:
+      - description: Grade ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.GradeResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get grade by ID
+      tags:
+      - grades
+    put:
+      consumes:
+      - application/json
+      description: Update a grade by ID (Admin only)
+      parameters:
+      - description: Grade ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated grade data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateGradeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update grade
+      tags:
+      - grades
   /job-positions:
     get:
       description: Get paginated list of job positions with sorting (Admin only)
@@ -2130,39 +2929,6 @@ paths:
       summary: Update job position
       tags:
       - job-positions
-  /job-positions/lookup:
-    get:
-      consumes:
-      - application/json
-      description: Get simplified list of job positions for dropdown/lookup (Admin
-        only)
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/handler.APIResponse'
-            - properties:
-                data:
-                  items:
-                    $ref: '#/definitions/types.JobPositionLookup'
-                  type: array
-              type: object
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handler.APIResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/handler.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: Get job positions lookup
-      tags:
-      - job-positions
   /leave-types:
     post:
       consumes:
@@ -2253,6 +3019,44 @@ paths:
       summary: Get my leave balances
       tags:
       - leave-balances
+  /leave/calculate-working-days:
+    post:
+      consumes:
+      - application/json
+      description: Calculate the number of working days (excluding weekends and holidays)
+        between two dates
+      parameters:
+      - description: Date range for calculation
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CalculateWorkingDaysRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.CalculateWorkingDaysResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Calculate working days between two dates
+      tags:
+      - leave-requests
   /leave/requests:
     get:
       consumes:
@@ -2763,11 +3567,115 @@ paths:
       summary: Update leave type
       tags:
       - leave-types
-  /leave/types/lookup:
+  /lookup/companies:
     get:
-      consumes:
+      description: Get all companies as lookup data (public API)
+      produces:
       - application/json
-      description: Get simplified list of leave types for dropdown/lookup
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.CompanyLookup'
+                  type: array
+              type: object
+      summary: Get all companies for lookup
+      tags:
+      - Lookup
+  /lookup/departments:
+    get:
+      description: Get all departments as lookup data (public API)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.DepartmentLookup'
+                  type: array
+              type: object
+      summary: Get all departments for lookup
+      tags:
+      - Lookup
+  /lookup/departments-by-company:
+    get:
+      description: Get departments filtered by company ID as lookup data (public API)
+      parameters:
+      - description: Company ID
+        in: query
+        name: company_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.DepartmentLookup'
+                  type: array
+              type: object
+      summary: Get departments by company for lookup
+      tags:
+      - Lookup
+  /lookup/grades:
+    get:
+      description: Get all grades as lookup data (public API)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.GradeLookup'
+                  type: array
+              type: object
+      summary: Get all grades for lookup
+      tags:
+      - Lookup
+  /lookup/job-positions:
+    get:
+      description: Get all job positions as lookup data (public API)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.JobPositionLookup'
+                  type: array
+              type: object
+      summary: Get all job positions for lookup
+      tags:
+      - Lookup
+  /lookup/leave-types:
+    get:
+      description: Get all leave types as lookup data (public API)
       produces:
       - application/json
       responses:
@@ -2782,15 +3690,62 @@ paths:
                     $ref: '#/definitions/types.LeaveTypeLookup'
                   type: array
               type: object
+      summary: Get all leave types for lookup
+      tags:
+      - Lookup
+  /reports/work-day:
+    get:
+      consumes:
+      - application/json
+      description: Get work day report with filters
+      parameters:
+      - description: Start Date (YYYY-MM-DD)
+        in: query
+        name: start_date
+        required: true
+        type: string
+      - description: End Date (YYYY-MM-DD)
+        in: query
+        name: end_date
+        required: true
+        type: string
+      - description: Company ID
+        in: query
+        name: company_id
+        type: integer
+      - description: Department ID
+        in: query
+        name: department_id
+        type: integer
+      - default: true
+        description: Is Active
+        in: query
+        name: is_active
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.WorkDayReportResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handler.APIResponse'
+            additionalProperties:
+              type: string
+            type: object
       security:
       - BearerAuth: []
-      summary: Get leave types lookup
+      summary: Get Work Day Report
       tags:
-      - leave-types
+      - reports
   /work-information:
     get:
       consumes:
@@ -2813,6 +3768,10 @@ paths:
         in: query
         name: direction
         type: string
+      - description: Filter by employee ID
+        in: query
+        name: employee_id
+        type: integer
       produces:
       - application/json
       responses:

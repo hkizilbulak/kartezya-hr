@@ -34,7 +34,7 @@ type UpdateJobPositionRequest struct {
 // @Summary Create a new job position
 // @Description Create a new job position (Admin only)
 // @Tags job-positions
-// @Accept jsonablo
+// @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param request body CreateJobPositionRequest true "Job position data"
