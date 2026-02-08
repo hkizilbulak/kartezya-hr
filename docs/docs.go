@@ -22,6 +22,57 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/auth/change-password": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Change password for the authenticated user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Change user password (authenticated)",
+                "parameters": [
+                    {
+                        "description": "Password change request",
+                        "name": "changePasswordRequest",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.ChangePasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/login": {
             "post": {
                 "description": "Authenticate user with email and password",
@@ -108,14 +159,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/auth/profile": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get the profile of the authenticated user",
+        "/auth/reset-password": {
+            "post": {
+                "description": "Reset user password using a valid password reset token",
                 "consumes": [
                     "application/json"
                 ],
@@ -125,7 +171,69 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Get user profile",
+                "summary": "Reset user password with token",
+                "parameters": [
+                    {
+                        "description": "Password reset request",
+                        "name": "resetPasswordRequest",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.ResetPasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/send-password-reset-email-batch": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Send password reset emails to a batch of users",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Send password reset emails to multiple users",
+                "parameters": [
+                    {
+                        "description": "Batch password reset email request",
+                        "name": "batchRequest",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.SendPasswordResetEmailBatchRequest"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -138,17 +246,154 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/domain.User"
+                                            "$ref": "#/definitions/handler.SendPasswordResetEmailBatchResponse"
                                         }
                                     }
                                 }
                             ]
                         }
                     },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/validate-reset-token": {
+            "post": {
+                "description": "Validate if a password reset token is valid and not expired",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Validate password reset token",
+                "parameters": [
+                    {
+                        "description": "Token validation request",
+                        "name": "validateResetTokenRequest",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.ValidateResetTokenRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/yandex/callback": {
+            "get": {
+                "description": "Handles the OAuth callback from Yandex and authenticates the user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Handle Yandex OAuth callback",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Authorization code from Yandex",
+                        "name": "code",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "State parameter for CSRF protection",
+                        "name": "state",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/service.LoginResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/yandex/login": {
+            "get": {
+                "description": "Redirects the user to Yandex OAuth authorization page",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Initiate Yandex OAuth login",
+                "responses": {
+                    "302": {
+                        "description": "Redirect to Yandex OAuth",
+                        "schema": {
+                            "type": "string"
                         }
                     }
                 }
@@ -281,128 +526,6 @@ const docTemplate = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/types.CompanyResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/companies/lookup": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get simplified list of companies for dropdown/lookup (Admin only)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "companies"
-                ],
-                "summary": "Get companies lookup",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/handler.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/types.CompanyLookup"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/companies/{company_id}/departments": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get all departments for a specific company (Admin only)",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "departments"
-                ],
-                "summary": "List departments by company",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Company ID",
-                        "name": "company_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/handler.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/types.DepartmentResponse"
-                                            }
                                         }
                                     }
                                 }
@@ -630,14 +753,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/companies/{id}/departments": {
+        "/dashboard/data": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get all departments for a specific company (Admin only)",
+                "description": "Get all dashboard statistics in a single request",
                 "consumes": [
                     "application/json"
                 ],
@@ -645,18 +768,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "companies"
+                    "dashboard"
                 ],
-                "summary": "Get company departments",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Company ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
+                "summary": "Get dashboard data",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -669,20 +783,11 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/domain.Department"
-                                            }
+                                            "$ref": "#/definitions/handler.DashboardDataResponse"
                                         }
                                     }
                                 }
                             ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
                         }
                     },
                     "401": {
@@ -691,14 +796,8 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/handler.APIResponse"
                         }
@@ -706,14 +805,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/companies/{id}/departments/lookup": {
+        "/dashboard/employees-by-company-department": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get simplified list of departments for a specific company (Admin only)",
+                "description": "Get employee statistics grouped by company and department",
                 "consumes": [
                     "application/json"
                 ],
@@ -721,18 +820,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "companies"
+                    "dashboard"
                 ],
-                "summary": "Get company departments lookup",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Company ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
+                "summary": "Get employees count by company and department",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -747,18 +837,12 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/types.DepartmentLookup"
+                                                "$ref": "#/definitions/handler.CompanyDepartmentChartData"
                                             }
                                         }
                                     }
                                 }
                             ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
                         }
                     },
                     "401": {
@@ -767,8 +851,118 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     },
-                    "403": {
-                        "description": "Forbidden",
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/dashboard/employees-by-gender": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get employee statistics grouped by gender",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dashboard"
+                ],
+                "summary": "Get employees count by gender",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/handler.GenderChartData"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/dashboard/employees-by-position": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get employee statistics grouped by job position",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dashboard"
+                ],
+                "summary": "Get employees count by position",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/handler.PositionChartData"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/handler.APIResponse"
                         }
@@ -1125,7 +1319,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get paginated list of all employees (Admin only)",
+                "description": "Get paginated list of all employees with filtering (Admin only)",
                 "consumes": [
                     "application/json"
                 ],
@@ -1145,8 +1339,80 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Offset for pagination (default: 0)",
-                        "name": "offset",
+                        "description": "Page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort field",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort direction (ASC/DESC)",
+                        "name": "direction",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by employee ID",
+                        "name": "id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by first name",
+                        "name": "first_name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by email",
+                        "name": "email",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by company ID",
+                        "name": "company_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by department ID",
+                        "name": "department_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by manager",
+                        "name": "manager",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by identity number",
+                        "name": "identity_no",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by gender",
+                        "name": "gender",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by marital status",
+                        "name": "marital_status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by grade ID",
+                        "name": "grade_id",
                         "in": "query"
                     }
                 ],
@@ -1274,6 +1540,65 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update the profile of the authenticated employee (own profile only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employees"
+                ],
+                "summary": "Update my employee profile",
+                "parameters": [
+                    {
+                        "description": "Updated employee data",
+                        "name": "employee",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.UpdateMyProfileRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "success: true, data: Employee",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -1463,6 +1788,360 @@ const docTemplate = `{
                 }
             }
         },
+        "/grades": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get paginated list of grades with sorting (Admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "grades"
+                ],
+                "summary": "Get grades with pagination",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default: 10)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort field (default: id)",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort direction (default: ASC)",
+                        "name": "direction",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.GradeResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new grade (Admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "grades"
+                ],
+                "summary": "Create grade",
+                "parameters": [
+                    {
+                        "description": "Grade data",
+                        "name": "grade",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.CreateGradeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.GradeResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/grades/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a specific grade by ID (Admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "grades"
+                ],
+                "summary": "Get grade by ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Grade ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.GradeResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update a grade by ID (Admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "grades"
+                ],
+                "summary": "Update grade",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Grade ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Updated grade data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.UpdateGradeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a grade by ID (Admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "grades"
+                ],
+                "summary": "Delete grade",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Grade ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/job-positions": {
             "get": {
                 "security": [
@@ -1597,61 +2276,6 @@ const docTemplate = `{
                         "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/handler.APIResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/job-positions/lookup": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get simplified list of job positions for dropdown/lookup (Admin only)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "job-positions"
-                ],
-                "summary": "Get job positions lookup",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/handler.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/types.JobPositionLookup"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
                         }
                     },
                     "401": {
@@ -2000,6 +2624,69 @@ const docTemplate = `{
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/leave/calculate-working-days": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Calculate the number of working days (excluding weekends and holidays) between two dates",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "leave-requests"
+                ],
+                "summary": "Calculate working days between two dates",
+                "parameters": [
+                    {
+                        "description": "Date range for calculation",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.CalculateWorkingDaysRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.CalculateWorkingDaysResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
                 }
@@ -2627,55 +3314,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/leave/types/lookup": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get simplified list of leave types for dropdown/lookup",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "leave-types"
-                ],
-                "summary": "Get leave types lookup",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/handler.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/types.LeaveTypeLookup"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/leave/types/{id}": {
             "get": {
                 "security": [
@@ -2876,6 +3514,306 @@ const docTemplate = `{
                 }
             }
         },
+        "/lookup/companies": {
+            "get": {
+                "description": "Get all companies as lookup data (public API)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Lookup"
+                ],
+                "summary": "Get all companies for lookup",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.CompanyLookup"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/lookup/departments": {
+            "get": {
+                "description": "Get all departments as lookup data (public API)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Lookup"
+                ],
+                "summary": "Get all departments for lookup",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.DepartmentLookup"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/lookup/departments-by-company": {
+            "get": {
+                "description": "Get departments filtered by company ID as lookup data (public API)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Lookup"
+                ],
+                "summary": "Get departments by company for lookup",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Company ID",
+                        "name": "company_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.DepartmentLookup"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/lookup/grades": {
+            "get": {
+                "description": "Get all grades as lookup data (public API)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Lookup"
+                ],
+                "summary": "Get all grades for lookup",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.GradeLookup"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/lookup/job-positions": {
+            "get": {
+                "description": "Get all job positions as lookup data (public API)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Lookup"
+                ],
+                "summary": "Get all job positions for lookup",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.JobPositionLookup"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/lookup/leave-types": {
+            "get": {
+                "description": "Get all leave types as lookup data (public API)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Lookup"
+                ],
+                "summary": "Get all leave types for lookup",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.LeaveTypeLookup"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/reports/work-day": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get work day report with filters",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "reports"
+                ],
+                "summary": "Get Work Day Report",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Start Date (YYYY-MM-DD)",
+                        "name": "start_date",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "End Date (YYYY-MM-DD)",
+                        "name": "end_date",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Company ID",
+                        "name": "company_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Department ID",
+                        "name": "department_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Is Active",
+                        "name": "is_active",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.WorkDayReportResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/work-information": {
             "get": {
                 "security": [
@@ -2917,6 +3855,12 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Sort direction (default: ASC)",
                         "name": "direction",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by employee ID",
+                        "name": "employee_id",
                         "in": "query"
                     }
                 ],
@@ -3372,6 +4316,12 @@ const docTemplate = `{
                 "city": {
                     "type": "string"
                 },
+                "company_email": {
+                    "type": "string"
+                },
+                "contract_no": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -3383,6 +4333,9 @@ const docTemplate = `{
                 },
                 "deleted": {
                     "type": "boolean"
+                },
+                "email": {
+                    "type": "string"
                 },
                 "emergency_contact": {
                     "type": "string"
@@ -3399,17 +4352,32 @@ const docTemplate = `{
                         "$ref": "#/definitions/domain.EmployeeWorkInformation"
                     }
                 },
+                "father_name": {
+                    "type": "string"
+                },
                 "first_name": {
                     "type": "string"
                 },
                 "gender": {
                     "type": "string"
                 },
+                "grade": {
+                    "$ref": "#/definitions/domain.Grade"
+                },
+                "grade_id": {
+                    "type": "integer"
+                },
                 "hire_date": {
                     "type": "string"
                 },
                 "id": {
                     "type": "integer"
+                },
+                "identity_no": {
+                    "type": "string"
+                },
+                "is_grade_up": {
+                    "type": "boolean"
                 },
                 "last_name": {
                     "type": "string"
@@ -3435,13 +4403,25 @@ const docTemplate = `{
                 "modified_by": {
                     "type": "string"
                 },
+                "mother_name": {
+                    "type": "string"
+                },
+                "nationality": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
                 "phone": {
+                    "type": "string"
+                },
+                "profession_start_date": {
                     "type": "string"
                 },
                 "state": {
                     "type": "string"
                 },
-                "total_experience": {
+                "total_gap": {
                     "type": "number"
                 },
                 "updated_at": {
@@ -3510,7 +4490,49 @@ const docTemplate = `{
                 "modified_by": {
                     "type": "string"
                 },
+                "personnel_no": {
+                    "type": "string"
+                },
                 "start_date": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "work_email": {
+                    "type": "string"
+                }
+            }
+        },
+        "domain.Grade": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "string"
+                },
+                "deleted": {
+                    "type": "boolean"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "employees": {
+                    "description": "Relationships",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/domain.Employee"
+                    }
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "modified_by": {
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 },
                 "updated_at": {
@@ -3597,9 +4619,6 @@ const docTemplate = `{
                 },
                 "used_days": {
                     "type": "number"
-                },
-                "year": {
-                    "type": "integer"
                 }
             }
         },
@@ -3696,7 +4715,15 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "is_finish_date_full_day": {
+                    "description": "true = tam gün, false = yarım gün",
+                    "type": "boolean"
+                },
                 "is_paid": {
+                    "type": "boolean"
+                },
+                "is_start_date_full_day": {
+                    "description": "true = tam gün, false = yarım gün",
                     "type": "boolean"
                 },
                 "leave_documents": {
@@ -3924,6 +4951,44 @@ const docTemplate = `{
                 }
             }
         },
+        "handler.CalculateWorkingDaysRequest": {
+            "type": "object",
+            "required": [
+                "end_date",
+                "start_date"
+            ],
+            "properties": {
+                "end_date": {
+                    "type": "string"
+                },
+                "is_finish_date_full_day": {
+                    "type": "boolean"
+                },
+                "is_start_date_full_day": {
+                    "type": "boolean"
+                },
+                "start_date": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.CalculateWorkingDaysResponse": {
+            "type": "object",
+            "properties": {
+                "calendar_days": {
+                    "type": "integer"
+                },
+                "end_date": {
+                    "type": "string"
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "working_days": {
+                    "type": "number"
+                }
+            }
+        },
         "handler.CancelLeaveRequest": {
             "type": "object",
             "required": [
@@ -3931,6 +4996,35 @@ const docTemplate = `{
             ],
             "properties": {
                 "reason": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.ChangePasswordRequest": {
+            "type": "object",
+            "required": [
+                "current_password",
+                "new_password"
+            ],
+            "properties": {
+                "current_password": {
+                    "type": "string"
+                },
+                "new_password": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.CompanyDepartmentChartData": {
+            "type": "object",
+            "properties": {
+                "company_name": {
+                    "type": "string"
+                },
+                "count": {
+                    "type": "integer"
+                },
+                "department_name": {
                     "type": "string"
                 }
             }
@@ -3980,6 +5074,7 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "company_email",
+                "email",
                 "first_name",
                 "last_name"
             ],
@@ -3993,7 +5088,13 @@ const docTemplate = `{
                 "company_email": {
                     "type": "string"
                 },
+                "contract_no": {
+                    "type": "string"
+                },
                 "date_of_birth": {
+                    "type": "string"
+                },
+                "email": {
                     "type": "string"
                 },
                 "emergency_contact": {
@@ -4005,14 +5106,26 @@ const docTemplate = `{
                 "emergency_contact_relation": {
                     "type": "string"
                 },
+                "father_name": {
+                    "type": "string"
+                },
                 "first_name": {
                     "type": "string"
                 },
                 "gender": {
                     "type": "string"
                 },
+                "grade_id": {
+                    "type": "integer"
+                },
                 "hire_date": {
                     "type": "string"
+                },
+                "identity_no": {
+                    "type": "string"
+                },
+                "is_grade_up": {
+                    "type": "boolean"
                 },
                 "last_name": {
                     "type": "string"
@@ -4023,14 +5136,46 @@ const docTemplate = `{
                 "marital_status": {
                     "type": "string"
                 },
+                "mother_name": {
+                    "type": "string"
+                },
+                "nationality": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
                 "phone": {
                     "type": "string"
+                },
+                "profession_start_date": {
+                    "type": "string"
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "state": {
                     "type": "string"
                 },
-                "total_experience": {
+                "total_gap": {
                     "type": "number"
+                }
+            }
+        },
+        "handler.CreateGradeRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
                 }
             }
         },
@@ -4048,10 +5193,8 @@ const docTemplate = `{
         "handler.CreateLeaveRequestRequest": {
             "type": "object",
             "required": [
-                "employee_id",
                 "end_date",
                 "leave_type_id",
-                "reason",
                 "start_date"
             ],
             "properties": {
@@ -4061,7 +5204,10 @@ const docTemplate = `{
                 "end_date": {
                     "type": "string"
                 },
-                "is_paid": {
+                "is_finish_date_full_day": {
+                    "type": "boolean"
+                },
+                "is_start_date_full_day": {
                     "type": "boolean"
                 },
                 "leave_type_id": {
@@ -4126,7 +5272,41 @@ const docTemplate = `{
                 "job_position_id": {
                     "type": "integer"
                 },
+                "personnel_no": {
+                    "type": "string"
+                },
                 "start_date": {
+                    "type": "string"
+                },
+                "work_email": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.DashboardDataResponse": {
+            "type": "object",
+            "properties": {
+                "pending_leave_requests": {
+                    "type": "integer"
+                },
+                "total_companies": {
+                    "type": "integer"
+                },
+                "total_departments": {
+                    "type": "integer"
+                },
+                "total_employees": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.GenderChartData": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "gender": {
                     "type": "string"
                 }
             }
@@ -4143,6 +5323,110 @@ const docTemplate = `{
                 },
                 "password": {
                     "type": "string"
+                }
+            }
+        },
+        "handler.PositionChartData": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "position_title": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.ResetPasswordRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "new_password",
+                "token"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "new_password": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.SendPasswordResetEmailBatchRequest": {
+            "type": "object",
+            "required": [
+                "users"
+            ],
+            "properties": {
+                "users": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.SendPasswordResetEmailRequest"
+                    }
+                }
+            }
+        },
+        "handler.SendPasswordResetEmailBatchResponse": {
+            "type": "object",
+            "properties": {
+                "failure_count": {
+                    "type": "integer"
+                },
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.SendPasswordResetEmailBatchResultItem"
+                    }
+                },
+                "success_count": {
+                    "type": "integer"
+                },
+                "total_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.SendPasswordResetEmailBatchResultItem": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.SendPasswordResetEmailRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "first_name",
+                "last_name",
+                "user_id"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
                 }
             }
         },
@@ -4190,7 +5474,6 @@ const docTemplate = `{
         "handler.UpdateEmployeeRequest": {
             "type": "object",
             "required": [
-                "company_email",
                 "first_name",
                 "last_name"
             ],
@@ -4204,7 +5487,13 @@ const docTemplate = `{
                 "company_email": {
                     "type": "string"
                 },
+                "contract_no": {
+                    "type": "string"
+                },
                 "date_of_birth": {
+                    "type": "string"
+                },
+                "email": {
                     "type": "string"
                 },
                 "emergency_contact": {
@@ -4216,14 +5505,26 @@ const docTemplate = `{
                 "emergency_contact_relation": {
                     "type": "string"
                 },
+                "father_name": {
+                    "type": "string"
+                },
                 "first_name": {
                     "type": "string"
                 },
                 "gender": {
                     "type": "string"
                 },
+                "grade_id": {
+                    "type": "integer"
+                },
                 "hire_date": {
                     "type": "string"
+                },
+                "identity_no": {
+                    "type": "string"
+                },
+                "is_grade_up": {
+                    "type": "boolean"
                 },
                 "last_name": {
                     "type": "string"
@@ -4234,14 +5535,46 @@ const docTemplate = `{
                 "marital_status": {
                     "type": "string"
                 },
+                "mother_name": {
+                    "type": "string"
+                },
+                "nationality": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
                 "phone": {
                     "type": "string"
+                },
+                "profession_start_date": {
+                    "type": "string"
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "state": {
                     "type": "string"
                 },
-                "total_experience": {
+                "total_gap": {
                     "type": "number"
+                }
+            }
+        },
+        "handler.UpdateGradeRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
                 }
             }
         },
@@ -4259,20 +5592,18 @@ const docTemplate = `{
         "handler.UpdateLeaveRequestRequest": {
             "type": "object",
             "required": [
-                "employee_id",
                 "end_date",
                 "leave_type_id",
-                "reason",
                 "start_date"
             ],
             "properties": {
-                "employee_id": {
-                    "type": "integer"
-                },
                 "end_date": {
                     "type": "string"
                 },
-                "is_paid": {
+                "is_finish_date_full_day": {
+                    "type": "boolean"
+                },
+                "is_start_date_full_day": {
                     "type": "boolean"
                 },
                 "leave_type_id": {
@@ -4282,6 +5613,59 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "start_date": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.UpdateMyProfileRequest": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "date_of_birth": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "emergency_contact": {
+                    "type": "string"
+                },
+                "emergency_contact_name": {
+                    "type": "string"
+                },
+                "emergency_contact_relation": {
+                    "type": "string"
+                },
+                "father_name": {
+                    "type": "string"
+                },
+                "gender": {
+                    "type": "string"
+                },
+                "identity_no": {
+                    "type": "string"
+                },
+                "marital_status": {
+                    "type": "string"
+                },
+                "mother_name": {
+                    "type": "string"
+                },
+                "nationality": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "profession_start_date": {
+                    "type": "string"
+                },
+                "state": {
                     "type": "string"
                 }
             }
@@ -4311,7 +5695,28 @@ const docTemplate = `{
                 "job_position_id": {
                     "type": "integer"
                 },
+                "personnel_no": {
+                    "type": "string"
+                },
                 "start_date": {
+                    "type": "string"
+                },
+                "work_email": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.ValidateResetTokenRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "token"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "token": {
                     "type": "string"
                 }
             }
@@ -4365,41 +5770,22 @@ const docTemplate = `{
         "service.UserWithRoles": {
             "type": "object",
             "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "created_by": {
-                    "type": "string"
-                },
-                "deleted": {
-                    "type": "boolean"
-                },
                 "email": {
                     "type": "string"
                 },
-                "employee": {
-                    "$ref": "#/definitions/domain.Employee"
+                "firstName": {
+                    "type": "string"
                 },
                 "id": {
                     "type": "integer"
                 },
-                "modified_by": {
+                "lastName": {
                     "type": "string"
                 },
                 "roles": {
                     "type": "array",
                     "items": {
                         "type": "string"
-                    }
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user_roles": {
-                    "description": "Relationships",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/domain.UserRole"
                     }
                 }
             }
@@ -4440,7 +5826,13 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "is_finish_date_full_day": {
+                    "type": "boolean"
+                },
                 "is_paid": {
+                    "type": "boolean"
+                },
+                "is_start_date_full_day": {
                     "type": "boolean"
                 },
                 "leave_type": {
@@ -4457,6 +5849,10 @@ const docTemplate = `{
                 },
                 "rejection_reason": {
                     "type": "string"
+                },
+                "remaining_days": {
+                    "description": "Leave balance remaining days (only for annual leave)",
+                    "type": "number"
                 },
                 "requested_days": {
                     "type": "number"
@@ -4581,6 +5977,46 @@ const docTemplate = `{
                 }
             }
         },
+        "types.GradeLookup": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.GradeResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "string"
+                },
+                "deleted": {
+                    "type": "boolean"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "modified_by": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "types.JobPositionLookup": {
             "type": "object",
             "properties": {
@@ -4668,7 +6104,13 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "is_finish_date_full_day": {
+                    "type": "boolean"
+                },
                 "is_paid": {
+                    "type": "boolean"
+                },
+                "is_start_date_full_day": {
                     "type": "boolean"
                 },
                 "leave_type": {
@@ -4694,6 +6136,67 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
+                }
+            }
+        },
+        "types.WorkDayReportResponse": {
+            "type": "object",
+            "properties": {
+                "end_date": {
+                    "type": "string"
+                },
+                "rows": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.WorkDayReportRow"
+                    }
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "total_holiday_days": {
+                    "type": "number"
+                },
+                "total_work_days": {
+                    "type": "number"
+                }
+            }
+        },
+        "types.WorkDayReportRow": {
+            "type": "object",
+            "properties": {
+                "company_name": {
+                    "type": "string"
+                },
+                "department_name": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "holiday_days": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "identity_no": {
+                    "type": "string"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "manager": {
+                    "type": "string"
+                },
+                "used_leave_days": {
+                    "type": "number"
+                },
+                "work_days": {
+                    "type": "number"
+                },
+                "worked_days": {
+                    "type": "number"
                 }
             }
         },
@@ -4780,10 +6283,16 @@ const docTemplate = `{
                 "modified_by": {
                     "type": "string"
                 },
+                "personnel_no": {
+                    "type": "string"
+                },
                 "start_date": {
                     "type": "string"
                 },
                 "updated_at": {
+                    "type": "string"
+                },
+                "work_email": {
                     "type": "string"
                 }
             }

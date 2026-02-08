@@ -16,6 +16,7 @@ type Config struct {
 	Server   ServerConfig
 	App      AppConfig
 	Email    EmailConfig
+	OAuth    OAuthConfig
 }
 
 type DatabaseConfig struct {
@@ -52,6 +53,12 @@ type EmailConfig struct {
 	FromEmail    string
 	FromName     string
 	FrontendURL  string
+}
+
+type OAuthConfig struct {
+	YandexClientID     string
+	YandexClientSecret string
+	YandexRedirectURL  string
 }
 
 func Load() *Config {
@@ -106,6 +113,11 @@ func Load() *Config {
 			FromEmail:    getEnv("FROM_EMAIL", "info@kartezya.com"),
 			FromName:     getEnv("FROM_NAME", "Kartezya Teknoloji"),
 			FrontendURL:  getEnv("FRONTEND_URL", "http://localhost:3000"),
+		},
+		OAuth: OAuthConfig{
+			YandexClientID:     getEnv("YANDEX_CLIENT_ID", ""),
+			YandexClientSecret: getEnv("YANDEX_CLIENT_SECRET", ""),
+			YandexRedirectURL:  getEnv("YANDEX_REDIRECT_URL", "http://localhost:8080/api/v1/auth/yandex/callback"),
 		},
 	}
 }

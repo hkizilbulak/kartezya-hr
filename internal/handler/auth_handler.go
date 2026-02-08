@@ -8,6 +8,7 @@ import (
 	"kartezya-hr/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/oauth2"
 )
 
 type AuthHandler struct {
@@ -449,4 +450,65 @@ func parseUintParam(c *gin.Context, paramName string) (uint, error) {
 	param := c.Param(paramName)
 	id, err := strconv.ParseUint(param, 10, 32)
 	return uint(id), err
+}
+
+// YandexLogin godoc
+// @Summary Initiate Yandex OAuth login
+// @Description Redirects the user to Yandex OAuth authorization page
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Success 302 {string} string "Redirect to Yandex OAuth"
+// @Router /auth/yandex/login [get]
+func (h *AuthHandler) YandexLogin(c *gin.Context) {
+	oauthConfig := h.authService.GetYandexOAuthConfig()
+
+	// Generate a random state for CSRF protection
+	// You might want to store the state in a session or cache for verification
+	state := "yandex_oauth_state"
+
+	url := oauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline)
+
+	c.Redirect(http.StatusTemporaryRedirect, url)
+}
+
+// YandexCallback godoc
+// @Summary Handle Yandex OAuth callback
+// @Description Handles the OAuth callback from Yandex and authenticates the user
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param code query string true "Authorization code from Yandex"
+// @Param state query string false "State parameter for CSRF protection"
+// @Success 200 {object} APIResponse{data=service.LoginResponse}
+// @Failure 400 {object} APIResponse
+// @Failure 401 {object} APIResponse
+// @Router /auth/yandex/callback [get]
+func (h *AuthHandler) YandexCallback(c *gin.Context) {
+	code := c.Query("code")
+	if code == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Authorization code is required",
+		})
+		return
+	}
+
+	// You might want to verify the state parameter here for CSRF protection
+	// state := c.Query("state")
+
+	response, err := h.authService.HandleYandexCallback(code)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Failed to authenticate with Yandex: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    response,
+		"message": "Yandex login successful",
+	})
 }

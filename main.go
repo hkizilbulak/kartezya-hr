@@ -146,6 +146,10 @@ func main() {
 		auth.POST("/login", authHandler.Login)
 		auth.POST("/validate-reset-token", authHandler.ValidateResetToken)
 		auth.POST("/reset-password", authHandler.ResetPassword)
+
+		// Yandex OAuth routes
+		auth.GET("/yandex/login", authHandler.YandexLogin)
+		auth.GET("/yandex/callback", authHandler.YandexCallback)
 	}
 
 	// Public lookup routes
