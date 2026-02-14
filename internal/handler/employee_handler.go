@@ -78,6 +78,7 @@ type UpdateEmployeeRequest struct {
 	Nationality              string   `json:"nationality"`
 	IdentityNo               string   `json:"identity_no"`
 	Roles                    []string `json:"roles"`
+	Status                   string   `json:"status"`
 }
 
 type UpdateMyProfileRequest struct {
@@ -197,18 +198,26 @@ func (h *EmployeeHandler) GetEmployeeByID(c *gin.Context) {
 		return
 	}
 
+	// Include the status field in the response
 	employee, err := h.employeeService.GetEmployeeByID(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+		c.JSON(http.StatusNotFound, gin.H{
 			"success": false,
-			"error":   err.Error(),
+			"error":   "Employee not found",
 		})
 		return
 	}
 
+	// Ensure the status field has a default value if empty
+	status := employee.Status
+	if status == "" {
+		status = "UNKNOWN" // Default to UNKNOWN if status is empty
+	}
+
+	// Reverting to the original response structure with response.data
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data":    employee,
+		"data":    employee, // Return the employee object directly under data
 	})
 }
 
@@ -260,7 +269,7 @@ func (h *EmployeeHandler) UpdateEmployee(c *gin.Context) {
 		req.CompanyEmail = email
 	}
 
-	if err := h.employeeService.UpdateEmployee(id, req.Email, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalGap, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.GradeID, req.IsGradeUp, req.ContractNo, req.ProfessionStartDate, req.Note, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo, email, requestingUserID, isAdmin(roles), req.Roles); err != nil {
+	if err := h.employeeService.UpdateEmployee(id, req.Email, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalGap, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.GradeID, req.IsGradeUp, req.ContractNo, req.ProfessionStartDate, req.Note, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo, req.Status, email, requestingUserID, isAdmin(roles), req.Roles); err != nil {
 		status := http.StatusInternalServerError
 		if err.Error() == "unauthorized to update this employee profile" {
 			status = http.StatusForbidden
@@ -464,6 +473,10 @@ func (h *EmployeeHandler) ListEmployees(c *gin.Context) {
 		if parsed, err := strconv.Atoi(gradeID); err == nil && parsed > 0 {
 			filters["grade_id"] = parsed
 		}
+	}
+
+	if status := c.Query("status"); status != "" {
+		filters["status"] = status
 	}
 
 	// Parse sorting parameters

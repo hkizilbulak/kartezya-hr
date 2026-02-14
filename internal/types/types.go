@@ -107,6 +107,7 @@ type EmployeeResponse struct {
 	IdentityNo               string                  `json:"identity_no"`
 	Roles                    []string                `json:"roles"`
 	WorkInformation          *EmployeeWorkInfoLookup `json:"work_information,omitempty"`
+	Status                   string                  `json:"status"`
 }
 
 // EmployeeWorkInfoLookup for employee response
@@ -278,48 +279,6 @@ func NormalizeGender(value string) *string {
 	return &result
 }
 
-// NormalizeMaritalStatus converts marital status values to English enum values
-// Returns nil pointer if value is empty string
-func NormalizeMaritalStatus(value string) *string {
-	if value == "" {
-		return nil
-	}
-	var result string
-	switch value {
-	case "MARRIED", "Married", "married", "Evli":
-		result = "MARRIED"
-	case "SINGLE", "Single", "single", "Bekar":
-		result = "SINGLE"
-	default:
-		result = value
-	}
-	return &result
-}
-
-// NormalizeEmergencyContactRelation converts relation values to English enum values
-// Returns nil pointer if value is empty string
-func NormalizeEmergencyContactRelation(value string) *string {
-	if value == "" {
-		return nil
-	}
-	var result string
-	switch value {
-	case "MOTHER", "Mother", "mother", "Anne":
-		result = "MOTHER"
-	case "FATHER", "Father", "father", "Baba":
-		result = "FATHER"
-	case "SPOUSE", "Spouse", "spouse", "Eş":
-		result = "SPOUSE"
-	case "SIBLING", "Sibling", "sibling", "Kardeş":
-		result = "SIBLING"
-	case "OTHER", "Other", "other", "RELATIVE", "Relative", "relative", "Diğer":
-		result = "OTHER"
-	default:
-		result = value
-	}
-	return &result
-}
-
 // EmployeeWorkInformationList for timeline view
 type EmployeeWorkInformationList struct {
 	ID             uint    `json:"id"`
@@ -363,6 +322,7 @@ type EmployeeDetailResponse struct {
 	IdentityNo               string                        `json:"identity_no"`
 	Roles                    []string                      `json:"roles"`
 	WorkInformation          []EmployeeWorkInformationList `json:"work_information,omitempty"`
+	Status                   string                        `json:"status"`
 }
 
 // WorkDayReportFilter represents the filter criteria for work day report

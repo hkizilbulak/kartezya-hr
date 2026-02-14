@@ -14,7 +14,7 @@ type EmployeeService interface {
 	CreateEmployee(email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalGap float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, isGradeUp bool, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, createdBy string, roles []string) (*domain.Employee, error)
 	GetEmployeeByID(id uint) (*types.EmployeeDetailResponse, error)
 	GetEmployeeByUserID(userID uint) (*types.EmployeeDetailResponse, error)
-	UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalGap float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, isGradeUp bool, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, modifiedBy string, requestingUserID uint, isAdmin bool, roles []string) error
+	UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalGap float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, isGradeUp bool, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo, status string, modifiedBy string, requestingUserID uint, isAdmin bool, roles []string) error
 	UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, professionStartDate string, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, motherName, fatherName, nationality, identityNo string) error
 	DeleteEmployee(id uint, deletedBy string, isAdmin bool) error
 	ListEmployees(limit, offset int, isAdmin bool) ([]*types.EmployeeResponse, error)
@@ -242,6 +242,7 @@ func (s *employeeService) GetEmployeeByID(id uint) (*types.EmployeeDetailRespons
 		IdentityNo:               employee.IdentityNo,
 		Roles:                    roleNames,
 		WorkInformation:          workInfoList,
+		Status:                   employee.Status,
 	}, nil
 }
 
@@ -354,7 +355,7 @@ func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeDetai
 	}, nil
 }
 
-func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalGap float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, isGradeUp bool, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, modifiedBy string, requestingUserID uint, isAdmin bool, roles []string) error {
+func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalGap float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, isGradeUp bool, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo, status string, modifiedBy string, requestingUserID uint, isAdmin bool, roles []string) error {
 	// Get existing employee for authorization check and audit trail
 	existingEmployee, err := s.employeeRepo.GetByID(id)
 	if err != nil {
@@ -419,6 +420,7 @@ func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName
 	updatedEmployee.FatherName = fatherName
 	updatedEmployee.Nationality = nationality
 	updatedEmployee.IdentityNo = identityNo
+	updatedEmployee.Status = status
 
 	// Update employee
 	if err := s.employeeRepo.Update(&updatedEmployee, modifiedBy); err != nil {
@@ -734,6 +736,7 @@ func (s *employeeService) ListEmployeesWithFilters(limit, offset int, sortField,
 			IdentityNo:               employee.IdentityNo,
 			Roles:                    roleNames,
 			WorkInformation:          workInfoLookup,
+			Status:                   employee.Status, // Include STATUS in the response
 		}
 	}
 
@@ -778,8 +781,6 @@ func (s *employeeService) assignRolesToUser(userID uint, roleNames []string, cre
 	if len(roleNames) == 0 {
 		return nil
 	}
-
-	fmt.Printf("Assigning %d roles to user %d\n", len(roleNames), userID)
 
 	successCount := 0
 	for _, roleName := range roleNames {

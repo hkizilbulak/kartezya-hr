@@ -56,9 +56,9 @@ func (r *workInformationRepository) GetByEmployeeID(employeeID uint) ([]domain.E
 func (r *workInformationRepository) GetByUserID(userID uint) ([]domain.EmployeeWorkInformation, error) {
 	var workInfos []domain.EmployeeWorkInformation
 	err := r.db.Preload("Employee").Preload("Company").Preload("Department").Preload("JobPosition").
-		Joins("JOIN hr_employees ON hr_employees.id = hr_employee_work_information.employee_id").
-		Where("hr_employees.user_id = ? AND hr_employee_work_information.deleted = ? AND hr_employees.deleted = ?", userID, false, false).
-		Order("hr_employee_work_information.start_date DESC").
+		Joins(fmt.Sprintf("JOIN %s ON %s.id = %s.employee_id", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees"), domain.GetTableName("hr_employee_work_information"))).
+		Where(fmt.Sprintf("%s.user_id = ? AND %s.deleted = ? AND %s.deleted = ?", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employee_work_information"), domain.GetTableName("hr_employees")), userID, false, false).
+		Order(fmt.Sprintf("%s.start_date DESC", domain.GetTableName("hr_employee_work_information"))).
 		Find(&workInfos).Error
 	return workInfos, err
 }
