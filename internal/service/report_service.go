@@ -283,6 +283,7 @@ func (s *reportService) getLeaveDataForDateRange(employees []*employeeWithWorkIn
 			leave.ID, leave.EmployeeID, overlapStart.Format("2006-01-02"), overlapEnd.Format("2006-01-02"))
 
 		// Count the overlapping working days (exclude weekends and public holidays)
+		// Also consider half-day leaves (IsStartDateFullDay and IsFinishDateFullDay)
 		daysInRange := 0.0
 		currentDate := overlapStart
 		for {
@@ -292,7 +293,27 @@ func (s *reportService) getLeaveDataForDateRange(employees []*employeeWithWorkIn
 
 			// Only count working days (not weekend and not public holiday)
 			if !isWeekend && !isHoliday {
-				daysInRange += 1.0
+				dayValue := 1.0 // Default to full day
+
+				// Check if this is the start date and it's a half-day
+				if currentDate.Equal(leave.StartDate) && !leave.IsStartDateFullDay {
+					dayValue = 0.5
+				}
+
+				// Check if this is the end date and it's a half-day
+				// For same-day leaves, both conditions can apply
+				if currentDate.Equal(leave.EndDate) && !leave.IsFinishDateFullDay {
+					// If start date is the same as end date and both are half-day
+					if currentDate.Equal(leave.StartDate) && !leave.IsStartDateFullDay {
+						// Same day, both half-day = 0.5 total (not 1.0)
+						dayValue = 0.5
+					} else {
+						// Different days or only end date is half-day
+						dayValue = 0.5
+					}
+				}
+
+				daysInRange += dayValue
 			}
 
 			if currentDate.Equal(overlapEnd) {
