@@ -76,8 +76,10 @@ func (h *DashboardHandler) GetDashboardData(c *gin.Context) {
 		return
 	}
 
-	// Fetch total employees
-	totalEmployees, err := h.employeeService.GetTotalCount()
+	// Fetch total employees (only ACTIVE status)
+	totalEmployees, err := h.employeeService.GetTotalCountWithFilters(map[string]interface{}{
+		"status": "ACTIVE",
+	})
 	if err != nil {
 		log.Printf("Error fetching total employees: %v", err)
 		totalEmployees = 0

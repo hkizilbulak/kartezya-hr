@@ -155,8 +155,56 @@ func (r *employeeRepository) GetAllWithFilters(limit, offset int, sortParams typ
 	// Log the final SQL query using GORM's Statement.SQL.String()
 	sql := query.Statement.SQL.String()
 	fmt.Printf("Final SQL Query: %s\n", sql)
-	// Count total records with filters
-	query.Count(&total)
+
+	// Count total records with same filters applied
+	// Create a new query with same base conditions and filters
+	countQuery := r.db.Model(&domain.Employee{}).
+		Where(fmt.Sprintf("%s.deleted = ?", domain.GetTableName("hr_employees")), false)
+
+	// Apply same filters to count query
+	if filters != nil {
+		if id, ok := filters["id"]; ok {
+			countQuery = countQuery.Where(fmt.Sprintf("%s.id = ?", domain.GetTableName("hr_employees")), id)
+		}
+		if firstName, ok := filters["first_name"]; ok {
+			countQuery = countQuery.Where(fmt.Sprintf("LOWER(%s.first_name) LIKE LOWER(?)", domain.GetTableName("hr_employees")), "%"+fmt.Sprintf("%v", firstName)+"%")
+		}
+		if email, ok := filters["email"]; ok {
+			emailStr := fmt.Sprintf("%v", email)
+			countQuery = countQuery.Where(fmt.Sprintf("LOWER(%s.email) LIKE LOWER(?) OR LOWER(%s.company_email) LIKE LOWER(?)", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), "%"+emailStr+"%", "%"+emailStr+"%")
+		}
+		if companyID, ok := filters["company_id"]; ok {
+			countQuery = countQuery.Joins(fmt.Sprintf(`JOIN %s ON %s.employee_id = %s.id AND %s.deleted = false`,
+				domain.GetTableName("hr_employee_work_information"),
+				domain.GetTableName("hr_employee_work_information"),
+				domain.GetTableName("hr_employees"),
+				domain.GetTableName("hr_employee_work_information"))).
+				Joins(fmt.Sprintf("JOIN %s ON %s.id = %s.department_id AND %s.deleted = false",
+					domain.GetTableName("hr_departments"),
+					domain.GetTableName("hr_departments"),
+					domain.GetTableName("hr_employee_work_information"),
+					domain.GetTableName("hr_departments"))).
+				Where(fmt.Sprintf("%s.company_id = ?", domain.GetTableName("hr_departments")), companyID)
+		}
+		if status, ok := filters["status"]; ok {
+			countQuery = countQuery.Where(fmt.Sprintf("%s.status = ?", domain.GetTableName("hr_employees")), status)
+		}
+		if identityNo, ok := filters["identity_no"]; ok {
+			countQuery = countQuery.Where(fmt.Sprintf("%s.identity_no = ?", domain.GetTableName("hr_employees")), identityNo)
+		}
+		if gender, ok := filters["gender"]; ok {
+			countQuery = countQuery.Where(fmt.Sprintf("%s.gender = ?", domain.GetTableName("hr_employees")), gender)
+		}
+		if maritalStatus, ok := filters["marital_status"]; ok {
+			countQuery = countQuery.Where(fmt.Sprintf("%s.marital_status = ?", domain.GetTableName("hr_employees")), maritalStatus)
+		}
+		if gradeID, ok := filters["grade_id"]; ok {
+			countQuery = countQuery.Where(fmt.Sprintf("%s.grade_id = ?", domain.GetTableName("hr_employees")), gradeID)
+		}
+	}
+
+	// Get the count
+	countQuery.Count(&total)
 
 	// Validate and sanitize sort field
 	validSortFields := map[string]bool{
