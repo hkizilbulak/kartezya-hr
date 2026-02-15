@@ -236,6 +236,11 @@ func (r *employeeRepository) GetTotalCountWithFilters(filters map[string]interfa
 			query = query.Where(fmt.Sprintf("%s.marital_status = ?", domain.GetTableName("hr_employees")), maritalStatus)
 		}
 
+		// Status filter (ACTIVE/PASSIVE)
+		if status, ok := filters["status"]; ok {
+			query = query.Where(fmt.Sprintf("%s.status = ?", domain.GetTableName("hr_employees")), status)
+		}
+
 		// Grade ID filter
 		if gradeID, ok := filters["grade_id"]; ok {
 			query = query.Where(fmt.Sprintf("%s.grade_id = ?", domain.GetTableName("hr_employees")), gradeID)
