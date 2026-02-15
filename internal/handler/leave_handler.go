@@ -437,11 +437,9 @@ func (h *LeaveHandler) CreateLeaveRequest(c *gin.Context) {
 		return
 	}
 
-	// Determine initial status based on role
+	// All leave requests start as PENDING (including admin's own requests)
+	// Admin can approve later if needed
 	initialStatus := domain.LeaveStatusPending
-	if isAdmin(roles) {
-		initialStatus = domain.LeaveStatusApproved
-	}
 
 	// Create LeaveRequest entity
 	leave := &domain.LeaveRequest{
