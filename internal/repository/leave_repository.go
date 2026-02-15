@@ -22,6 +22,7 @@ type LeaveRepository interface {
 	GetByDateRange(startDate, endDate string) ([]*domain.LeaveRequest, error)
 	GetApprovedBirthdayLeaveInYear(employeeID uint, leaveTypeID uint, year int) ([]*domain.LeaveRequest, error)
 	GetPendingLeaveByEmployeeAndLeaveType(employeeID uint, leaveTypeID uint) (*domain.LeaveRequest, error)
+	GetUsedLeaveDaysByEmployeesInDateRange(employeeIDs []uint, startDate, endDate string) (map[uint]float64, error)
 }
 
 // LeaveTypeRepository interface for leave types
@@ -382,4 +383,39 @@ func (r *leaveTypeRepository) Update(leaveType *domain.LeaveType, modifiedBy str
 
 func (r *leaveTypeRepository) Delete(id uint) error {
 	return r.db.Model(&domain.LeaveType{}).Where("id = ?", id).Update("deleted", true).Error
+}
+
+// GetUsedLeaveDaysByEmployeesInDateRange returns a map of employee_id -> total used leave days
+// for approved leaves that overlap with the given date range
+func (r *leaveRepository) GetUsedLeaveDaysByEmployeesInDateRange(employeeIDs []uint, startDate, endDate string) (map[uint]float64, error) {
+	type Result struct {
+		EmployeeID uint
+		TotalDays  float64
+	}
+
+	var results []Result
+
+	// Query to sum up requested_days for APPROVED leaves that overlap with date range
+	// A leave overlaps if: leave.start_date <= endDate AND leave.end_date >= startDate
+	err := r.db.Model(&domain.LeaveRequest{}).
+		Select("employee_id, SUM(requested_days) as total_days").
+		Where("employee_id IN ?", employeeIDs).
+		Where("status = ?", "APPROVED").
+		Where("deleted = ?", false).
+		Where("start_date <= ?", endDate).
+		Where("end_date >= ?", startDate).
+		Group("employee_id").
+		Scan(&results).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to map
+	usedDaysMap := make(map[uint]float64)
+	for _, result := range results {
+		usedDaysMap[result.EmployeeID] = result.TotalDays
+	}
+
+	return usedDaysMap, nil
 }

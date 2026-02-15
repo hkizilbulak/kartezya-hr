@@ -58,10 +58,10 @@ func (s *reportService) GetWorkDayReport(filter *types.WorkDayReportFilter) (*ty
 		return nil, fmt.Errorf("failed to get employees: %w", err)
 	}
 
-	// Pre-fetch all leave data for the date range and company/department (if specified)
-	leaveDataMap, err := s.getLeaveDataForDateRange(employees, filter)
+	// Pre-fetch leave balance data for all employees in the date range
+	leaveBalanceMap, err := s.getLeaveBalanceData(employees, filter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get leave data: %w", err)
+		return nil, fmt.Errorf("failed to get leave balance data: %w", err)
 	}
 
 	// Build report rows with concurrent processing
@@ -80,8 +80,8 @@ func (s *reportService) GetWorkDayReport(filter *types.WorkDayReportFilter) (*ty
 			semaphore <- struct{}{}        // Acquire
 			defer func() { <-semaphore }() // Release
 
-			// Get used leave days from pre-fetched data
-			usedLeaveDays := leaveDataMap[emp.EmployeeID]
+			// Get used leave days from leave balance
+			usedLeaveDays := leaveBalanceMap[emp.EmployeeID]
 
 			// Calculate worked days: work days - holiday days - used leave days
 			workedDays := commonWorkDays - commonHolidayDays - usedLeaveDays
@@ -201,7 +201,49 @@ func (s *reportService) getFilteredEmployeesWithWorkInfo(filter *types.WorkDayRe
 	return result, nil
 }
 
-// getLeaveDataForDateRange pre-fetches all leave data for the date range with company/department filtering
+// getLeaveBalanceData fetches used leave days for the specific date range using optimized SQL
+func (s *reportService) getLeaveBalanceData(employees []*employeeWithWorkInfo, filter *types.WorkDayReportFilter) (map[uint]float64, error) {
+	// Initialize map with 0 for all employees
+	leaveBalanceMap := make(map[uint]float64)
+	employeeIDs := make([]uint, 0, len(employees))
+
+	for _, emp := range employees {
+		leaveBalanceMap[emp.EmployeeID] = 0
+		employeeIDs = append(employeeIDs, emp.EmployeeID)
+	}
+
+	if len(employeeIDs) == 0 {
+		return leaveBalanceMap, nil
+	}
+
+	log.Printf("[DEBUG] getLeaveBalanceData: Fetching approved leaves for %d employees in date range: %s to %s",
+		len(employees), filter.StartDate.Format("2006-01-02"), filter.EndDate.Format("2006-01-02"))
+
+	// Get used leave days from database using optimized aggregate query
+	usedDaysMap, err := s.leaveRepo.GetUsedLeaveDaysByEmployeesInDateRange(
+		employeeIDs,
+		filter.StartDate.Format("2006-01-02"),
+		filter.EndDate.Format("2006-01-02"),
+	)
+	if err != nil {
+		log.Printf("[ERROR] getLeaveBalanceData: Failed to fetch used leave days: %v", err)
+		return leaveBalanceMap, nil // Return initialized map on error (non-blocking)
+	}
+
+	// Merge results
+	for employeeID, usedDays := range usedDaysMap {
+		leaveBalanceMap[employeeID] = usedDays
+		log.Printf("[DEBUG] getLeaveBalanceData: Employee %d has %.1f used leave days in date range", employeeID, usedDays)
+	}
+
+	log.Printf("[DEBUG] getLeaveBalanceData: Completed. Processed %d employees", len(employees))
+
+	return leaveBalanceMap, nil
+}
+
+// getLeaveDataForDateRange is deprecated - leave balance is now managed in leave_balance table
+// This method is kept for backward compatibility but should not be used
+// DEPRECATED: Use getLeaveBalanceData instead
 func (s *reportService) getLeaveDataForDateRange(employees []*employeeWithWorkInfo, filter *types.WorkDayReportFilter) (map[uint]float64, error) {
 	leaveDataMap := make(map[uint]float64)
 
