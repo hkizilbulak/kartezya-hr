@@ -485,7 +485,7 @@ func (r *employeeRepository) GetEmployeeCountByGender() ([]interface{}, error) {
 
 	var results []GenderCount
 	err := r.db.Model(&domain.Employee{}).
-		Where("deleted = ?", false).
+		Where("deleted = ? AND status = ?", false, "ACTIVE").
 		Group("gender").
 		Select("gender, COUNT(*) as count").
 		Order("count DESC").
@@ -520,7 +520,7 @@ func (r *employeeRepository) GetEmployeeCountByPosition() ([]interface{}, error)
 			domain.GetTableName("hr_job_positions"),
 			domain.GetTableName("hr_job_positions"),
 			domain.GetTableName("hr_employee_work_information"))).
-		Where(fmt.Sprintf("%s.deleted = ?", domain.GetTableName("hr_employees")), false).
+		Where(fmt.Sprintf("%s.deleted = ? AND %s.status = ?", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), false, "ACTIVE").
 		Group(fmt.Sprintf("%s.title", domain.GetTableName("hr_job_positions"))).
 		Select(fmt.Sprintf("%s.title as position_title, COUNT(*) as count", domain.GetTableName("hr_job_positions"))).
 		Order("count DESC").
@@ -560,7 +560,7 @@ func (r *employeeRepository) GetEmployeeCountByCompanyDepartment() ([]interface{
 			domain.GetTableName("hr_companies"),
 			domain.GetTableName("hr_companies"),
 			domain.GetTableName("hr_departments"))).
-		Where(fmt.Sprintf("%s.deleted = ?", domain.GetTableName("hr_employees")), false).
+		Where(fmt.Sprintf("%s.deleted = ? AND %s.status = ?", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), false, "ACTIVE").
 		Group(fmt.Sprintf("%s.name, %s.name", domain.GetTableName("hr_companies"), domain.GetTableName("hr_departments"))).
 		Select(fmt.Sprintf("%s.name as company_name, %s.name as department_name, COUNT(*) as count",
 			domain.GetTableName("hr_companies"), domain.GetTableName("hr_departments"))).
