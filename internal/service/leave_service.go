@@ -104,9 +104,6 @@ func (s *leaveService) CreateLeave(leave *domain.LeaveRequest, userID uint, isAd
 	if leave.EndDate.IsZero() {
 		return errors.New("end_date is required")
 	}
-	if leave.RequestedDays < 1 {
-		return errors.New("selected date range does not include any working days")
-	}
 
 	// Get leave type to check if it's birthday leave
 	leaveType, err := s.leaveTypeRepo.GetByID(leave.LeaveTypeID)
