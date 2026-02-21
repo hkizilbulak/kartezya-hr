@@ -12,6 +12,7 @@ type EmployeeRepository interface {
 	Create(employee *domain.Employee, createdBy string) error
 	GetByID(id uint) (*domain.Employee, error)
 	GetByUserID(userID uint) (*domain.Employee, error)
+	GetByCompanyEmail(companyEmail string) (*domain.Employee, error)
 	GetAll(limit, offset int, sortParams types.SortParams) ([]*domain.Employee, int64, error)
 	GetAllWithFilters(limit, offset int, sortParams types.SortParams, filters map[string]interface{}) ([]*domain.Employee, int64, error)
 	Update(employee *domain.Employee, modifiedBy string) error
@@ -46,6 +47,15 @@ func (r *employeeRepository) GetByID(id uint) (*domain.Employee, error) {
 func (r *employeeRepository) GetByUserID(userID uint) (*domain.Employee, error) {
 	var employee domain.Employee
 	err := r.db.Preload("User").Where("user_id = ? AND deleted = ?", userID, false).First(&employee).Error
+	return &employee, err
+}
+
+func (r *employeeRepository) GetByCompanyEmail(companyEmail string) (*domain.Employee, error) {
+	var employee domain.Employee
+	err := r.db.Preload("User").Where("company_email = ? AND deleted = ? AND status != ?", companyEmail, false, "PASSIVE").First(&employee).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
 	return &employee, err
 }
 
