@@ -12,10 +12,10 @@ type EmployeeRepository interface {
 	Create(employee *domain.Employee, createdBy string) error
 	GetByID(id uint) (*domain.Employee, error)
 	GetByUserID(userID uint) (*domain.Employee, error)
-	GetByCompanyEmail(companyEmail string) (*domain.Employee, error)
 	GetByEmail(email string) (*domain.Employee, error)
 	GetByIdentityNo(identityNo string) (*domain.Employee, error)
 	GetByPhone(phone string) (*domain.Employee, error)
+	GetByCompanyEmail(companyEmail string) (*domain.Employee, error)
 	GetAll(limit, offset int, sortParams types.SortParams) ([]*domain.Employee, int64, error)
 	GetAllWithFilters(limit, offset int, sortParams types.SortParams, filters map[string]interface{}) ([]*domain.Employee, int64, error)
 	Update(employee *domain.Employee, modifiedBy string) error
