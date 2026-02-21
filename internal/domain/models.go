@@ -278,12 +278,31 @@ type Grade struct {
 	Description string `json:"description"`
 
 	// Relationships
-	Employees []Employee `json:"employees,omitempty"`
+	Employees      []Employee      `json:"employees,omitempty"`
+	EmployeeGrades []EmployeeGrade `json:"employee_grades,omitempty"`
+}
+
+// EmployeeGrade represents employee grade history
+type EmployeeGrade struct {
+	AuditableModel
+	EmployeeID uint       `json:"employee_id" gorm:"not null"`
+	GradeID    uint       `json:"grade_id" gorm:"not null"`
+	StartDate  time.Time  `json:"start_date" gorm:"not null"`
+	EndDate    *time.Time `json:"end_date"`
+
+	// Relationships
+	Employee Employee `json:"employee,omitempty"`
+	Grade    Grade    `json:"grade,omitempty"`
 }
 
 // Grade table name
 func (Grade) TableName() string {
 	return GetTableName("hr_grades")
+}
+
+// EmployeeGrade table name
+func (EmployeeGrade) TableName() string {
+	return GetTableName("hr_employee_grades")
 }
 
 // AuditLog represents system audit logs (NO SOFT DELETE - this table is append-only)
