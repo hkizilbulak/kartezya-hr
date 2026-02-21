@@ -13,9 +13,6 @@ type EmployeeRepository interface {
 	GetByID(id uint) (*domain.Employee, error)
 	GetByUserID(userID uint) (*domain.Employee, error)
 	GetByCompanyEmail(companyEmail string) (*domain.Employee, error)
-	GetByEmail(email string) (*domain.Employee, error)
-	GetByIdentityNo(identityNo string) (*domain.Employee, error)
-	GetByPhone(phone string) (*domain.Employee, error)
 	GetAll(limit, offset int, sortParams types.SortParams) ([]*domain.Employee, int64, error)
 	GetAllWithFilters(limit, offset int, sortParams types.SortParams, filters map[string]interface{}) ([]*domain.Employee, int64, error)
 	Update(employee *domain.Employee, modifiedBy string) error
@@ -56,33 +53,6 @@ func (r *employeeRepository) GetByUserID(userID uint) (*domain.Employee, error) 
 func (r *employeeRepository) GetByCompanyEmail(companyEmail string) (*domain.Employee, error) {
 	var employee domain.Employee
 	err := r.db.Preload("User").Where("company_email = ? AND deleted = ? AND status != ?", companyEmail, false, "PASSIVE").First(&employee).Error
-	if err == gorm.ErrRecordNotFound {
-		return nil, nil
-	}
-	return &employee, err
-}
-
-func (r *employeeRepository) GetByEmail(email string) (*domain.Employee, error) {
-	var employee domain.Employee
-	err := r.db.Preload("User").Where("email = ? AND deleted = ? AND status != ?", email, false, "PASSIVE").First(&employee).Error
-	if err == gorm.ErrRecordNotFound {
-		return nil, nil
-	}
-	return &employee, err
-}
-
-func (r *employeeRepository) GetByIdentityNo(identityNo string) (*domain.Employee, error) {
-	var employee domain.Employee
-	err := r.db.Preload("User").Where("identity_no = ? AND deleted = ? AND status != ?", identityNo, false, "PASSIVE").First(&employee).Error
-	if err == gorm.ErrRecordNotFound {
-		return nil, nil
-	}
-	return &employee, err
-}
-
-func (r *employeeRepository) GetByPhone(phone string) (*domain.Employee, error) {
-	var employee domain.Employee
-	err := r.db.Preload("User").Where("phone = ? AND deleted = ? AND status != ?", phone, false, "PASSIVE").First(&employee).Error
 	if err == gorm.ErrRecordNotFound {
 		return nil, nil
 	}
