@@ -76,6 +76,7 @@ func main() {
 	leaveTypeRepo := repository.NewLeaveTypeRepository(db.DB)
 	holidayRepo := repository.NewHolidayRepository(db.DB)
 	gradeRepo := repository.NewGradeRepository(db.DB)
+	employeeGradeRepo := repository.NewEmployeeGradeRepository(db.DB)
 
 	// Initialize services
 	auditService := service.NewAuditService(auditRepo)
@@ -89,6 +90,7 @@ func main() {
 	workInfoService := service.NewWorkInformationService(workInfoRepo, employeeRepo, companyRepo, departmentRepo, jobPositionRepo, auditService)
 	lookupService := service.NewLookupService(companyRepo, departmentRepo, jobPositionRepo, leaveTypeRepo, gradeRepo)
 	gradeService := service.NewGradeService(gradeRepo, auditService)
+	employeeGradeService := service.NewEmployeeGradeService(employeeGradeRepo, employeeRepo, gradeRepo, auditService)
 	reportService := service.NewReportService(employeeRepo, workInfoRepo, leaveRepo, holidayRepo, leaveService)
 
 	// Initialize handlers
@@ -102,6 +104,7 @@ func main() {
 	lookupHandler := handler.NewLookupHandler(lookupService)
 	dashboardHandler := handler.NewDashboardHandler(employeeService, departmentService, companyService, leaveService)
 	gradeHandler := handler.NewGradeHandler(gradeService)
+	employeeGradeHandler := handler.NewEmployeeGradeHandler(employeeGradeService, employeeService)
 	reportHandler := handler.NewReportHandler(reportService)
 
 	// Initialize middleware
@@ -283,6 +286,20 @@ func main() {
 			workInfoRoutes.POST("", authMiddleware.RequireAdmin(), workInfoHandler.CreateWorkInformation)
 			workInfoRoutes.PUT("/:id", authMiddleware.RequireAdmin(), workInfoHandler.UpdateWorkInformation)
 			workInfoRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), workInfoHandler.DeleteWorkInformation)
+		}
+
+		// Employee Grade management routes
+		employeeGradeRoutes := protected.Group("/employee-grades")
+		{
+			// Employee can view their own grades
+			employeeGradeRoutes.GET("/me", employeeGradeHandler.GetMyEmployeeGrades)
+
+			// Admin only routes
+			employeeGradeRoutes.GET("/:id", authMiddleware.RequireAdmin(), employeeGradeHandler.GetEmployeeGradeByID)
+			employeeGradeRoutes.GET("", authMiddleware.RequireAdmin(), employeeGradeHandler.ListEmployeeGrades)
+			employeeGradeRoutes.POST("", authMiddleware.RequireAdmin(), employeeGradeHandler.CreateEmployeeGrade)
+			employeeGradeRoutes.PUT("/:id", authMiddleware.RequireAdmin(), employeeGradeHandler.UpdateEmployeeGrade)
+			employeeGradeRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), employeeGradeHandler.DeleteEmployeeGrade)
 		}
 
 		// Dashboard routes
