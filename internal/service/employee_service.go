@@ -106,15 +106,6 @@ func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastNam
 		return nil, fmt.Errorf("Bu şirket e-posta adresine sahip aktif çalışan var")
 	}
 
-	// Check if an employee with the same company email already exists and is active
-	existingEmployee, err := s.employeeRepo.GetByCompanyEmail(companyEmail)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check company email: %w", err)
-	}
-	if existingEmployee != nil {
-		return nil, fmt.Errorf("Bu şirket e-posta adresine sahip aktif çalışan var")
-	}
-
 	// Check if an employee with the same personal email already exists and is active
 	if email != "" {
 		existingEmailEmployee, err := s.employeeRepo.GetByEmail(email)
@@ -403,7 +394,6 @@ func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeDetai
 		IdentityNo:               employee.IdentityNo,
 		Roles:                    roleNames,
 		WorkInformation:          workInfoList,
-		Status:                   employee.Status,
 		Status:                   employee.Status,
 	}, nil
 }
