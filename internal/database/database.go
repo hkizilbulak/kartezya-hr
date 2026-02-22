@@ -14,7 +14,8 @@ import (
 )
 
 type Database struct {
-	DB *gorm.DB
+	DB     *gorm.DB
+	Config *config.Config
 }
 
 // NewDatabase creates a new database connection
@@ -59,7 +60,10 @@ func NewDatabase(cfg *config.Config) *Database {
 
 	log.Println("Successfully connected to database")
 
-	return &Database{DB: db}
+	return &Database{
+		DB:     db,
+		Config: cfg,
+	}
 }
 
 // Close closes the database connection
@@ -91,6 +95,8 @@ func (d *Database) Migrate() error {
 		&domain.JobPosition{},
 		&domain.Employee{},
 		&domain.EmployeeWorkInformation{},
+		&domain.Grade{},
+		&domain.EmployeeGrade{},
 		&domain.LeaveType{},
 		&domain.LeaveBalance{},
 		&domain.LeaveRequest{},

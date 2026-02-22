@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"kartezya-hr/internal/domain"
 
 	"gorm.io/gorm"
@@ -41,20 +42,20 @@ func (r *userRoleRepository) DeleteByUserID(userID uint, deletedBy string) error
 
 func (r *userRoleRepository) GetRolesByUserID(userID uint) ([]domain.Role, error) {
 	var roles []domain.Role
-	err := r.db.Table("hr_roles").
-		Joins("JOIN hr_user_roles ON hr_roles.id = hr_user_roles.role_id").
-		Where("hr_user_roles.user_id = ? AND hr_user_roles.deleted = ?", userID, false).
-		Where("hr_roles.deleted = ?", false).
+	err := r.db.Table(domain.GetTableName("hr_roles")).
+		Joins(fmt.Sprintf("JOIN %s ON %s.role_id = %s.id", domain.GetTableName("hr_user_roles"), domain.GetTableName("hr_user_roles"), domain.GetTableName("hr_roles"))).
+		Where(fmt.Sprintf("%s.user_id = ? AND %s.deleted = ?", domain.GetTableName("hr_user_roles"), domain.GetTableName("hr_user_roles")), userID, false).
+		Where(fmt.Sprintf("%s.deleted = ?", domain.GetTableName("hr_roles")), false).
 		Find(&roles).Error
 	return roles, err
 }
 
 func (r *userRoleRepository) HasRole(userID uint, roleName string) (bool, error) {
 	var count int64
-	err := r.db.Table("hr_user_roles").
-		Joins("JOIN hr_roles ON hr_user_roles.role_id = hr_roles.id").
-		Where("hr_user_roles.user_id = ? AND hr_roles.name = ?", userID, roleName).
-		Where("hr_user_roles.deleted = ? AND hr_roles.deleted = ?", false, false).
+	err := r.db.Table(domain.GetTableName("hr_user_roles")).
+		Joins(fmt.Sprintf("JOIN %s ON %s.role_id = %s.id", domain.GetTableName("hr_roles"), domain.GetTableName("hr_user_roles"), domain.GetTableName("hr_roles"))).
+		Where(fmt.Sprintf("%s.user_id = ? AND %s.name = ?", domain.GetTableName("hr_user_roles"), domain.GetTableName("hr_roles")), userID, roleName).
+		Where(fmt.Sprintf("%s.deleted = ? AND %s.deleted = ?", domain.GetTableName("hr_user_roles"), domain.GetTableName("hr_roles")), false, false).
 		Count(&count).Error
 	return count > 0, err
 }

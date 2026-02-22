@@ -20,13 +20,14 @@ type Config struct {
 }
 
 type DatabaseConfig struct {
-	Host     string
-	Port     int
-	User     string
-	Password string
-	Name     string
-	SSLMode  string
-	Debug    bool
+	Host        string
+	Port        int
+	User        string
+	Password    string
+	Name        string
+	SSLMode     string
+	Debug       bool
+	TablePrefix string
 }
 
 type JWTConfig struct {
@@ -83,13 +84,14 @@ func Load() *Config {
 
 	return &Config{
 		Database: DatabaseConfig{
-			Host:     getEnv("DB_HOST", "localhost"),
-			Port:     port,
-			User:     getEnv("DB_USER", "postgres"),
-			Password: getEnv("DB_PASSWORD", "postgres"),
-			Name:     getEnv("DB_NAME", "kartezya_hr"),
-			SSLMode:  getEnv("DB_SSLMODE", "disable"),
-			Debug:    getEnv("DB_DEBUG", "false") == "true",
+			Host:        getEnv("DB_HOST", "localhost"),
+			Port:        port,
+			User:        getEnv("DB_USER", "postgres"),
+			Password:    getEnv("DB_PASSWORD", "postgres"),
+			Name:        getEnv("DB_NAME", "kartezya_hr"),
+			SSLMode:     getEnv("DB_SSLMODE", "disable"),
+			Debug:       getEnv("DB_DEBUG", "false") == "true",
+			TablePrefix: getEnv("DB_TABLE_PREFIX", "hr"),
 		},
 		JWT: JWTConfig{
 			Secret:      getEnv("JWT_SECRET", "default-secret-change-me"),
@@ -129,6 +131,20 @@ func (c *Config) GetDatabaseDSN() string {
 		c.Database.Name,
 		c.Database.SSLMode,
 	)
+}
+
+// GetTableName returns the table name with prefix if configured
+func (c *Config) GetTableName(tableName string) string {
+	if c.Database.TablePrefix != "" {
+		// If table already has hr_ prefix, replace it with the configured prefix
+		if len(tableName) > 3 && tableName[:3] == "hr_" {
+			return c.Database.TablePrefix + "_" + tableName[3:]
+		}
+		// If no hr_ prefix, add the configured prefix
+		return c.Database.TablePrefix + "_" + tableName
+	}
+	// If no prefix configured, return original table name
+	return tableName
 }
 
 func getEnv(key, defaultValue string) string {

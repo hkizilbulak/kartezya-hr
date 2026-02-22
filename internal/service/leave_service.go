@@ -104,9 +104,6 @@ func (s *leaveService) CreateLeave(leave *domain.LeaveRequest, userID uint, isAd
 	if leave.EndDate.IsZero() {
 		return errors.New("end_date is required")
 	}
-	if leave.RequestedDays < 1 {
-		return errors.New("selected date range does not include any working days")
-	}
 
 	// Get leave type to check if it's birthday leave
 	leaveType, err := s.leaveTypeRepo.GetByID(leave.LeaveTypeID)
@@ -114,13 +111,15 @@ func (s *leaveService) CreateLeave(leave *domain.LeaveRequest, userID uint, isAd
 		return fmt.Errorf("failed to get leave type: %w", err)
 	}
 
-	// Check if there's already a pending leave request for the same leave type
-	pendingLeave, err := s.leaveRepo.GetPendingLeaveByEmployeeAndLeaveType(leave.EmployeeID, leave.LeaveTypeID)
+	// Check for date overlap with existing PENDING leave requests
+	pendingLeaves, err := s.leaveRepo.GetPendingLeavesByEmployeeIDAndDateRange(leave.EmployeeID, leave.LeaveTypeID, leave.StartDate, leave.EndDate)
 	if err != nil {
-		return fmt.Errorf("failed to check pending leave: %w", err)
+		return fmt.Errorf("failed to check pending leaves: %w", err)
 	}
-	if pendingLeave != nil {
-		return fmt.Errorf("Bekleyen %s talebiniz olduğundan yeni talebiniz için izin girişi yapamazsınız", leaveType.Name)
+	if len(pendingLeaves) > 0 {
+		// Get the leave type name for the error message
+		typeName := leaveType.Name
+		return fmt.Errorf("Seçtiğiniz tarih aralığında bekleyen %s talebiniz olduğundan yeni talebiniz için izin girişi yapamazsınız", typeName)
 	}
 
 	// Check for birthday leave restrictions (Doğum Günü İzni)
@@ -277,38 +276,16 @@ func (s *leaveService) UpdateLeave(leave *domain.LeaveRequest, userID uint) erro
 		return fmt.Errorf("failed to get leave type: %w", err)
 	}
 
-	// If leave type is being changed, check if there's a pending leave request for the new leave type
-	if existingLeave.LeaveTypeID != leave.LeaveTypeID {
-		pendingLeave, err := s.leaveRepo.GetPendingLeaveByEmployeeAndLeaveType(leave.EmployeeID, leave.LeaveTypeID)
-		if err != nil {
-			return fmt.Errorf("failed to check pending leave: %w", err)
-		}
-		if pendingLeave != nil {
-			return fmt.Errorf("Bekleyen %s talebiniz olduğundan yeni talebiniz için izin girişi yapamazsınız", leaveType.Name)
-		}
-	} else {
-		// Even if not changing leave type, check if there are other pending leave requests (excluding this one)
-		allPendingLeaves, _, err := s.leaveRepo.GetByEmployeeIDWithLeaveTypeAndStatus(leave.EmployeeID, 1000, 0, types.SortParams{}, LeaveStatusPending)
-		if err != nil {
-			return fmt.Errorf("failed to check pending leaves: %w", err)
-		}
-
-		// Check if there's another pending leave request (not the current one being updated)
-		for _, pendingLeave := range allPendingLeaves {
-			if pendingLeave.ID != leave.ID {
-				return fmt.Errorf("Başka bir bekleyen izin talebiniz bulunmaktadır, lütfen o talebi sonlandırdıktan sonra yeni bir talib oluşturunuz")
-			}
-		}
+	// Check for date overlap with existing PENDING or APPROVED leave requests for the same leave type
+	// Exclude the current leave request being updated
+	pendingLeaves, err := s.leaveRepo.GetPendingLeavesByEmployeeIDAndDateRange(leave.EmployeeID, leave.LeaveTypeID, leave.StartDate, leave.EndDate)
+	if err != nil {
+		return fmt.Errorf("failed to check pending leaves: %w", err)
 	}
-
-	// Check for birthday leave restrictions if leave type is being changed to birthday leave (Doğum Günü İzni)
-	if (leaveType.Name == "Doğum Günü İzni" || leaveType.Name == "Birthday Leave") &&
-		existingLeave.LeaveTypeID != leave.LeaveTypeID {
-		// Check if there's already an approved birthday leave in this year
-		year := leave.StartDate.Year()
-		existingBirthdayLeaves, err := s.leaveRepo.GetApprovedBirthdayLeaveInYear(leave.EmployeeID, leave.LeaveTypeID, year)
-		if err == nil && len(existingBirthdayLeaves) > 0 {
-			return errors.New("Bir takvim yılı içerisinde en fazla 1 kez doğum günü izin girebilirsiniz")
+	// Filter out the current leave request from the results
+	for _, pendingLeave := range pendingLeaves {
+		if pendingLeave.ID != leave.ID {
+			return fmt.Errorf("Seçtiğiniz tarih aralığında bekleyen %s talebiniz olduğundan yeni talebiniz için izin girişi yapamazsınız", leaveType.Name)
 		}
 	}
 

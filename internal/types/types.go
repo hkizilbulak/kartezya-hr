@@ -107,6 +107,7 @@ type EmployeeResponse struct {
 	IdentityNo               string                  `json:"identity_no"`
 	Roles                    []string                `json:"roles"`
 	WorkInformation          *EmployeeWorkInfoLookup `json:"work_information,omitempty"`
+	Status                   string                  `json:"status"`
 }
 
 // EmployeeWorkInfoLookup for employee response
@@ -278,48 +279,6 @@ func NormalizeGender(value string) *string {
 	return &result
 }
 
-// NormalizeMaritalStatus converts marital status values to English enum values
-// Returns nil pointer if value is empty string
-func NormalizeMaritalStatus(value string) *string {
-	if value == "" {
-		return nil
-	}
-	var result string
-	switch value {
-	case "MARRIED", "Married", "married", "Evli":
-		result = "MARRIED"
-	case "SINGLE", "Single", "single", "Bekar":
-		result = "SINGLE"
-	default:
-		result = value
-	}
-	return &result
-}
-
-// NormalizeEmergencyContactRelation converts relation values to English enum values
-// Returns nil pointer if value is empty string
-func NormalizeEmergencyContactRelation(value string) *string {
-	if value == "" {
-		return nil
-	}
-	var result string
-	switch value {
-	case "MOTHER", "Mother", "mother", "Anne":
-		result = "MOTHER"
-	case "FATHER", "Father", "father", "Baba":
-		result = "FATHER"
-	case "SPOUSE", "Spouse", "spouse", "Eş":
-		result = "SPOUSE"
-	case "SIBLING", "Sibling", "sibling", "Kardeş":
-		result = "SIBLING"
-	case "OTHER", "Other", "other", "RELATIVE", "Relative", "relative", "Diğer":
-		result = "OTHER"
-	default:
-		result = value
-	}
-	return &result
-}
-
 // EmployeeWorkInformationList for timeline view
 type EmployeeWorkInformationList struct {
 	ID             uint    `json:"id"`
@@ -363,6 +322,7 @@ type EmployeeDetailResponse struct {
 	IdentityNo               string                        `json:"identity_no"`
 	Roles                    []string                      `json:"roles"`
 	WorkInformation          []EmployeeWorkInformationList `json:"work_information,omitempty"`
+	Status                   string                        `json:"status"`
 }
 
 // WorkDayReportFilter represents the filter criteria for work day report
@@ -396,4 +356,45 @@ type WorkDayReportResponse struct {
 	TotalWorkDays    float64            `json:"total_work_days"`
 	TotalHolidayDays float64            `json:"total_holiday_days"`
 	Rows             []WorkDayReportRow `json:"rows"`
+}
+
+// EmployeeGradeLookup for lookup responses
+type EmployeeGradeLookup struct {
+	ID        uint   `json:"id"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+}
+
+// EmployeeGradeResponse for detail responses
+type EmployeeGradeResponse struct {
+	ID         uint           `json:"id"`
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
+	Deleted    bool           `json:"deleted"`
+	CreatedBy  string         `json:"created_by"`
+	ModifiedBy string         `json:"modified_by"`
+	Employee   EmployeeLookup `json:"employee"`
+	Grade      GradeLookup    `json:"grade"`
+	StartDate  time.Time      `json:"start_date"`
+	EndDate    *time.Time     `json:"end_date"`
+}
+
+// EmployeeGradeWithNames for API responses with names
+type EmployeeGradeWithNames struct {
+	ID             uint    `json:"id"`
+	EmployeeName   string  `json:"employee_name"`
+	GradeName      string  `json:"grade_name"`
+	StartDate      string  `json:"start_date"`
+	EndDate        *string `json:"end_date"`
+	IsCurrentGrade bool    `json:"is_current_grade"`
+}
+
+// Pagination response wrapper
+type PaginatedResponse struct {
+	Success bool        `json:"success"`
+	Data    interface{} `json:"data"`
+	Page    int         `json:"page"`
+	Limit   int         `json:"limit"`
+	Total   int64       `json:"total"`
+	Pages   int         `json:"pages"`
 }
