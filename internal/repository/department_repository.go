@@ -36,7 +36,8 @@ func (r *departmentRepository) Create(department *domain.Department, createdBy s
 func (r *departmentRepository) GetByID(id uint) (*domain.Department, error) {
 	var department domain.Department
 	err := r.db.Preload("Company").Preload("EmployeeWorkInformation").
-		Where("id = ? AND deleted = ?", id, false).First(&department).Error
+		Where(fmt.Sprintf("%s.id = ? AND %s.deleted = ?", domain.GetTableName("hr_departments"), domain.GetTableName("hr_departments")), id, false).
+		First(&department).Error
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +46,11 @@ func (r *departmentRepository) GetByID(id uint) (*domain.Department, error) {
 
 func (r *departmentRepository) GetByCompanyIDAndName(companyID uint, name string) (*domain.Department, error) {
 	var department domain.Department
-	err := r.db.Where("company_id = ? AND name = ? AND deleted = ?", companyID, name, false).First(&department).Error
+	err := r.db.Where(fmt.Sprintf("%s.company_id = ? AND %s.name = ? AND %s.deleted = ?",
+		domain.GetTableName("hr_departments"),
+		domain.GetTableName("hr_departments"),
+		domain.GetTableName("hr_departments")), companyID, name, false).
+		First(&department).Error
 	if err != nil {
 		return nil, err
 	}
@@ -56,8 +61,12 @@ func (r *departmentRepository) GetAll(limit, offset int, sortParams types.SortPa
 	var departments []*domain.Department
 	var total int64
 
+	// Get dynamic table names
+	deptTable := domain.GetTableName("hr_departments")
+	companyTable := domain.GetTableName("hr_companies")
+
 	// Determine sort field and direction
-	sortField := "d.id"
+	sortField := fmt.Sprintf("%s.id", deptTable)
 	direction := "ASC"
 
 	if sortParams.Direction == "DESC" {
@@ -68,32 +77,31 @@ func (r *departmentRepository) GetAll(limit, offset int, sortParams types.SortPa
 	if sortParams.Sort != "" {
 		switch sortParams.Sort {
 		case "company":
-			sortField = "c.name"
+			sortField = fmt.Sprintf("%s.name", companyTable)
 		case "name":
-			sortField = "d.name"
+			sortField = fmt.Sprintf("%s.name", deptTable)
 		case "manager":
-			sortField = "d.manager"
+			sortField = fmt.Sprintf("%s.manager", deptTable)
 		case "created_at":
-			sortField = "d.created_at"
+			sortField = fmt.Sprintf("%s.created_at", deptTable)
 		case "updated_at":
-			sortField = "d.updated_at"
+			sortField = fmt.Sprintf("%s.updated_at", deptTable)
 		default:
-			sortField = "d.id"
+			sortField = fmt.Sprintf("%s.id", deptTable)
 		}
 	}
 
 	// Build SQL query with proper JOIN
-	query := `
-		SELECT d.* FROM hr_departments d
-		LEFT JOIN hr_companies c ON c.id = d.company_id
-		WHERE d.deleted = false
+	query := fmt.Sprintf(`
+		SELECT %s.* FROM %s
+		LEFT JOIN %s ON %s.id = %s.company_id
+		WHERE %s.deleted = false
 		ORDER BY %s %s
 		LIMIT ? OFFSET ?
-	`
-	formattedQuery := fmt.Sprintf(query, sortField, direction)
+	`, deptTable, deptTable, companyTable, companyTable, deptTable, deptTable, sortField, direction)
 
 	// Execute query
-	err := r.db.Raw(formattedQuery, limit, offset).
+	err := r.db.Raw(query, limit, offset).
 		Preload("Company").
 		Find(&departments).Error
 
@@ -102,14 +110,18 @@ func (r *departmentRepository) GetAll(limit, offset int, sortParams types.SortPa
 	}
 
 	// Count total records
-	r.db.Model(&domain.Department{}).Where("deleted = ?", false).Count(&total)
+	r.db.Model(&domain.Department{}).Where(fmt.Sprintf("%s.deleted = ?", deptTable), false).Count(&total)
 
 	return departments, total, nil
 }
 
 func (r *departmentRepository) GetByCompanyID(companyID uint) ([]*domain.Department, error) {
 	var departments []*domain.Department
-	err := r.db.Preload("Company").Where("company_id = ? AND deleted = ?", companyID, false).Find(&departments).Error
+	err := r.db.Preload("Company").
+		Where(fmt.Sprintf("%s.company_id = ? AND %s.deleted = ?",
+			domain.GetTableName("hr_departments"),
+			domain.GetTableName("hr_departments")), companyID, false).
+		Find(&departments).Error
 	return departments, err
 }
 
@@ -130,6 +142,8 @@ func (r *departmentRepository) Delete(id uint, deletedBy string) error {
 // GetTotalCount returns the total number of departments
 func (r *departmentRepository) GetTotalCount() (int64, error) {
 	var count int64
-	err := r.db.Model(&domain.Department{}).Where("deleted = ?", false).Count(&count).Error
+	err := r.db.Model(&domain.Department{}).
+		Where(fmt.Sprintf("%s.deleted = ?", domain.GetTableName("hr_departments")), false).
+		Count(&count).Error
 	return count, err
 }

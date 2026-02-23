@@ -77,6 +77,7 @@ func main() {
 	holidayRepo := repository.NewHolidayRepository(db.DB)
 	gradeRepo := repository.NewGradeRepository(db.DB)
 	employeeGradeRepo := repository.NewEmployeeGradeRepository(db.DB)
+	employeeContractRepo := repository.NewEmployeeContractRepository(db.DB)
 
 	// Initialize services
 	auditService := service.NewAuditService(auditRepo)
@@ -91,6 +92,7 @@ func main() {
 	lookupService := service.NewLookupService(companyRepo, departmentRepo, jobPositionRepo, leaveTypeRepo, gradeRepo)
 	gradeService := service.NewGradeService(gradeRepo, auditService)
 	employeeGradeService := service.NewEmployeeGradeService(employeeGradeRepo, employeeRepo, gradeRepo, auditService)
+	employeeContractService := service.NewEmployeeContractService(employeeContractRepo, employeeRepo, auditService)
 	reportService := service.NewReportService(employeeRepo, workInfoRepo, leaveRepo, holidayRepo, leaveService)
 
 	// Initialize handlers
@@ -105,6 +107,7 @@ func main() {
 	dashboardHandler := handler.NewDashboardHandler(employeeService, departmentService, companyService, leaveService)
 	gradeHandler := handler.NewGradeHandler(gradeService)
 	employeeGradeHandler := handler.NewEmployeeGradeHandler(employeeGradeService, employeeService)
+	employeeContractHandler := handler.NewEmployeeContractHandler(employeeContractService, employeeService)
 	reportHandler := handler.NewReportHandler(reportService)
 
 	// Initialize middleware
@@ -300,6 +303,20 @@ func main() {
 			employeeGradeRoutes.POST("", authMiddleware.RequireAdmin(), employeeGradeHandler.CreateEmployeeGrade)
 			employeeGradeRoutes.PUT("/:id", authMiddleware.RequireAdmin(), employeeGradeHandler.UpdateEmployeeGrade)
 			employeeGradeRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), employeeGradeHandler.DeleteEmployeeGrade)
+		}
+
+		// Employee Contract management routes
+		employeeContractRoutes := protected.Group("/employee-contracts")
+		{
+			// Employee can view their own contracts
+			employeeContractRoutes.GET("/me", employeeContractHandler.GetMyEmployeeContracts)
+
+			// Admin only routes
+			employeeContractRoutes.GET("/:id", authMiddleware.RequireAdmin(), employeeContractHandler.GetEmployeeContractByID)
+			employeeContractRoutes.GET("", authMiddleware.RequireAdmin(), employeeContractHandler.ListEmployeeContracts)
+			employeeContractRoutes.POST("", authMiddleware.RequireAdmin(), employeeContractHandler.CreateEmployeeContract)
+			employeeContractRoutes.PUT("/:id", authMiddleware.RequireAdmin(), employeeContractHandler.UpdateEmployeeContract)
+			employeeContractRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), employeeContractHandler.DeleteEmployeeContract)
 		}
 
 		// Dashboard routes

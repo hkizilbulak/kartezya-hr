@@ -97,6 +97,7 @@ func (d *Database) Migrate() error {
 		&domain.EmployeeWorkInformation{},
 		&domain.Grade{},
 		&domain.EmployeeGrade{},
+		&domain.EmployeeContract{},
 		&domain.LeaveType{},
 		&domain.LeaveBalance{},
 		&domain.LeaveRequest{},

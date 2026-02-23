@@ -955,17 +955,7 @@ func (h *LeaveHandler) CancelLeaveRequest(c *gin.Context) {
 		return
 	}
 
-	var req CancelLeaveRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid request format",
-			"details": err.Error(),
-		})
-		return
-	}
-
-	if err := h.leaveService.CancelLeave(id, req.Reason, userID, isAdmin(roles)); err != nil {
+	if err := h.leaveService.CancelLeave(id, "İptal", userID, isAdmin(roles)); err != nil {
 		status := http.StatusInternalServerError
 		if err.Error() == "you can only cancel your own leave requests" ||
 			err.Error() == "only pending leave requests can be cancelled, current status: PENDING" ||

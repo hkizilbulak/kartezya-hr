@@ -389,6 +389,37 @@ type EmployeeGradeWithNames struct {
 	IsCurrentGrade bool    `json:"is_current_grade"`
 }
 
+// EmployeeContractLookup for lookup responses
+type EmployeeContractLookup struct {
+	ID        uint   `json:"id"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+}
+
+// EmployeeContractResponse for detail responses
+type EmployeeContractResponse struct {
+	ID         uint           `json:"id"`
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
+	Deleted    bool           `json:"deleted"`
+	CreatedBy  string         `json:"created_by"`
+	ModifiedBy string         `json:"modified_by"`
+	Employee   EmployeeLookup `json:"employee"`
+	ContractNo string         `json:"contract_no"`
+	StartDate  time.Time      `json:"start_date"`
+	EndDate    *time.Time     `json:"end_date"`
+}
+
+// EmployeeContractWithNames for API responses with names
+type EmployeeContractWithNames struct {
+	ID           uint    `json:"id"`
+	EmployeeName string  `json:"employee_name"`
+	ContractNo   string  `json:"contract_no"`
+	StartDate    string  `json:"start_date"`
+	EndDate      *string `json:"end_date"`
+	IsActive     bool    `json:"is_active"`
+}
+
 // Pagination response wrapper
 type PaginatedResponse struct {
 	Success bool        `json:"success"`
