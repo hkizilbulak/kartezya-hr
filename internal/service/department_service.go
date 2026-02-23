@@ -6,6 +6,7 @@ import (
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/repository"
 	"kartezya-hr/internal/types"
+	"strings"
 )
 
 type DepartmentService interface {
@@ -32,14 +33,13 @@ func NewDepartmentService(departmentRepo repository.DepartmentRepository, compan
 }
 
 func (s *departmentService) CreateDepartment(department *domain.Department, userID uint) error {
+	// Trim whitespace from name
+	department.Name = strings.TrimSpace(department.Name)
+
 	// Validation
 	if department.Name == "" {
 		return errors.New("department name is required")
 	}
-	if department.CompanyID == 0 {
-		return errors.New("company ID is required")
-	}
-
 	// Check if company exists
 	_, err := s.companyRepo.GetByID(department.CompanyID)
 	if err != nil {
@@ -69,9 +69,6 @@ func (s *departmentService) CreateDepartment(department *domain.Department, user
 }
 
 func (s *departmentService) GetDepartmentByID(id uint) (*types.DepartmentResponse, error) {
-	if id == 0 {
-		return nil, errors.New("invalid department ID")
-	}
 
 	department, err := s.departmentRepo.GetByID(id)
 	if err != nil {
@@ -162,16 +159,12 @@ func (s *departmentService) GetAllDepartments(page, limit int, sortParams types.
 }
 
 func (s *departmentService) UpdateDepartment(id uint, department *domain.Department, userID uint) error {
-	if id == 0 {
-		return errors.New("invalid department ID")
-	}
+	// Trim whitespace from name
+	department.Name = strings.TrimSpace(department.Name)
 
 	// Check if department exists and get old value for audit
 	existingDepartment, err := s.departmentRepo.GetByID(id)
-	if err != nil {
-		return errors.New("department not found")
-	}
-	if existingDepartment == nil {
+	if err != nil || existingDepartment == nil {
 		return errors.New("department not found")
 	}
 
@@ -179,13 +172,10 @@ func (s *departmentService) UpdateDepartment(id uint, department *domain.Departm
 	if department.Name == "" {
 		return errors.New("department name is required")
 	}
-	if department.CompanyID == 0 {
-		return errors.New("company ID is required")
-	}
 
 	// Check if company exists
-	_, err = s.companyRepo.GetByID(department.CompanyID)
-	if err != nil {
+	existingCompany, err := s.companyRepo.GetByID(department.CompanyID)
+	if err != nil || existingCompany == nil {
 		return errors.New("company not found")
 	}
 
@@ -206,6 +196,7 @@ func (s *departmentService) UpdateDepartment(id uint, department *domain.Departm
 	updatedDepartment.Name = department.Name
 	updatedDepartment.Manager = department.Manager
 	updatedDepartment.CompanyID = department.CompanyID
+	updatedDepartment.Company = *existingCompany
 
 	// Update the department
 	if err := s.departmentRepo.Update(&updatedDepartment, modifiedBy); err != nil {
@@ -224,16 +215,10 @@ func (s *departmentService) UpdateDepartment(id uint, department *domain.Departm
 }
 
 func (s *departmentService) DeleteDepartment(id uint, userID uint) error {
-	if id == 0 {
-		return errors.New("invalid department ID")
-	}
 
 	// Check if department exists and get old value for audit
 	existingDepartment, err := s.departmentRepo.GetByID(id)
-	if err != nil {
-		return errors.New("department not found")
-	}
-	if existingDepartment == nil {
+	if err != nil || existingDepartment == nil {
 		return errors.New("department not found")
 	}
 

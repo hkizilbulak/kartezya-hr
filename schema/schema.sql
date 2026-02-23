@@ -297,6 +297,21 @@ CREATE TABLE IF NOT EXISTS hr_employee_grades (
     FOREIGN KEY (grade_id) REFERENCES hr_grades(id) ON DELETE CASCADE
 );
 
+-- Employee Contracts table (contract history for employees)
+CREATE TABLE IF NOT EXISTS hr_employee_contracts (
+    id BIGSERIAL PRIMARY KEY,
+    employee_id BIGINT NOT NULL,
+    contract_no VARCHAR(100),
+    start_date DATE NOT NULL,
+    end_date DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted BOOLEAN NOT NULL DEFAULT false,
+    created_by VARCHAR(50),
+    modified_by VARCHAR(50),
+    FOREIGN KEY (employee_id) REFERENCES hr_employees(id) ON DELETE CASCADE
+);
+
 -- ================================================
 -- INDEXES FOR PERFORMANCE
 -- ================================================
@@ -323,6 +338,10 @@ CREATE INDEX IF NOT EXISTS idx_hr_leave_balances_employee_year ON hr_leave_balan
 CREATE INDEX IF NOT EXISTS idx_hr_employee_grades_employee_id ON hr_employee_grades(employee_id);
 CREATE INDEX IF NOT EXISTS idx_hr_employee_grades_grade_id ON hr_employee_grades(grade_id);
 CREATE INDEX IF NOT EXISTS idx_hr_employee_grades_dates ON hr_employee_grades(start_date, end_date);
+
+-- Employee contracts indexes
+CREATE INDEX IF NOT EXISTS idx_hr_employee_contracts_employee_id ON hr_employee_contracts(employee_id);
+CREATE INDEX IF NOT EXISTS idx_hr_employee_contracts_dates ON hr_employee_contracts(start_date, end_date);
 
 -- Audit indexes
 CREATE INDEX IF NOT EXISTS idx_hr_audit_logs_entity ON hr_audit_logs(entity_name, entity_id);
@@ -398,6 +417,10 @@ BEGIN
 
     IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_hr_employee_grades_updated_at') THEN
         CREATE TRIGGER update_hr_employee_grades_updated_at BEFORE UPDATE ON hr_employee_grades FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_hr_employee_contracts_updated_at') THEN
+        CREATE TRIGGER update_hr_employee_contracts_updated_at BEFORE UPDATE ON hr_employee_contracts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     END IF;
 
     IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_hr_holidays_updated_at') THEN

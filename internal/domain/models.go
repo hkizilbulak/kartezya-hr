@@ -295,6 +295,23 @@ type EmployeeGrade struct {
 	Grade    Grade    `json:"grade,omitempty"`
 }
 
+// EmployeeContract represents employee contracts
+type EmployeeContract struct {
+	AuditableModel
+	EmployeeID uint       `json:"employee_id" gorm:"not null"`
+	ContractNo string     `json:"contract_no" gorm:"size:100"`
+	StartDate  time.Time  `json:"start_date" gorm:"not null"`
+	EndDate    *time.Time `json:"end_date"`
+
+	// Relationships
+	Employee Employee `json:"employee,omitempty"`
+}
+
+// EmployeeContract table name
+func (EmployeeContract) TableName() string {
+	return GetTableName("hr_employee_contracts")
+}
+
 // Grade table name
 func (Grade) TableName() string {
 	return GetTableName("hr_grades")
