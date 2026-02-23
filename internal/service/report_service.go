@@ -3,7 +3,6 @@ package service
 import (
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
 	"kartezya-hr/internal/domain"
@@ -40,79 +39,37 @@ func NewReportService(
 }
 
 func (s *reportService) GetWorkDayReport(filter *types.WorkDayReportFilter) (*types.WorkDayReportResponse, error) {
-	// Calculate working days ONCE (same for all employees)
-	commonWorkDays, err := s.leaveService.CalculateWorkingDays(filter.StartDate, filter.EndDate, true, true)
+	// Format dates for SQL query
+	startDateStr := filter.StartDate.Format("2006-01-02")
+	endDateStr := filter.EndDate.Format("2006-01-02")
+
+	// Execute optimized SQL query
+	rows, err := s.employeeRepo.GetWorkDayReportData(
+		startDateStr,
+		endDateStr,
+		filter.CompanyID,
+		filter.DepartmentID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get work day report data: %w", err)
+	}
+
+	// Calculate total work days and holiday days once
+	totalWorkDays, err := s.leaveService.CalculateWorkingDays(filter.StartDate, filter.EndDate, true, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate work days: %w", err)
 	}
 
-	// Calculate holiday days ONCE (same for all employees)
-	commonHolidayDays, err := s.calculateHolidayDays(filter.StartDate, filter.EndDate)
+	totalHolidayDays, err := s.calculateHolidayDays(filter.StartDate, filter.EndDate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate holiday days: %w", err)
 	}
 
-	// Get filtered employees with work info in a single optimized query
-	employees, err := s.getFilteredEmployeesWithWorkInfo(filter)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get employees: %w", err)
-	}
-
-	// Pre-fetch leave balance data for all employees in the date range
-	leaveBalanceMap, err := s.getLeaveBalanceData(employees, filter)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get leave balance data: %w", err)
-	}
-
-	// Build report rows with concurrent processing
-	var rows []types.WorkDayReportRow
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-
-	// Process employees concurrently (max 10 goroutines)
-	maxConcurrency := 10
-	semaphore := make(chan struct{}, maxConcurrency)
-
-	for _, employee := range employees {
-		wg.Add(1)
-		go func(emp *employeeWithWorkInfo) {
-			defer wg.Done()
-			semaphore <- struct{}{}        // Acquire
-			defer func() { <-semaphore }() // Release
-
-			// Get used leave days from leave balance
-			usedLeaveDays := leaveBalanceMap[emp.EmployeeID]
-
-			// Calculate worked days: work days - holiday days - used leave days
-			workedDays := commonWorkDays - commonHolidayDays - usedLeaveDays
-
-			row := types.WorkDayReportRow{
-				ID:             emp.EmployeeID,
-				FirstName:      emp.FirstName,
-				LastName:       emp.LastName,
-				IdentityNo:     emp.IdentityNo,
-				CompanyName:    emp.CompanyName,
-				DepartmentName: emp.DepartmentName,
-				Manager:        emp.Manager,
-				WorkDays:       commonWorkDays,
-				HolidayDays:    commonHolidayDays,
-				UsedLeaveDays:  usedLeaveDays,
-				WorkedDays:     workedDays,
-			}
-
-			mu.Lock()
-			rows = append(rows, row)
-			mu.Unlock()
-		}(employee)
-	}
-
-	wg.Wait()
-
 	return &types.WorkDayReportResponse{
 		StartDate:        filter.StartDate,
 		EndDate:          filter.EndDate,
-		TotalWorkDays:    commonWorkDays,
-		TotalHolidayDays: commonHolidayDays,
+		TotalWorkDays:    totalWorkDays,
+		TotalHolidayDays: totalHolidayDays,
 		Rows:             rows,
 	}, nil
 }

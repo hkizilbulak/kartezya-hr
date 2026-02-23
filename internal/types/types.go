@@ -343,8 +343,11 @@ type WorkDayReportRow struct {
 	CompanyName    string  `json:"company_name"`
 	DepartmentName string  `json:"department_name"`
 	Manager        string  `json:"manager"`
+	TeamStartDate  *string `json:"team_start_date"`
+	TeamEndDate    *string `json:"team_end_date"`
+	HireDate       *string `json:"hire_date"`
+	LeaveDate      *string `json:"leave_date"`
 	WorkDays       float64 `json:"work_days"`
-	HolidayDays    float64 `json:"holiday_days"`
 	UsedLeaveDays  float64 `json:"used_leave_days"`
 	WorkedDays     float64 `json:"worked_days"`
 }

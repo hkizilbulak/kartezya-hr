@@ -25,6 +25,7 @@ type EmployeeRepository interface {
 	GetEmployeeCountByGender() ([]interface{}, error)
 	GetEmployeeCountByPosition() ([]interface{}, error)
 	GetEmployeeCountByCompanyDepartment() ([]interface{}, error)
+	GetWorkDayReportData(startDate, endDate string, companyID, departmentID *uint) ([]types.WorkDayReportRow, error)
 }
 
 type employeeRepository struct {
@@ -693,4 +694,133 @@ func (r *employeeRepository) GetEmployeeCountByCompanyDepartment() ([]interface{
 		data = append(data, result)
 	}
 	return data, nil
+}
+
+// GetWorkDayReportData executes the work day report SQL query
+func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, companyID, departmentID *uint) ([]types.WorkDayReportRow, error) {
+	var rows []types.WorkDayReportRow
+
+	// Build base query with numbered parameters for PostgreSQL
+	query := `
+		WITH date_range AS (
+			SELECT generate_series(
+				$1::date,
+				$2::date,
+				INTERVAL '1 day'
+			)::date AS work_date
+		),
+		
+		working_days AS (
+			SELECT work_date
+			FROM date_range
+			WHERE EXTRACT(DOW FROM work_date) NOT IN (0,6)
+			  AND NOT EXISTS (
+					SELECT 1
+					FROM hr_holidays h
+					WHERE h.holiday_date = date_range.work_date
+			  )
+		),
+		
+		employee_days AS (
+			SELECT
+				e.id AS employee_id,
+				w.work_date,
+				wi.start_date AS team_start_date,
+				wi.end_date   AS team_end_date,
+				wi.company_id,
+				wi.department_id,
+				CASE
+					WHEN lr.id IS NOT NULL THEN 'LEAVE'
+					ELSE 'WORK'
+					END AS day_type
+			FROM working_days w
+				CROSS JOIN hr_employees e
+			
+				LEFT JOIN hr_employee_work_information wi
+					ON wi.employee_id = e.id
+						AND w.work_date BETWEEN wi.start_date
+						   AND COALESCE(wi.end_date, DATE '9999-12-31')
+			
+				LEFT JOIN hr_leave_requests lr
+					ON lr.employee_id = e.id
+						AND w.work_date BETWEEN lr.start_date AND lr.end_date
+						AND lr.status = 'APPROVED'
+			
+			WHERE
+				w.work_date BETWEEN e.hire_date
+				AND COALESCE(e.leave_date, DATE '9999-12-31')
+			  AND wi.id IS NOT NULL
+		)
+		
+		SELECT
+			e.id,
+			e.identity_no,
+			e.first_name,
+			e.last_name,
+			
+			c.id   AS company_id,
+			c.name AS company_name,
+			
+			d.id   AS department_id,
+			d.name AS department_name,
+			d.manager AS manager,
+
+			MIN(ed.team_start_date) AS team_start_date,
+			MAX(ed.team_end_date)   AS team_end_date,
+			
+			e.hire_date,
+			e.leave_date,
+		
+			COUNT(CASE WHEN ed.day_type = 'WORK' THEN 1 END) AS worked_days,
+			COUNT(CASE WHEN ed.day_type = 'LEAVE' THEN 1 END) AS used_leave_days,
+
+			COUNT(CASE WHEN ed.day_type = 'WORK' THEN 1 END)
+				+
+			COUNT(CASE WHEN ed.day_type = 'LEAVE' THEN 1 END) AS work_days
+		
+		FROM employee_days ed
+		
+		JOIN hr_employees e ON e.id = ed.employee_id
+		
+		LEFT JOIN hr_companies c ON c.id = ed.company_id
+		LEFT JOIN hr_departments d ON d.id = ed.department_id
+		
+		WHERE 1=1`
+
+	// Build dynamic parameters list
+	params := []interface{}{startDate, endDate}
+	paramCounter := 3
+
+	// Add company filter if provided
+	if companyID != nil {
+		query += fmt.Sprintf("\n\t\t\tAND c.id = $%d", paramCounter)
+		params = append(params, *companyID)
+		paramCounter++
+	}
+
+	// Add department filter if provided
+	if departmentID != nil {
+		query += fmt.Sprintf("\n\t\t\tAND d.id = $%d", paramCounter)
+		params = append(params, *departmentID)
+		paramCounter++
+	}
+
+	// Add GROUP BY and ORDER BY
+	query += `
+		GROUP BY
+			e.id,
+			e.identity_no,
+			e.first_name,
+			e.last_name,
+			c.id,
+			c.name,
+			d.id,
+			d.name,
+			e.hire_date,
+			e.leave_date
+		ORDER BY e.id
+	`
+
+	err := r.db.Raw(query, params...).Scan(&rows).Error
+	return rows, err
 }
