@@ -98,14 +98,14 @@ INSERT INTO hr_job_positions (title, created_by, modified_by) VALUES
 -- ================================================
 
 -- Leave types with new boolean fields including is_required_document
-INSERT INTO hr_leave_types (name, description, is_paid, is_limited, is_accrual, is_required_document, created_by, modified_by) VALUES 
-('Yıllık İzin', 'Mevcut izin bakiyesine, 1 – 5 yıl (5 dahil) arasında çalışanlara 14 gün, 5 – 15 yıl arasında çalışanlara 20 gün, 15 yıl ve üzeri çalışanlara 26 gün her yıl eklenir.', true, true, true, false, 'admin@kartezya.com', 'admin@kartezya.com'),
-('Doğum İzni (Anne)', 'Doğumdan önce 8 hafta, doğumdan sonra 8 hafta olmak üzere 16 hafta izin kullanılabilir. Çoğul doğumlarda +2 hafta daha kullanılabilir.', true, false, false, true, 'admin@kartezya.com', 'admin@kartezya.com'),
-('Süt İzni', 'Çocuk 1 yaşına gelene kadar günde 1.5 saat izin kullanılabilir.', true, false, false, true, 'admin@kartezya.com', 'admin@kartezya.com'),
-('Evlenme İzni', 'Evlilik durumunda 3 gün izin kullanılabilir.', true, false, false, true, 'admin@kartezya.com', 'admin@kartezya.com'),
-('Yakın Akraba Ölümü', 'Anne, baba, eş, kardeş, çocuk ölümü durumunda 3 gün izin kullanılabilir.', true, false, false, true, 'admin@kartezya.com', 'admin@kartezya.com'),
-('Doğum İzni (Baba)', 'Doğum sonrası 5 gün izin kullanılabilir.', true, false, false, true, 'admin@kartezya.com', 'admin@kartezya.com'),
-('Askerlik İzni', 'Askere gitme durumunda kullanılabilir. Ücretsiz izindir.', false, false, false, true, 'admin@kartezya.com', 'admin@kartezya.com'),
-('Doğum Günü İzni', 'Bir takvim yılı içerisinde doğduğun ay içerisinde 1 gün kullanılabilir. Ücretli izindir.', true, false, false, false, 'admin@kartezya.com', 'admin@kartezya.com'),
-('Rapor İzni', 'Rapor dahilinde kullanılabilir. Ücretsiz izindir.', false, false, false, true, 'admin@kartezya.com', 'admin@kartezya.com'),
-('Diğer', 'Genel ücretsiz izin talepleri için kullanılabilir.', false, false, false, false, 'admin@kartezya.com', 'admin@kartezya.com');
+INSERT INTO hr_leave_types (name, description, is_paid, limit_amount, is_accrual, is_required_document, created_by, modified_by) VALUES 
+('Yıllık İzin', 'Mevcut izin bakiyesine, 1 – 5 yıl (5 dahil) arasında çalışanlara 14 gün, 5 – 15 yıl arasında çalışanlara 20 gün, 15 yıl ve üzeri çalışanlara 26 gün her yıl eklenir.', true, 14, true, false, 'admin@kartezya.com', 'admin@kartezya.com'),
+('Doğum İzni (Anne)', 'Doğumdan önce 8 hafta, doğumdan sonra 8 hafta olmak üzere 16 hafta izin kullanılabilir. Çoğul doğumlarda +2 hafta daha kullanılabilir.', true, NULL, false, true, 'admin@kartezya.com', 'admin@kartezya.com'),
+('Süt İzni', 'Çocuk 1 yaşına gelene kadar günde 1.5 saat izin kullanılabilir.', true, NULL, false, true, 'admin@kartezya.com', 'admin@kartezya.com'),
+('Evlenme İzni', 'Evlilik durumunda 3 gün izin kullanılabilir.', true, 3, false, true, 'admin@kartezya.com', 'admin@kartezya.com'),
+('Yakın Akraba Ölümü', 'Anne, baba, eş, kardeş, çocuk ölümü durumunda 3 gün izin kullanılabilir.', true, 3, false, true, 'admin@kartezya.com', 'admin@kartezya.com'),
+('Doğum İzni (Baba)', 'Doğum sonrası 5 gün izin kullanılabilir.', true, 5, false, true, 'admin@kartezya.com', 'admin@kartezya.com'),
+('Askerlik İzni', 'Askere gitme durumunda kullanılabilir. Ücretsiz izindir.', false, NULL, false, true, 'admin@kartezya.com', 'admin@kartezya.com'),
+('Doğum Günü İzni', 'Bir takvim yılı içerisinde doğduğun ay içerisinde 1 gün kullanılabilir. Ücretli izindir.', true, 1, false, false, 'admin@kartezya.com', 'admin@kartezya.com'),
+('Rapor İzni', 'Rapor dahilinde kullanılabilir. Ücretsiz izindir.', false, NULL, false, true, 'admin@kartezya.com', 'admin@kartezya.com'),
+('Diğer', 'Genel ücretsiz izin talepleri için kullanılabilir.', false, NULL, false, false, 'admin@kartezya.com', 'admin@kartezya.com');

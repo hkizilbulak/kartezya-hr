@@ -192,7 +192,7 @@ type LeaveTypeResponse struct {
 	Name               string    `json:"name"`
 	Description        string    `json:"description"`
 	IsPaid             bool      `json:"is_paid"`
-	IsLimited          bool      `json:"is_limited"`
+	LimitAmount        *int      `json:"limit_amount"`
 	IsAccrual          bool      `json:"is_accrual"`
 	IsRequiredDocument bool      `json:"is_required_document"`
 }

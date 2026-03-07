@@ -409,11 +409,11 @@ func seedDatabase(db *database.Database) error {
 
 	// Create default leave types
 	leaveTypes := []domain.LeaveType{
-		{Name: "Annual Leave", Description: "Annual vacation leave for rest and personal time", IsPaid: true, IsLimited: true, IsAccrual: true, IsRequiredDocument: false},
-		{Name: "Sick Leave", Description: "Medical leave for illness and health-related issues", IsPaid: true, IsLimited: false, IsAccrual: false, IsRequiredDocument: true},
-		{Name: "Personal Leave", Description: "Personal time off for individual matters", IsPaid: false, IsLimited: true, IsAccrual: false, IsRequiredDocument: false},
-		{Name: "Maternity Leave", Description: "Maternity leave for new mothers", IsPaid: true, IsLimited: false, IsAccrual: false, IsRequiredDocument: true},
-		{Name: "Paternity Leave", Description: "Paternity leave for new fathers", IsPaid: true, IsLimited: false, IsAccrual: false, IsRequiredDocument: false},
+		{Name: "Annual Leave", Description: "Annual vacation leave for rest and personal time", IsPaid: true, LimitAmount: func() *int { v := 14; return &v }(), IsAccrual: true, IsRequiredDocument: false},
+		{Name: "Sick Leave", Description: "Medical leave for illness and health-related issues", IsPaid: true, LimitAmount: nil, IsAccrual: false, IsRequiredDocument: true},
+		{Name: "Personal Leave", Description: "Personal time off for individual matters", IsPaid: false, LimitAmount: func() *int { v := 5; return &v }(), IsAccrual: false, IsRequiredDocument: false},
+		{Name: "Maternity Leave", Description: "Maternity leave for new mothers", IsPaid: true, LimitAmount: nil, IsAccrual: false, IsRequiredDocument: true},
+		{Name: "Paternity Leave", Description: "Paternity leave for new fathers", IsPaid: true, LimitAmount: nil, IsAccrual: false, IsRequiredDocument: false},
 	}
 
 	for _, leaveType := range leaveTypes {

@@ -30,7 +30,7 @@ type CreateLeaveTypeRequest struct {
 	Name               string `json:"name" binding:"required"`
 	Description        string `json:"description"`
 	IsPaid             bool   `json:"is_paid"`
-	IsLimited          bool   `json:"is_limited"`
+	LimitAmount        *int   `json:"limit_amount"`
 	IsAccrual          bool   `json:"is_accrual"`
 	IsRequiredDocument bool   `json:"is_required_document"`
 }
@@ -113,7 +113,7 @@ func (h *LeaveHandler) CreateLeaveType(c *gin.Context) {
 		Name:               req.Name,
 		Description:        req.Description,
 		IsPaid:             req.IsPaid,
-		IsLimited:          req.IsLimited,
+		LimitAmount:        req.LimitAmount,
 		IsAccrual:          req.IsAccrual,
 		IsRequiredDocument: req.IsRequiredDocument,
 	}
@@ -265,7 +265,7 @@ func (h *LeaveHandler) UpdateLeaveType(c *gin.Context) {
 		Name:               req.Name,
 		Description:        req.Description,
 		IsPaid:             req.IsPaid,
-		IsLimited:          req.IsLimited,
+		LimitAmount:        req.LimitAmount,
 		IsAccrual:          req.IsAccrual,
 		IsRequiredDocument: req.IsRequiredDocument,
 	}
