@@ -26,6 +26,7 @@ type LeaveRepository interface {
 	GetPendingLeaveByEmployeeAndLeaveType(employeeID uint, leaveTypeID uint) (*domain.LeaveRequest, error)
 	GetPendingLeavesByEmployeeIDAndDateRange(employeeID uint, leaveTypeID uint, startDate, endDate time.Time) ([]*domain.LeaveRequest, error)
 	GetUsedLeaveDaysByEmployeesInDateRange(employeeIDs []uint, startDate, endDate string) (map[uint]float64, error)
+	GetApprovedLeavesByEmployeeAndTypeInYear(employeeID uint, leaveTypeID uint, year int) ([]*domain.LeaveRequest, error)
 }
 
 // LeaveTypeRepository interface for leave types
@@ -434,4 +435,29 @@ func (r *leaveRepository) GetUsedLeaveDaysByEmployeesInDateRange(employeeIDs []u
 	}
 
 	return usedDaysMap, nil
+}
+
+// GetApprovedLeavesByEmployeeAndTypeInYear returns all approved leave requests for an employee
+// of a specific leave type within a given year
+func (r *leaveRepository) GetApprovedLeavesByEmployeeAndTypeInYear(employeeID uint, leaveTypeID uint, year int) ([]*domain.LeaveRequest, error) {
+	var leaves []*domain.LeaveRequest
+	
+	// Calculate start and end of the year
+	yearStart := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+	yearEnd := time.Date(year, 12, 31, 23, 59, 59, 999999999, time.UTC)
+	
+	err := r.db.
+		Where("employee_id = ?", employeeID).
+		Where("leave_type_id = ?", leaveTypeID).
+		Where("status = ?", "APPROVED").
+		Where("deleted = ?", false).
+		Where("start_date >= ? AND start_date <= ?", yearStart, yearEnd).
+		Order("start_date DESC").
+		Find(&leaves).Error
+	
+	if err != nil {
+		return nil, err
+	}
+	
+	return leaves, nil
 }

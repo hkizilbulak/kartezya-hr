@@ -676,6 +676,38 @@ func (s *leaveService) ValidateLeaveBalance(employeeID, leaveTypeID uint, reques
 		return nil
 	}
 
+	// Get leave type to check if it has a limit
+	leaveType, err := s.leaveTypeRepo.GetByID(leaveTypeID)
+	if err != nil {
+		return fmt.Errorf("failed to get leave type: %w", err)
+	}
+
+	// If leave type has a limit amount, check against approved leaves in current year
+	if leaveType.LimitAmount != nil && *leaveType.LimitAmount > 0 {
+		currentYear := time.Now().Year()
+		
+		// Get all approved leaves for this employee and leave type in current year
+		approvedLeaves, err := s.leaveRepo.GetApprovedLeavesByEmployeeAndTypeInYear(employeeID, leaveTypeID, currentYear)
+		if err != nil {
+			return fmt.Errorf("failed to get approved leaves: %w", err)
+		}
+		
+		// Calculate total used days from approved leaves
+		var totalUsedDays float64
+		for _, leave := range approvedLeaves {
+			totalUsedDays += leave.RequestedDays
+		}
+		
+		// Check if requested days + used days exceeds limit
+		if totalUsedDays+requestedDays > float64(*leaveType.LimitAmount) {
+			return fmt.Errorf("%s izin türü için yıllık limitiniz %d gündür. Bu yıl içinde %.1f gün kullanmışsınız. %.1f günden fazla izin girişi yapamazsınız",
+				leaveType.Name,
+				*leaveType.LimitAmount,
+				totalUsedDays,
+				float64(*leaveType.LimitAmount)-totalUsedDays)
+		}
+	}
+
 	// Get all leave balance records for the employee and leave type
 	balances, err := s.leaveBalanceRepo.GetByEmployeeAndLeaveType(employeeID, leaveTypeID)
 	if err != nil {
@@ -881,7 +913,7 @@ func (s *leaveService) GetLeaveTypeByID(id uint) (*types.LeaveTypeResponse, erro
 		Name:               leaveType.Name,
 		Description:        leaveType.Description,
 		IsPaid:             leaveType.IsPaid,
-		IsLimited:          leaveType.IsLimited,
+		LimitAmount:        leaveType.LimitAmount,
 		IsAccrual:          leaveType.IsAccrual,
 		IsRequiredDocument: leaveType.IsRequiredDocument,
 	}, nil
@@ -922,7 +954,7 @@ func (s *leaveService) GetAllLeaveTypes(page, limit int, sortParams types.SortPa
 			Name:               leaveType.Name,
 			Description:        leaveType.Description,
 			IsPaid:             leaveType.IsPaid,
-			IsLimited:          leaveType.IsLimited,
+			LimitAmount:        leaveType.LimitAmount,
 			IsAccrual:          leaveType.IsAccrual,
 			IsRequiredDocument: leaveType.IsRequiredDocument,
 		})
@@ -970,7 +1002,7 @@ func (s *leaveService) UpdateLeaveType(leaveType *domain.LeaveType, userID uint)
 	updatedLeaveType.Name = leaveType.Name
 	updatedLeaveType.Description = leaveType.Description
 	updatedLeaveType.IsPaid = leaveType.IsPaid
-	updatedLeaveType.IsLimited = leaveType.IsLimited
+	updatedLeaveType.LimitAmount = leaveType.LimitAmount
 	updatedLeaveType.IsAccrual = leaveType.IsAccrual
 	updatedLeaveType.IsRequiredDocument = leaveType.IsRequiredDocument
 	updatedLeaveType.ModifiedBy = strconv.FormatUint(uint64(userID), 10)
