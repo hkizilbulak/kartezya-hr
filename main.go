@@ -332,6 +332,7 @@ func main() {
 		reportRoutes := protected.Group("/reports")
 		{
 			reportRoutes.GET("/work-day", authMiddleware.RequireAdmin(), reportHandler.GetWorkDayReport)
+			reportRoutes.GET("/grade", authMiddleware.RequireAdmin(), reportHandler.GetGradeReport)
 		}
 	}
 

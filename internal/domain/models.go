@@ -276,6 +276,8 @@ type Grade struct {
 	AuditableModel
 	Name        string `json:"name" gorm:"not null"`
 	Description string `json:"description"`
+	MinYear     *int   `json:"min_year"`
+	MaxYear     *int   `json:"max_year"`
 
 	// Relationships
 	Employees      []Employee      `json:"employees,omitempty"`

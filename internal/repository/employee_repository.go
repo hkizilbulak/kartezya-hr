@@ -26,6 +26,7 @@ type EmployeeRepository interface {
 	GetEmployeeCountByPosition() ([]interface{}, error)
 	GetEmployeeCountByCompanyDepartment() ([]interface{}, error)
 	GetWorkDayReportData(startDate, endDate string, companyID, departmentID *uint) ([]types.WorkDayReportRow, error)
+	GetGradeReportData(companyID, departmentID *uint) ([]types.GradeReportRow, error)
 }
 
 type employeeRepository struct {
@@ -737,12 +738,12 @@ func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, com
 				CROSS JOIN hr_employees e
 			
 				LEFT JOIN hr_employee_work_information wi
-					ON wi.employee_id = e.id
+					ON wi.employee_id = e.id AND wi.deleted = false
 						AND w.work_date BETWEEN wi.start_date
 						   AND COALESCE(wi.end_date, DATE '9999-12-31')
 			
 				LEFT JOIN hr_leave_requests lr
-					ON lr.employee_id = e.id
+					ON lr.employee_id = e.id AND lr.deleted = false
 						AND w.work_date BETWEEN lr.start_date AND lr.end_date
 						AND lr.status = 'APPROVED'
 			
@@ -820,6 +821,148 @@ func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, com
 			e.leave_date
 		ORDER BY e.id
 	`
+
+	err := r.db.Raw(query, params...).Scan(&rows).Error
+	return rows, err
+}
+
+// GetGradeReportData executes the grade report SQL query
+func (r *employeeRepository) GetGradeReportData(companyID, departmentID *uint) ([]types.GradeReportRow, error) {
+	var rows []types.GradeReportRow
+
+	// Build base query with user-provided SQL
+	query := `
+WITH experience_calc AS (
+    SELECT
+        e.id,
+        e.first_name,
+        e.last_name,
+        e.hire_date,
+        e.profession_start_date,
+        COALESCE(e.total_gap,0) AS total_gap,
+
+        CASE
+            WHEN e.profession_start_date IS NULL THEN 0
+            ELSE
+                (
+                    EXTRACT(YEAR FROM AGE(CURRENT_DATE, e.profession_start_date))
+                        +
+                    EXTRACT(MONTH FROM AGE(CURRENT_DATE, e.profession_start_date)) / 12.0
+                    )
+                    - COALESCE(e.total_gap,0)
+            END AS total_experience,
+
+        -- rapor için text format
+        CASE
+            WHEN e.profession_start_date IS NULL THEN '0 Yıl 0 Ay'
+            ELSE
+                (
+                    (
+                        EXTRACT(YEAR FROM AGE(CURRENT_DATE, e.profession_start_date))
+                        )::int
+                        || ' Yıl '
+                        ||
+                    EXTRACT(MONTH FROM AGE(CURRENT_DATE, e.profession_start_date))::int
+                        || ' Ay'
+                    )
+            END AS total_experience_text
+
+
+    FROM hr_employees e
+    WHERE e.deleted = false
+      AND e.leave_date IS NULL
+),
+
+expected_grade_calc AS (
+    SELECT
+        ec.*,
+        (ec.total_experience + 0.5) AS expected_experience
+    FROM experience_calc ec
+),
+
+expected_grade AS (
+    SELECT
+        egc.*,
+        g.id AS expected_grade_id,
+        g.name AS expected_grade
+    FROM expected_grade_calc egc
+    LEFT JOIN hr_test_grades g
+        ON egc.expected_experience >= g.min_year
+            AND egc.expected_experience < g.max_year
+),
+
+current_grade AS (
+    SELECT
+        eg.employee_id,
+        g.name AS current_grade
+    FROM hr_employee_grades eg
+    LEFT JOIN hr_grades g
+        ON g.id = eg.grade_id
+    WHERE eg.deleted = false
+      AND eg.start_date <= CURRENT_DATE
+      AND (eg.end_date IS NULL OR eg.end_date >= CURRENT_DATE)
+),
+
+team_info AS (
+    SELECT DISTINCT ON (wi.employee_id)
+        wi.employee_id,
+        wi.start_date,
+        wi.company_id,
+        wi.department_id,
+        c.name AS company_name,
+        d.name AS department_name,
+        d.manager
+    FROM hr_employee_work_information wi
+    LEFT JOIN hr_companies c
+        ON c.id = wi.company_id
+    LEFT JOIN hr_departments d
+        ON d.id = wi.department_id
+    WHERE wi.start_date <= CURRENT_DATE
+      AND (wi.end_date IS NULL OR wi.end_date >= CURRENT_DATE)
+    ORDER BY wi.employee_id, wi.start_date DESC
+)
+SELECT
+    e.id,
+    e.first_name,
+    e.last_name,
+    e.hire_date,
+    t.company_name,
+    t.department_name,
+    t.manager,
+    t.start_date AS team_start_date,
+    e.profession_start_date,
+    e.total_gap,
+    e.total_experience_text,
+    cg.current_grade,
+    eg.expected_grade
+
+FROM expected_grade eg
+JOIN experience_calc e ON e.id = eg.id
+LEFT JOIN current_grade cg ON cg.employee_id = e.id
+LEFT JOIN team_info t ON t.employee_id = e.id
+WHERE 1=1`
+
+	// Build dynamic parameters list
+	params := []interface{}{}
+	paramCounter := 1
+
+	// Add company filter if provided
+	if companyID != nil {
+		query += fmt.Sprintf("\n  AND t.company_id = $%d", paramCounter)
+		params = append(params, *companyID)
+		paramCounter++
+	}
+
+	// Add department filter if provided
+	if departmentID != nil {
+		query += fmt.Sprintf("\n  AND t.department_id = $%d", paramCounter)
+		params = append(params, *departmentID)
+		paramCounter++
+	}
+
+	// Complete the query
+	query += `
+ORDER BY e.id`
 
 	err := r.db.Raw(query, params...).Scan(&rows).Error
 	return rows, err

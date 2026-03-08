@@ -43,7 +43,6 @@ func (h *ReportHandler) GetWorkDayReport(c *gin.Context) {
 	endDateStr := c.Query("end_date")
 	companyIDStr := c.Query("company_id")
 	departmentIDStr := c.Query("department_id")
-	isActiveStr := c.DefaultQuery("is_active", "true")
 
 	// Parse dates
 	startDate, err := time.Parse("2006-01-02", startDateStr)
@@ -81,20 +80,69 @@ func (h *ReportHandler) GetWorkDayReport(c *gin.Context) {
 		departmentID = &uid
 	}
 
-	// Parse isActive flag
-	isActive := isActiveStr == "true" || isActiveStr == "1"
-
 	// Create filter
 	filter := &types.WorkDayReportFilter{
 		StartDate:    startDate,
 		EndDate:      endDate,
 		CompanyID:    companyID,
 		DepartmentID: departmentID,
-		IsActive:     isActive,
 	}
 
 	// Get report
 	report, err := h.reportService.GetWorkDayReport(filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, report)
+}
+
+// GetGradeReport godoc
+// @Summary Get grade distribution report
+// @Description Get employee count grouped by grade with optional company and department filters (Admin only)
+// @Tags reports
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param company_id query int false "Filter by company ID"
+// @Param department_id query int false "Filter by department ID"
+// @Success 200 {object} map[string]interface{} "success: true, data: []GradeReportRow"
+// @Failure 401 {object} map[string]interface{}
+// @Failure 403 {object} map[string]interface{}
+// @Router /reports/grade [get]
+func (h *ReportHandler) GetGradeReport(c *gin.Context) {
+	companyIDStr := c.Query("company_id")
+	departmentIDStr := c.Query("department_id")
+
+	var companyID *uint
+	if companyIDStr != "" {
+		id, err := strconv.ParseUint(companyIDStr, 10, 32)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid company_id"})
+			return
+		}
+		uid := uint(id)
+		companyID = &uid
+	}
+
+	var departmentID *uint
+	if departmentIDStr != "" {
+		id, err := strconv.ParseUint(departmentIDStr, 10, 32)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid department_id"})
+			return
+		}
+		uid := uint(id)
+		departmentID = &uid
+	}
+
+	filter := &types.GradeReportFilter{
+		CompanyID:    companyID,
+		DepartmentID: departmentID,
+	}
+
+	report, err := h.reportService.GetGradeReportData(filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

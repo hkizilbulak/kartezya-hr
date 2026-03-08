@@ -331,7 +331,6 @@ type WorkDayReportFilter struct {
 	EndDate      time.Time `json:"end_date"`
 	CompanyID    *uint     `json:"company_id"`
 	DepartmentID *uint     `json:"department_id"`
-	IsActive     bool      `json:"is_active"`
 }
 
 // WorkDayReportRow represents a single row in the work day report
@@ -431,4 +430,32 @@ type PaginatedResponse struct {
 	Limit   int         `json:"limit"`
 	Total   int64       `json:"total"`
 	Pages   int         `json:"pages"`
+}
+
+// GradeReportFilter represents the filter criteria for grade report
+type GradeReportFilter struct {
+	CompanyID    *uint `json:"company_id"`
+	DepartmentID *uint `json:"department_id"`
+}
+
+// GradeReportRow represents a single row in the grade report
+type GradeReportRow struct {
+	ID                  uint    `json:"id"`
+	FirstName           string  `json:"first_name"`
+	LastName            string  `json:"last_name"`
+	HireDate            *string `json:"hire_date"`
+	CompanyName         string  `json:"company_name"`
+	DepartmentName      string  `json:"department_name"`
+	Manager             string  `json:"manager"`
+	TeamStartDate       *string `json:"team_start_date"`
+	ProfessionStartDate *string `json:"profession_start_date"`
+	TotalGap            float64 `json:"total_gap"`
+	TotalExperienceText string  `json:"total_experience_text"`
+	CurrentGrade        string  `json:"current_grade"`
+	ExpectedGrade       string  `json:"expected_grade"`
+}
+
+// GradeReportResponse represents the complete grade report response
+type GradeReportResponse struct {
+	Rows []GradeReportRow `json:"rows"`
 }
