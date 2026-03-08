@@ -165,7 +165,7 @@ type LeaveType struct {
 	Name               string `json:"name" gorm:"not null"`
 	Description        string `json:"description"`
 	IsPaid             bool   `json:"is_paid" gorm:"not null"`
-	IsLimited          bool   `json:"is_limited" gorm:"not null"`
+	LimitAmount        *int   `json:"limit_amount" gorm:"default:null"`
 	IsAccrual          bool   `json:"is_accrual" gorm:"not null"`
 	IsRequiredDocument bool   `json:"is_required_document" gorm:"not null"`
 
@@ -276,6 +276,8 @@ type Grade struct {
 	AuditableModel
 	Name        string `json:"name" gorm:"not null"`
 	Description string `json:"description"`
+	MinYear     *int   `json:"min_year"`
+	MaxYear     *int   `json:"max_year"`
 
 	// Relationships
 	Employees      []Employee      `json:"employees,omitempty"`
