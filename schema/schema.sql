@@ -169,7 +169,7 @@ CREATE TABLE IF NOT EXISTS hr_leave_types (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     is_paid BOOLEAN NOT NULL DEFAULT false,
-    is_limited BOOLEAN NOT NULL DEFAULT false,
+    limit_amount INTEGER NULL,
     is_accrual BOOLEAN NOT NULL DEFAULT false,
     is_required_document BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
