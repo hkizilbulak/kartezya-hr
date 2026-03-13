@@ -9,8 +9,9 @@ type CompanyLookup struct {
 }
 
 type LeaveTypeLookup struct {
-	ID   uint   `json:"id"`
-	Name string `json:"name"`
+	ID          uint   `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 // Grade response DTO
