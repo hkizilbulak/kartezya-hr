@@ -395,6 +395,7 @@ func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeDetai
 		Roles:                    roleNames,
 		WorkInformation:          workInfoList,
 		Status:                   employee.Status,
+		Status:                   employee.Status,
 	}, nil
 }
 
@@ -426,6 +427,39 @@ func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName
 		existingUser.Email = companyEmail
 		if err := s.userRepo.Update(existingUser, modifiedBy); err != nil {
 			return fmt.Errorf("failed to update user email: %v", err)
+		}
+	}
+
+	// Check if company email has changed and if new email already exists
+	if existingEmployee.CompanyEmail != companyEmail {
+		existingEmailEmployee, err := s.employeeRepo.GetByCompanyEmail(companyEmail)
+		if err != nil {
+			return fmt.Errorf("failed to check company email: %w", err)
+		}
+		if existingEmailEmployee != nil && existingEmailEmployee.ID != id {
+			return fmt.Errorf("Bu şirket e-posta adresine sahip aktif çalışan var")
+		}
+	}
+
+	// Check if identity number has changed and if new identity number already exists
+	if existingEmployee.IdentityNo != identityNo && identityNo != "" {
+		existingIdentityEmployee, err := s.employeeRepo.GetByIdentityNo(identityNo)
+		if err != nil {
+			return fmt.Errorf("failed to check identity number: %w", err)
+		}
+		if existingIdentityEmployee != nil && existingIdentityEmployee.ID != id {
+			return fmt.Errorf("Bu kimlik numarasına sahip aktif çalışan var")
+		}
+	}
+
+	// Check if phone number has changed and if new phone number already exists
+	if existingEmployee.Phone != phone && phone != "" {
+		existingPhoneEmployee, err := s.employeeRepo.GetByPhone(phone)
+		if err != nil {
+			return fmt.Errorf("failed to check phone number: %w", err)
+		}
+		if existingPhoneEmployee != nil && existingPhoneEmployee.ID != id {
+			return fmt.Errorf("Bu telefon numarasına sahip aktif çalışan var")
 		}
 	}
 

@@ -135,6 +135,8 @@ definitions:
         type: string
       state:
         type: string
+      status:
+        type: string
       total_gap:
         type: number
       updated_at:
@@ -145,6 +147,35 @@ definitions:
         description: Relationships
       user_id:
         type: integer
+    type: object
+  domain.EmployeeGrade:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      employee:
+        allOf:
+        - $ref: '#/definitions/domain.Employee'
+        description: Relationships
+      employee_id:
+        type: integer
+      end_date:
+        type: string
+      grade:
+        $ref: '#/definitions/domain.Grade'
+      grade_id:
+        type: integer
+      id:
+        type: integer
+      modified_by:
+        type: string
+      start_date:
+        type: string
+      updated_at:
+        type: string
     type: object
   domain.EmployeeWorkInformation:
     properties:
@@ -197,12 +228,20 @@ definitions:
         type: boolean
       description:
         type: string
+      employee_grades:
+        items:
+          $ref: '#/definitions/domain.EmployeeGrade'
+        type: array
       employees:
         description: Relationships
         items:
           $ref: '#/definitions/domain.Employee'
         type: array
       id:
+        type: integer
+      max_year:
+        type: integer
+      min_year:
         type: integer
       modified_by:
         type: string
@@ -371,8 +410,6 @@ definitions:
         type: integer
       is_accrual:
         type: boolean
-      is_limited:
-        type: boolean
       is_paid:
         type: boolean
       is_required_document:
@@ -386,6 +423,8 @@ definitions:
         items:
           $ref: '#/definitions/domain.LeaveRequest'
         type: array
+      limit_amount:
+        type: integer
       modified_by:
         type: string
       name:
@@ -557,6 +596,35 @@ definitions:
     - company_id
     - name
     type: object
+  handler.CreateEmployeeContractRequest:
+    properties:
+      contract_no:
+        type: string
+      employee_id:
+        type: integer
+      end_date:
+        type: string
+      start_date:
+        type: string
+    required:
+    - employee_id
+    - start_date
+    type: object
+  handler.CreateEmployeeGradeRequest:
+    properties:
+      employee_id:
+        type: integer
+      end_date:
+        type: string
+      grade_id:
+        type: integer
+      start_date:
+        type: string
+    required:
+    - employee_id
+    - grade_id
+    - start_date
+    type: object
   handler.CreateEmployeeRequest:
     properties:
       address:
@@ -664,12 +732,12 @@ definitions:
         type: string
       is_accrual:
         type: boolean
-      is_limited:
-        type: boolean
       is_paid:
         type: boolean
       is_required_document:
         type: boolean
+      limit_amount:
+        type: integer
       name:
         type: string
     required:
@@ -824,6 +892,35 @@ definitions:
     - company_id
     - name
     type: object
+  handler.UpdateEmployeeContractRequest:
+    properties:
+      contract_no:
+        type: string
+      employee_id:
+        type: integer
+      end_date:
+        type: string
+      start_date:
+        type: string
+    required:
+    - employee_id
+    - start_date
+    type: object
+  handler.UpdateEmployeeGradeRequest:
+    properties:
+      employee_id:
+        type: integer
+      end_date:
+        type: string
+      grade_id:
+        type: integer
+      start_date:
+        type: string
+    required:
+    - employee_id
+    - grade_id
+    - start_date
+    type: object
   handler.UpdateEmployeeRequest:
     properties:
       address:
@@ -879,6 +976,8 @@ definitions:
           type: string
         type: array
       state:
+        type: string
+      status:
         type: string
       total_gap:
         type: number
@@ -1150,6 +1249,82 @@ definitions:
       updated_at:
         type: string
     type: object
+  types.EmployeeContractResponse:
+    properties:
+      contract_no:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      employee:
+        $ref: '#/definitions/types.EmployeeLookup'
+      end_date:
+        type: string
+      id:
+        type: integer
+      modified_by:
+        type: string
+      start_date:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  types.EmployeeContractWithNames:
+    properties:
+      contract_no:
+        type: string
+      employee_name:
+        type: string
+      end_date:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      start_date:
+        type: string
+    type: object
+  types.EmployeeGradeResponse:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      employee:
+        $ref: '#/definitions/types.EmployeeLookup'
+      end_date:
+        type: string
+      grade:
+        $ref: '#/definitions/types.GradeLookup'
+      id:
+        type: integer
+      modified_by:
+        type: string
+      start_date:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  types.EmployeeGradeWithNames:
+    properties:
+      employee_name:
+        type: string
+      end_date:
+        type: string
+      grade_name:
+        type: string
+      id:
+        type: integer
+      is_current_grade:
+        type: boolean
+      start_date:
+        type: string
+    type: object
   types.EmployeeLookup:
     properties:
       first_name:
@@ -1194,6 +1369,8 @@ definitions:
     type: object
   types.LeaveTypeLookup:
     properties:
+      description:
+        type: string
       id:
         type: integer
       name:
@@ -1213,12 +1390,12 @@ definitions:
         type: integer
       is_accrual:
         type: boolean
-      is_limited:
-        type: boolean
       is_paid:
         type: boolean
       is_required_document:
         type: boolean
+      limit_amount:
+        type: integer
       modified_by:
         type: string
       name:
@@ -1288,15 +1465,21 @@ definitions:
         type: string
       first_name:
         type: string
-      holiday_days:
-        type: number
+      hire_date:
+        type: string
       id:
         type: integer
       identity_no:
         type: string
       last_name:
         type: string
+      leave_date:
+        type: string
       manager:
+        type: string
+      team_end_date:
+        type: string
+      team_start_date:
         type: string
       used_leave_days:
         type: number
@@ -2189,6 +2372,490 @@ paths:
       summary: Update department
       tags:
       - departments
+  /employee-contracts:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated list of all employee contracts (Admin only)
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10)'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Sort field (default: id)'
+        in: query
+        name: sort
+        type: string
+      - description: 'Sort direction (default: ASC)'
+        in: query
+        name: direction
+        type: string
+      - description: Filter by employee ID
+        in: query
+        name: employee_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.EmployeeContractResponse'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List employee contracts
+      tags:
+      - employee-contracts
+    post:
+      consumes:
+      - application/json
+      description: Create employee contract record (Admin only)
+      parameters:
+      - description: Employee contract data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateEmployeeContractRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.EmployeeContractResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create employee contract
+      tags:
+      - employee-contracts
+  /employee-contracts/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete employee contract by ID (Admin only)
+      parameters:
+      - description: Employee Contract ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete employee contract
+      tags:
+      - employee-contracts
+    get:
+      consumes:
+      - application/json
+      description: Get specific employee contract by ID
+      parameters:
+      - description: Employee Contract ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.EmployeeContractResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get employee contract by ID
+      tags:
+      - employee-contracts
+    put:
+      consumes:
+      - application/json
+      description: Update employee contract by ID (Admin only)
+      parameters:
+      - description: Employee Contract ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated employee contract data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateEmployeeContractRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.EmployeeContractResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update employee contract
+      tags:
+      - employee-contracts
+  /employee-contracts/me:
+    get:
+      consumes:
+      - application/json
+      description: Get employee contracts for the authenticated employee
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.EmployeeContractWithNames'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my employee contracts
+      tags:
+      - employee-contracts
+  /employee-grades:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated list of all employee grades (Admin only)
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10)'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Sort field (default: id)'
+        in: query
+        name: sort
+        type: string
+      - description: 'Sort direction (default: ASC)'
+        in: query
+        name: direction
+        type: string
+      - description: Filter by employee ID
+        in: query
+        name: employee_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.EmployeeGradeResponse'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List employee grades
+      tags:
+      - employee-grades
+    post:
+      consumes:
+      - application/json
+      description: Create employee grade record (Admin only)
+      parameters:
+      - description: Employee grade data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateEmployeeGradeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.EmployeeGradeResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create employee grade
+      tags:
+      - employee-grades
+  /employee-grades/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete employee grade by ID (Admin only)
+      parameters:
+      - description: Employee Grade ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete employee grade
+      tags:
+      - employee-grades
+    get:
+      consumes:
+      - application/json
+      description: Get specific employee grade by ID
+      parameters:
+      - description: Employee Grade ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.EmployeeGradeResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get employee grade by ID
+      tags:
+      - employee-grades
+    put:
+      consumes:
+      - application/json
+      description: Update employee grade by ID (Admin only)
+      parameters:
+      - description: Employee Grade ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated employee grade data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateEmployeeGradeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.EmployeeGradeResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update employee grade
+      tags:
+      - employee-grades
+  /employee-grades/me:
+    get:
+      consumes:
+      - application/json
+      description: Get employee grades for the authenticated employee
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/types.EmployeeGradeWithNames'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my employee grades
+      tags:
+      - employee-grades
   /employees:
     get:
       consumes:
@@ -3693,6 +4360,44 @@ paths:
       summary: Get all leave types for lookup
       tags:
       - Lookup
+  /reports/grade:
+    get:
+      consumes:
+      - application/json
+      description: Get employee count grouped by grade with optional company and department
+        filters (Admin only)
+      parameters:
+      - description: Filter by company ID
+        in: query
+        name: company_id
+        type: integer
+      - description: Filter by department ID
+        in: query
+        name: department_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'success: true, data: []GradeReportRow'
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get grade distribution report
+      tags:
+      - reports
   /reports/work-day:
     get:
       consumes:

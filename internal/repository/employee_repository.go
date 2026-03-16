@@ -213,6 +213,46 @@ func (r *employeeRepository) GetAllWithFilters(limit, offset int, sortParams typ
 			query = query.Where(fmt.Sprintf("LOWER(%s.manager) LIKE LOWER(?)", domain.GetTableName("hr_departments")), "%"+fmt.Sprintf("%v", manager)+"%")
 		}
 
+		// Department IDs filter - only if company_id is provided (since we need the JOINs)
+		if departmentIDs, ok := filters["department_ids"]; ok {
+			if departmentIDSlice, ok := departmentIDs.([]int); ok && len(departmentIDSlice) > 0 {
+				// If company_id was not provided, we need to add the JOINs
+				if _, hasCompany := filters["company_id"]; !hasCompany {
+					query = query.Joins(fmt.Sprintf(`JOIN %s ON %s.employee_id = %s.id AND %s.deleted = false`,
+						domain.GetTableName("hr_employee_work_information"),
+						domain.GetTableName("hr_employee_work_information"),
+						domain.GetTableName("hr_employees"),
+						domain.GetTableName("hr_employee_work_information"))).
+						Joins(fmt.Sprintf("JOIN %s ON %s.id = %s.department_id AND %s.deleted = false",
+							domain.GetTableName("hr_departments"),
+							domain.GetTableName("hr_departments"),
+							domain.GetTableName("hr_employee_work_information"),
+							domain.GetTableName("hr_departments")))
+				}
+				query = query.Where(fmt.Sprintf("%s.department_id IN ?", domain.GetTableName("hr_employee_work_information")), departmentIDSlice)
+			}
+		}
+
+		// Manager filter - needs department JOIN
+		if manager, ok := filters["manager"]; ok {
+			// If we haven't added JOINs yet, add them now
+			if _, hasCompany := filters["company_id"]; !hasCompany {
+				if _, hasDepartmentIDs := filters["department_ids"]; !hasDepartmentIDs {
+					query = query.Joins(fmt.Sprintf(`JOIN %s ON %s.employee_id = %s.id AND %s.deleted = false`,
+						domain.GetTableName("hr_employee_work_information"),
+						domain.GetTableName("hr_employee_work_information"),
+						domain.GetTableName("hr_employees"),
+						domain.GetTableName("hr_employee_work_information"))).
+						Joins(fmt.Sprintf("JOIN %s ON %s.id = %s.department_id AND %s.deleted = false",
+							domain.GetTableName("hr_departments"),
+							domain.GetTableName("hr_departments"),
+							domain.GetTableName("hr_employee_work_information"),
+							domain.GetTableName("hr_departments")))
+				}
+			}
+			query = query.Where(fmt.Sprintf("LOWER(%s.manager) LIKE LOWER(?)", domain.GetTableName("hr_departments")), "%"+fmt.Sprintf("%v", manager)+"%")
+		}
+
 		if status, ok := filters["status"]; ok {
 			query = query.Where(fmt.Sprintf("%s.status = ?", domain.GetTableName("hr_employees")), status)
 		}
@@ -237,6 +277,92 @@ func (r *employeeRepository) GetAllWithFilters(limit, offset int, sortParams typ
 	// Log the final SQL query using GORM's Statement.SQL.String()
 	sql := query.Statement.SQL.String()
 	fmt.Printf("Final SQL Query: %s\n", sql)
+
+	// Count total records with same filters applied
+	// Create a new query with same base conditions and filters
+	countQuery := r.db.Model(&domain.Employee{}).
+		Where(fmt.Sprintf("%s.deleted = ?", domain.GetTableName("hr_employees")), false)
+
+	// Apply same filters to count query
+	if filters != nil {
+		if id, ok := filters["id"]; ok {
+			countQuery = countQuery.Where(fmt.Sprintf("%s.id = ?", domain.GetTableName("hr_employees")), id)
+		}
+		if firstName, ok := filters["first_name"]; ok {
+			countQuery = countQuery.Where(fmt.Sprintf("LOWER(%s.first_name) LIKE LOWER(?)", domain.GetTableName("hr_employees")), "%"+fmt.Sprintf("%v", firstName)+"%")
+		}
+		if email, ok := filters["email"]; ok {
+			emailStr := fmt.Sprintf("%v", email)
+			countQuery = countQuery.Where(fmt.Sprintf("LOWER(%s.email) LIKE LOWER(?) OR LOWER(%s.company_email) LIKE LOWER(?)", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), "%"+emailStr+"%", "%"+emailStr+"%")
+		}
+		if companyID, ok := filters["company_id"]; ok {
+			countQuery = countQuery.Joins(fmt.Sprintf(`JOIN %s ON %s.employee_id = %s.id AND %s.deleted = false`,
+				domain.GetTableName("hr_employee_work_information"),
+				domain.GetTableName("hr_employee_work_information"),
+				domain.GetTableName("hr_employees"),
+				domain.GetTableName("hr_employee_work_information"))).
+				Joins(fmt.Sprintf("JOIN %s ON %s.id = %s.department_id AND %s.deleted = false",
+					domain.GetTableName("hr_departments"),
+					domain.GetTableName("hr_departments"),
+					domain.GetTableName("hr_employee_work_information"),
+					domain.GetTableName("hr_departments"))).
+				Where(fmt.Sprintf("%s.company_id = ?", domain.GetTableName("hr_departments")), companyID)
+		}
+		// Department IDs filter for count query
+		if departmentIDs, ok := filters["department_ids"]; ok {
+			if departmentIDSlice, ok := departmentIDs.([]int); ok && len(departmentIDSlice) > 0 {
+				if _, hasCompany := filters["company_id"]; !hasCompany {
+					countQuery = countQuery.Joins(fmt.Sprintf(`JOIN %s ON %s.employee_id = %s.id AND %s.deleted = false`,
+						domain.GetTableName("hr_employee_work_information"),
+						domain.GetTableName("hr_employee_work_information"),
+						domain.GetTableName("hr_employees"),
+						domain.GetTableName("hr_employee_work_information"))).
+						Joins(fmt.Sprintf("JOIN %s ON %s.id = %s.department_id AND %s.deleted = false",
+							domain.GetTableName("hr_departments"),
+							domain.GetTableName("hr_departments"),
+							domain.GetTableName("hr_employee_work_information"),
+							domain.GetTableName("hr_departments")))
+				}
+				countQuery = countQuery.Where(fmt.Sprintf("%s.department_id IN ?", domain.GetTableName("hr_employee_work_information")), departmentIDSlice)
+			}
+		}
+		// Manager filter for count query
+		if manager, ok := filters["manager"]; ok {
+			if _, hasCompany := filters["company_id"]; !hasCompany {
+				if _, hasDepartmentIDs := filters["department_ids"]; !hasDepartmentIDs {
+					countQuery = countQuery.Joins(fmt.Sprintf(`JOIN %s ON %s.employee_id = %s.id AND %s.deleted = false`,
+						domain.GetTableName("hr_employee_work_information"),
+						domain.GetTableName("hr_employee_work_information"),
+						domain.GetTableName("hr_employees"),
+						domain.GetTableName("hr_employee_work_information"))).
+						Joins(fmt.Sprintf("JOIN %s ON %s.id = %s.department_id AND %s.deleted = false",
+							domain.GetTableName("hr_departments"),
+							domain.GetTableName("hr_departments"),
+							domain.GetTableName("hr_employee_work_information"),
+							domain.GetTableName("hr_departments")))
+				}
+			}
+			countQuery = countQuery.Where(fmt.Sprintf("LOWER(%s.manager) LIKE LOWER(?)", domain.GetTableName("hr_departments")), "%"+fmt.Sprintf("%v", manager)+"%")
+		}
+		if status, ok := filters["status"]; ok {
+			countQuery = countQuery.Where(fmt.Sprintf("%s.status = ?", domain.GetTableName("hr_employees")), status)
+		}
+		if identityNo, ok := filters["identity_no"]; ok {
+			countQuery = countQuery.Where(fmt.Sprintf("%s.identity_no = ?", domain.GetTableName("hr_employees")), identityNo)
+		}
+		if gender, ok := filters["gender"]; ok {
+			countQuery = countQuery.Where(fmt.Sprintf("%s.gender = ?", domain.GetTableName("hr_employees")), gender)
+		}
+		if maritalStatus, ok := filters["marital_status"]; ok {
+			countQuery = countQuery.Where(fmt.Sprintf("%s.marital_status = ?", domain.GetTableName("hr_employees")), maritalStatus)
+		}
+		if gradeID, ok := filters["grade_id"]; ok {
+			countQuery = countQuery.Where(fmt.Sprintf("%s.grade_id = ?", domain.GetTableName("hr_employees")), gradeID)
+		}
+	}
+
+	// Get the count
+	countQuery.Count(&total)
 
 	// Count total records with same filters applied
 	// Create a new query with same base conditions and filters
@@ -400,6 +526,11 @@ func (r *employeeRepository) GetTotalCountWithFilters(filters map[string]interfa
 		// Marital status filter
 		if maritalStatus, ok := filters["marital_status"]; ok {
 			query = query.Where(fmt.Sprintf("%s.marital_status = ?", domain.GetTableName("hr_employees")), maritalStatus)
+		}
+
+		// Status filter (ACTIVE/PASSIVE)
+		if status, ok := filters["status"]; ok {
+			query = query.Where(fmt.Sprintf("%s.status = ?", domain.GetTableName("hr_employees")), status)
 		}
 
 		// Status filter (ACTIVE/PASSIVE)
@@ -604,6 +735,7 @@ func (r *employeeRepository) GetEmployeeCountByGender() ([]interface{}, error) {
 	var results []GenderCount
 	err := r.db.Model(&domain.Employee{}).
 		Where("deleted = ? AND status = ?", false, "ACTIVE").
+		Where("deleted = ? AND status = ?", false, "ACTIVE").
 		Group("gender").
 		Select("gender, COUNT(*) as count").
 		Order("count DESC").
@@ -638,6 +770,7 @@ func (r *employeeRepository) GetEmployeeCountByPosition() ([]interface{}, error)
 			domain.GetTableName("hr_job_positions"),
 			domain.GetTableName("hr_job_positions"),
 			domain.GetTableName("hr_employee_work_information"))).
+		Where(fmt.Sprintf("%s.deleted = ? AND %s.status = ?", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), false, "ACTIVE").
 		Where(fmt.Sprintf("%s.deleted = ? AND %s.status = ?", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), false, "ACTIVE").
 		Group(fmt.Sprintf("%s.title", domain.GetTableName("hr_job_positions"))).
 		Select(fmt.Sprintf("%s.title as position_title, COUNT(*) as count", domain.GetTableName("hr_job_positions"))).
@@ -678,6 +811,7 @@ func (r *employeeRepository) GetEmployeeCountByCompanyDepartment() ([]interface{
 			domain.GetTableName("hr_companies"),
 			domain.GetTableName("hr_companies"),
 			domain.GetTableName("hr_departments"))).
+		Where(fmt.Sprintf("%s.deleted = ? AND %s.status = ?", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), false, "ACTIVE").
 		Where(fmt.Sprintf("%s.deleted = ? AND %s.status = ?", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), false, "ACTIVE").
 		Group(fmt.Sprintf("%s.name, %s.name", domain.GetTableName("hr_companies"), domain.GetTableName("hr_departments"))).
 		Select(fmt.Sprintf("%s.name as company_name, %s.name as department_name, COUNT(*) as count",

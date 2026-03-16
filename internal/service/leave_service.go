@@ -1072,8 +1072,18 @@ func (s *leaveService) CalculateWorkingDays(startDate, endDate time.Time, isStar
 			// Apply half-day rules for start and end dates
 			if currentDate.Equal(startDate) && !isStartDateFullDay {
 				dayValue = 0.5
-			} else if currentDate.Equal(endDate) && !isFinishDateFullDay {
-				dayValue = 0.5
+			}
+
+			// Check end date separately (not else-if to handle same-day leaves)
+			if currentDate.Equal(endDate) && !isFinishDateFullDay {
+				// If start and end are the same day and both are half-day
+				if currentDate.Equal(startDate) && !isStartDateFullDay {
+					// Same day, both half-day = 0.5 total (not 1.0)
+					dayValue = 0.5
+				} else {
+					// Different days or only end date is half-day
+					dayValue = 0.5
+				}
 			}
 
 			// Count the day value (could be 1.0 or 0.5)
