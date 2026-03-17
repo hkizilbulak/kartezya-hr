@@ -395,7 +395,6 @@ func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeDetai
 		Roles:                    roleNames,
 		WorkInformation:          workInfoList,
 		Status:                   employee.Status,
-		Status:                   employee.Status,
 	}, nil
 }
 

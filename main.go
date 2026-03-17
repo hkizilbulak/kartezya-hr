@@ -9,6 +9,7 @@ import (
 	"kartezya-hr/internal/database"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/handler"
+	"kartezya-hr/internal/jobs"
 	"kartezya-hr/internal/middleware"
 	"kartezya-hr/internal/repository"
 	"kartezya-hr/internal/service"
@@ -55,6 +56,11 @@ func main() {
 	if err := db.Migrate(); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
+
+	// Initialize and start scheduled jobs
+	scheduler := jobs.NewScheduler(db.DB)
+	scheduler.Start()
+	defer scheduler.Stop()
 
 	// Seed database with default data
 	/*if err := seedDatabase(db); err != nil {
