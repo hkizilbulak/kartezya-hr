@@ -25,6 +25,10 @@ const (
 	LeaveTypeSick   = "sick"
 )
 
+var (
+	ErrLeaveTypeLimitExceeded = errors.New("leave type limit exceeded")
+)
+
 type LeaveService interface {
 	// Leave methods
 	CreateLeave(leave *domain.LeaveRequest, userID uint, isAdmin bool) error
@@ -700,11 +704,13 @@ func (s *leaveService) ValidateLeaveBalance(employeeID, leaveTypeID uint, reques
 		
 		// Check if requested days + used days exceeds limit
 		if totalUsedDays+requestedDays > float64(*leaveType.LimitAmount) {
-			return fmt.Errorf("%s izin türü için yıllık limitiniz %d gündür. Bu yıl içinde %.1f gün kullanmışsınız. %.1f günden fazla izin girişi yapamazsınız",
+			remainingLimit := float64(*leaveType.LimitAmount) - totalUsedDays
+			return fmt.Errorf("%w: %s izin türü için yıllık limitiniz %d gündür. Bu yıl içinde %.1f gün kullanmışsınız. En fazla %.1f gün izin girişi yapabilirsiniz",
+				ErrLeaveTypeLimitExceeded,
 				leaveType.Name,
 				*leaveType.LimitAmount,
 				totalUsedDays,
-				float64(*leaveType.LimitAmount)-totalUsedDays)
+				remainingLimit)
 		}
 	}
 
