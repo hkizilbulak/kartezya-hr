@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -459,7 +460,8 @@ func (h *LeaveHandler) CreateLeaveRequest(c *gin.Context) {
 		status := http.StatusInternalServerError
 		// Check for balance validation errors
 		if strings.Contains(err.Error(), "insufficient leave balance") ||
-			strings.Contains(err.Error(), "no leave balance found") {
+			strings.Contains(err.Error(), "no leave balance found") ||
+			errors.Is(err, service.ErrLeaveTypeLimitExceeded) {
 			status = http.StatusBadRequest
 		}
 		c.JSON(status, gin.H{
