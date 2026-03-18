@@ -61,6 +61,7 @@ type LeaveService interface {
 
 	// Working days calculation
 	CalculateWorkingDays(startDate, endDate time.Time, isStartDateFullDay, isFinishDateFullDay bool) (float64, error)
+	CalculateEndDate(startDate time.Time, requestedDays float64, isStartDateFullDay, isFinishDateFullDay bool) (time.Time, error)
 }
 
 type leaveService struct {
@@ -1189,4 +1190,35 @@ func (s *leaveService) CalculateWorkingDays(startDate, endDate time.Time, isStar
 	}
 
 	return workingDays, nil
+}
+
+// CalculateEndDate calculates the end date given a start date and requested working days
+func (s *leaveService) CalculateEndDate(startDate time.Time, requestedDays float64, isStartDateFullDay, isFinishDateFullDay bool) (time.Time, error) {
+	if requestedDays <= 0 {
+		return time.Time{}, errors.New("requested days must be greater than 0")
+	}
+
+	currentDate := time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, startDate.Location())
+	
+	for {
+		days, err := s.CalculateWorkingDays(startDate, currentDate, isStartDateFullDay, isFinishDateFullDay)
+		if err != nil {
+			return time.Time{}, err
+		}
+		
+		if days == requestedDays {
+			return currentDate, nil
+		}
+		
+		if days > requestedDays {
+			return time.Time{}, errors.New("impossible to reach exactly the requested days with the given full/half day settings")
+		}
+
+		currentDate = currentDate.AddDate(0, 0, 1)
+
+		// Hard limit to prevent infinite loops (e.g. searching for 1000 days or due to zero progress)
+		if currentDate.Sub(startDate).Hours() > 24*365*10 {
+			return time.Time{}, errors.New("requested days too large or calculation loop exceeded limit")
+		}
+	}
 }

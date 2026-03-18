@@ -64,10 +64,11 @@ type CancelLeaveRequest struct {
 }
 
 type CalculateWorkingDaysRequest struct {
-	StartDate           time.Time `json:"start_date" binding:"required"`
-	EndDate             time.Time `json:"end_date" binding:"required"`
-	IsStartDateFullDay  bool      `json:"is_start_date_full_day" binding:""`
-	IsFinishDateFullDay bool      `json:"is_finish_date_full_day" binding:""`
+	StartDate           time.Time  `json:"start_date" binding:"required"`
+	EndDate             *time.Time `json:"end_date"`
+	RequestedDays       *float64   `json:"requested_days"`
+	IsStartDateFullDay  bool       `json:"is_start_date_full_day"`
+	IsFinishDateFullDay bool       `json:"is_finish_date_full_day"`
 }
 
 type CalculateWorkingDaysResponse struct {
@@ -1152,17 +1153,36 @@ func (h *LeaveHandler) CalculateWorkingDays(c *gin.Context) {
 		return
 	}
 
-	// Validate dates
-	if req.StartDate.After(req.EndDate) {
+	// Validate inputs
+	if req.EndDate == nil && req.RequestedDays == nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"error":   "Start date must be before or equal to end date",
+			"error":   "Either end_date or requested_days must be provided",
 		})
 		return
 	}
 
-	// Calculate working days using service
-	workingDays, err := h.leaveService.CalculateWorkingDays(req.StartDate, req.EndDate, req.IsStartDateFullDay, req.IsFinishDateFullDay)
+	var workingDays float64
+	var endDate time.Time
+	var err error
+
+	if req.EndDate != nil {
+		endDate = *req.EndDate
+		if req.StartDate.After(endDate) {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error":   "Start date must be before or equal to end date",
+			})
+			return
+		}
+
+		// Calculate working days using service
+		workingDays, err = h.leaveService.CalculateWorkingDays(req.StartDate, endDate, req.IsStartDateFullDay, req.IsFinishDateFullDay)
+	} else if req.RequestedDays != nil {
+		workingDays = *req.RequestedDays
+		endDate, err = h.leaveService.CalculateEndDate(req.StartDate, workingDays, req.IsStartDateFullDay, req.IsFinishDateFullDay)
+	}
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -1172,13 +1192,13 @@ func (h *LeaveHandler) CalculateWorkingDays(c *gin.Context) {
 	}
 
 	// Calculate calendar days
-	calendarDays := int(req.EndDate.Sub(req.StartDate).Hours()/24) + 1
+	calendarDays := int(endDate.Sub(req.StartDate).Hours()/24) + 1
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": CalculateWorkingDaysResponse{
 			StartDate:    req.StartDate,
-			EndDate:      req.EndDate,
+			EndDate:      endDate,
 			WorkingDays:  workingDays,
 			CalendarDays: calendarDays,
 		},
