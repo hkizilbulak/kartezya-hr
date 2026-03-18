@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/types"
+	"strings"
 
 	"gorm.io/gorm"
 )
@@ -35,6 +36,22 @@ type employeeRepository struct {
 
 func NewEmployeeRepository(db *gorm.DB) EmployeeRepository {
 	return &employeeRepository{db: db}
+}
+
+func normalizeFilterValue(value interface{}) string {
+	trimmed := strings.TrimSpace(fmt.Sprintf("%v", value))
+	if trimmed == "" || strings.EqualFold(trimmed, "null") || strings.EqualFold(trimmed, "undefined") {
+		return ""
+	}
+	return trimmed
+}
+
+func normalizedLikePattern(value interface{}) string {
+	normalized := normalizeFilterValue(value)
+	if normalized == "" {
+		return ""
+	}
+	return "%" + normalized + "%"
 }
 
 func (r *employeeRepository) Create(employee *domain.Employee, createdBy string) error {
@@ -146,17 +163,59 @@ func (r *employeeRepository) GetAllWithFilters(limit, offset int, sortParams typ
 
 	// Apply filters
 	if filters != nil {
-		if id, ok := filters["id"]; ok {
-			query = query.Where(fmt.Sprintf("%s.id = ?", domain.GetTableName("hr_employees")), id)
-		}
-
 		if firstName, ok := filters["first_name"]; ok {
-			query = query.Where(fmt.Sprintf("LOWER(%s.first_name) LIKE LOWER(?)", domain.GetTableName("hr_employees")), "%"+fmt.Sprintf("%v", firstName)+"%")
+			firstNameFilter := normalizedLikePattern(firstName)
+			if firstNameFilter != "" {
+				query = query.Where(fmt.Sprintf("LOWER(%s.first_name) LIKE LOWER(?)", domain.GetTableName("hr_employees")), firstNameFilter)
+			}
 		}
 
 		if email, ok := filters["email"]; ok {
-			emailStr := fmt.Sprintf("%v", email)
-			query = query.Where(fmt.Sprintf("LOWER(%s.email) LIKE LOWER(?) OR LOWER(%s.company_email) LIKE LOWER(?)", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), "%"+emailStr+"%", "%"+emailStr+"%")
+			emailFilter := normalizedLikePattern(email)
+			if emailFilter != "" {
+				query = query.Where(fmt.Sprintf("LOWER(%s.email) LIKE LOWER(?) OR LOWER(%s.company_email) LIKE LOWER(?)", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), emailFilter, emailFilter)
+			}
+		}
+
+		if company, ok := filters["company"]; ok {
+			query = query.Where(fmt.Sprintf(`EXISTS (
+				SELECT 1 FROM %s wi
+				JOIN %s d ON d.id = wi.department_id AND d.deleted = false
+				JOIN %s c ON c.id = d.company_id AND c.deleted = false
+				WHERE wi.employee_id = %s.id
+				AND wi.deleted = false
+				AND regexp_replace(LOWER(c.name), '\\s+', '', 'g') LIKE regexp_replace(LOWER(?), '\\s+', '', 'g')
+			)`,
+				domain.GetTableName("hr_employee_work_information"),
+				domain.GetTableName("hr_departments"),
+				domain.GetTableName("hr_companies"),
+				domain.GetTableName("hr_employees")), "%"+fmt.Sprintf("%v", company)+"%")
+		}
+
+		if department, ok := filters["department"]; ok {
+			query = query.Where(fmt.Sprintf(`EXISTS (
+				SELECT 1 FROM %s wi
+				JOIN %s d ON d.id = wi.department_id AND d.deleted = false
+				WHERE wi.employee_id = %s.id
+				AND wi.deleted = false
+				AND regexp_replace(LOWER(d.name), '\\s+', '', 'g') LIKE regexp_replace(LOWER(?), '\\s+', '', 'g')
+			)`,
+				domain.GetTableName("hr_employee_work_information"),
+				domain.GetTableName("hr_departments"),
+				domain.GetTableName("hr_employees")), "%"+fmt.Sprintf("%v", department)+"%")
+		}
+
+		if jobTitle, ok := filters["job_title"]; ok {
+			query = query.Where(fmt.Sprintf(`EXISTS (
+				SELECT 1 FROM %s wi
+				JOIN %s jp ON jp.id = wi.job_position_id AND jp.deleted = false
+				WHERE wi.employee_id = %s.id
+				AND wi.deleted = false
+				AND regexp_replace(LOWER(jp.title), '\\s+', '', 'g') LIKE regexp_replace(LOWER(?), '\\s+', '', 'g')
+			)`,
+				domain.GetTableName("hr_employee_work_information"),
+				domain.GetTableName("hr_job_positions"),
+				domain.GetTableName("hr_employees")), "%"+fmt.Sprintf("%v", jobTitle)+"%")
 		}
 
 		if companyID, ok := filters["company_id"]; ok {
@@ -210,7 +269,10 @@ func (r *employeeRepository) GetAllWithFilters(limit, offset int, sortParams typ
 							domain.GetTableName("hr_departments")))
 				}
 			}
-			query = query.Where(fmt.Sprintf("LOWER(%s.manager) LIKE LOWER(?)", domain.GetTableName("hr_departments")), "%"+fmt.Sprintf("%v", manager)+"%")
+			managerFilter := normalizedLikePattern(manager)
+			if managerFilter != "" {
+				query = query.Where(fmt.Sprintf("LOWER(%s.manager) LIKE LOWER(?)", domain.GetTableName("hr_departments")), managerFilter)
+			}
 		}
 
 		// Department IDs filter - only if company_id is provided (since we need the JOINs)
@@ -250,7 +312,10 @@ func (r *employeeRepository) GetAllWithFilters(limit, offset int, sortParams typ
 							domain.GetTableName("hr_departments")))
 				}
 			}
-			query = query.Where(fmt.Sprintf("LOWER(%s.manager) LIKE LOWER(?)", domain.GetTableName("hr_departments")), "%"+fmt.Sprintf("%v", manager)+"%")
+			managerFilter := normalizedLikePattern(manager)
+			if managerFilter != "" {
+				query = query.Where(fmt.Sprintf("LOWER(%s.manager) LIKE LOWER(?)", domain.GetTableName("hr_departments")), managerFilter)
+			}
 		}
 
 		if status, ok := filters["status"]; ok {
@@ -258,7 +323,10 @@ func (r *employeeRepository) GetAllWithFilters(limit, offset int, sortParams typ
 		}
 
 		if identityNo, ok := filters["identity_no"]; ok {
-			query = query.Where(fmt.Sprintf("%s.identity_no = ?", domain.GetTableName("hr_employees")), identityNo)
+			identityNoFilter := normalizedLikePattern(identityNo)
+			if identityNoFilter != "" {
+				query = query.Where(fmt.Sprintf("LOWER(%s.identity_no) LIKE LOWER(?)", domain.GetTableName("hr_employees")), identityNoFilter)
+			}
 		}
 
 		if gender, ok := filters["gender"]; ok {
@@ -285,15 +353,55 @@ func (r *employeeRepository) GetAllWithFilters(limit, offset int, sortParams typ
 
 	// Apply same filters to count query
 	if filters != nil {
-		if id, ok := filters["id"]; ok {
-			countQuery = countQuery.Where(fmt.Sprintf("%s.id = ?", domain.GetTableName("hr_employees")), id)
-		}
 		if firstName, ok := filters["first_name"]; ok {
-			countQuery = countQuery.Where(fmt.Sprintf("LOWER(%s.first_name) LIKE LOWER(?)", domain.GetTableName("hr_employees")), "%"+fmt.Sprintf("%v", firstName)+"%")
+			firstNameFilter := normalizedLikePattern(firstName)
+			if firstNameFilter != "" {
+				countQuery = countQuery.Where(fmt.Sprintf("LOWER(%s.first_name) LIKE LOWER(?)", domain.GetTableName("hr_employees")), firstNameFilter)
+			}
 		}
 		if email, ok := filters["email"]; ok {
-			emailStr := fmt.Sprintf("%v", email)
-			countQuery = countQuery.Where(fmt.Sprintf("LOWER(%s.email) LIKE LOWER(?) OR LOWER(%s.company_email) LIKE LOWER(?)", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), "%"+emailStr+"%", "%"+emailStr+"%")
+			emailFilter := normalizedLikePattern(email)
+			if emailFilter != "" {
+				countQuery = countQuery.Where(fmt.Sprintf("LOWER(%s.email) LIKE LOWER(?) OR LOWER(%s.company_email) LIKE LOWER(?)", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), emailFilter, emailFilter)
+			}
+		}
+		if company, ok := filters["company"]; ok {
+			countQuery = countQuery.Where(fmt.Sprintf(`EXISTS (
+				SELECT 1 FROM %s wi
+				JOIN %s d ON d.id = wi.department_id AND d.deleted = false
+				JOIN %s c ON c.id = d.company_id AND c.deleted = false
+				WHERE wi.employee_id = %s.id
+				AND wi.deleted = false
+				AND regexp_replace(LOWER(c.name), '\\s+', '', 'g') LIKE regexp_replace(LOWER(?), '\\s+', '', 'g')
+			)`,
+				domain.GetTableName("hr_employee_work_information"),
+				domain.GetTableName("hr_departments"),
+				domain.GetTableName("hr_companies"),
+				domain.GetTableName("hr_employees")), "%"+fmt.Sprintf("%v", company)+"%")
+		}
+		if department, ok := filters["department"]; ok {
+			countQuery = countQuery.Where(fmt.Sprintf(`EXISTS (
+				SELECT 1 FROM %s wi
+				JOIN %s d ON d.id = wi.department_id AND d.deleted = false
+				WHERE wi.employee_id = %s.id
+				AND wi.deleted = false
+				AND regexp_replace(LOWER(d.name), '\\s+', '', 'g') LIKE regexp_replace(LOWER(?), '\\s+', '', 'g')
+			)`,
+				domain.GetTableName("hr_employee_work_information"),
+				domain.GetTableName("hr_departments"),
+				domain.GetTableName("hr_employees")), "%"+fmt.Sprintf("%v", department)+"%")
+		}
+		if jobTitle, ok := filters["job_title"]; ok {
+			countQuery = countQuery.Where(fmt.Sprintf(`EXISTS (
+				SELECT 1 FROM %s wi
+				JOIN %s jp ON jp.id = wi.job_position_id AND jp.deleted = false
+				WHERE wi.employee_id = %s.id
+				AND wi.deleted = false
+				AND regexp_replace(LOWER(jp.title), '\\s+', '', 'g') LIKE regexp_replace(LOWER(?), '\\s+', '', 'g')
+			)`,
+				domain.GetTableName("hr_employee_work_information"),
+				domain.GetTableName("hr_job_positions"),
+				domain.GetTableName("hr_employees")), "%"+fmt.Sprintf("%v", jobTitle)+"%")
 		}
 		if companyID, ok := filters["company_id"]; ok {
 			countQuery = countQuery.Joins(fmt.Sprintf(`JOIN %s ON %s.employee_id = %s.id AND %s.deleted = false`,
@@ -342,13 +450,19 @@ func (r *employeeRepository) GetAllWithFilters(limit, offset int, sortParams typ
 							domain.GetTableName("hr_departments")))
 				}
 			}
-			countQuery = countQuery.Where(fmt.Sprintf("LOWER(%s.manager) LIKE LOWER(?)", domain.GetTableName("hr_departments")), "%"+fmt.Sprintf("%v", manager)+"%")
+			managerFilter := normalizedLikePattern(manager)
+			if managerFilter != "" {
+				countQuery = countQuery.Where(fmt.Sprintf("LOWER(%s.manager) LIKE LOWER(?)", domain.GetTableName("hr_departments")), managerFilter)
+			}
 		}
 		if status, ok := filters["status"]; ok {
 			countQuery = countQuery.Where(fmt.Sprintf("%s.status = ?", domain.GetTableName("hr_employees")), status)
 		}
 		if identityNo, ok := filters["identity_no"]; ok {
-			countQuery = countQuery.Where(fmt.Sprintf("%s.identity_no = ?", domain.GetTableName("hr_employees")), identityNo)
+			identityNoFilter := normalizedLikePattern(identityNo)
+			if identityNoFilter != "" {
+				countQuery = countQuery.Where(fmt.Sprintf("LOWER(%s.identity_no) LIKE LOWER(?)", domain.GetTableName("hr_employees")), identityNoFilter)
+			}
 		}
 		if gender, ok := filters["gender"]; ok {
 			countQuery = countQuery.Where(fmt.Sprintf("%s.gender = ?", domain.GetTableName("hr_employees")), gender)
@@ -411,25 +525,72 @@ func (r *employeeRepository) GetTotalCountWithFilters(filters map[string]interfa
 
 	// Apply filters (same logic as GetAllWithFilters)
 	if filters != nil {
-		// ID filter
-		if id, ok := filters["id"]; ok {
-			query = query.Where(fmt.Sprintf("%s.id = ?", domain.GetTableName("hr_employees")), id)
-		}
-
 		// First name filter (LIKE search)
 		if firstName, ok := filters["first_name"]; ok {
-			query = query.Where(fmt.Sprintf("LOWER(%s.first_name) LIKE LOWER(?)", domain.GetTableName("hr_employees")), "%"+fmt.Sprintf("%v", firstName)+"%")
+			firstNameFilter := normalizedLikePattern(firstName)
+			if firstNameFilter != "" {
+				query = query.Where(fmt.Sprintf("LOWER(%s.first_name) LIKE LOWER(?)", domain.GetTableName("hr_employees")), firstNameFilter)
+			}
 		}
 
 		// Email filter (LIKE search for both personal and company email)
 		if email, ok := filters["email"]; ok {
-			emailStr := fmt.Sprintf("%v", email)
-			query = query.Where(fmt.Sprintf("LOWER(%s.email) LIKE LOWER(?) OR LOWER(%s.company_email) LIKE LOWER(?)", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), "%"+emailStr+"%", "%"+emailStr+"%")
+			emailFilter := normalizedLikePattern(email)
+			if emailFilter != "" {
+				query = query.Where(fmt.Sprintf("LOWER(%s.email) LIKE LOWER(?) OR LOWER(%s.company_email) LIKE LOWER(?)", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), emailFilter, emailFilter)
+			}
+		}
+
+		// Company name filter (case-insensitive LIKE)
+		if company, ok := filters["company"]; ok {
+			query = query.Where(fmt.Sprintf(`EXISTS (
+				SELECT 1 FROM %s wi
+				JOIN %s d ON d.id = wi.department_id AND d.deleted = false
+				JOIN %s c ON c.id = d.company_id AND c.deleted = false
+				WHERE wi.employee_id = %s.id
+				AND wi.deleted = false
+				AND regexp_replace(LOWER(c.name), '\\s+', '', 'g') LIKE regexp_replace(LOWER(?), '\\s+', '', 'g')
+			)`,
+				domain.GetTableName("hr_employee_work_information"),
+				domain.GetTableName("hr_departments"),
+				domain.GetTableName("hr_companies"),
+				domain.GetTableName("hr_employees")), "%"+fmt.Sprintf("%v", company)+"%")
+		}
+
+		// Department name filter (case-insensitive LIKE)
+		if department, ok := filters["department"]; ok {
+			query = query.Where(fmt.Sprintf(`EXISTS (
+				SELECT 1 FROM %s wi
+				JOIN %s d ON d.id = wi.department_id AND d.deleted = false
+				WHERE wi.employee_id = %s.id
+				AND wi.deleted = false
+				AND regexp_replace(LOWER(d.name), '\\s+', '', 'g') LIKE regexp_replace(LOWER(?), '\\s+', '', 'g')
+			)`,
+				domain.GetTableName("hr_employee_work_information"),
+				domain.GetTableName("hr_departments"),
+				domain.GetTableName("hr_employees")), "%"+fmt.Sprintf("%v", department)+"%")
+		}
+
+		// Job title filter (case-insensitive LIKE)
+		if jobTitle, ok := filters["job_title"]; ok {
+			query = query.Where(fmt.Sprintf(`EXISTS (
+				SELECT 1 FROM %s wi
+				JOIN %s jp ON jp.id = wi.job_position_id AND jp.deleted = false
+				WHERE wi.employee_id = %s.id
+				AND wi.deleted = false
+				AND regexp_replace(LOWER(jp.title), '\\s+', '', 'g') LIKE regexp_replace(LOWER(?), '\\s+', '', 'g')
+			)`,
+				domain.GetTableName("hr_employee_work_information"),
+				domain.GetTableName("hr_job_positions"),
+				domain.GetTableName("hr_employees")), "%"+fmt.Sprintf("%v", jobTitle)+"%")
 		}
 
 		// Identity number filter
 		if identityNo, ok := filters["identity_no"]; ok {
-			query = query.Where(fmt.Sprintf("%s.identity_no LIKE ?", domain.GetTableName("hr_employees")), "%"+fmt.Sprintf("%v", identityNo)+"%")
+			identityNoFilter := normalizedLikePattern(identityNo)
+			if identityNoFilter != "" {
+				query = query.Where(fmt.Sprintf("LOWER(%s.identity_no) LIKE LOWER(?)", domain.GetTableName("hr_employees")), identityNoFilter)
+			}
 		}
 
 		// Gender filter
@@ -577,7 +738,10 @@ func (r *employeeRepository) GetTotalCountWithFilters(filters map[string]interfa
 			}
 
 			// Apply manager filter
-			query = query.Where(fmt.Sprintf("LOWER(%s.manager) LIKE LOWER(?)", domain.GetTableName("hr_departments")), "%"+fmt.Sprintf("%v", manager)+"%")
+			managerFilter := normalizedLikePattern(manager)
+			if managerFilter != "" {
+				query = query.Where(fmt.Sprintf("LOWER(%s.manager) LIKE LOWER(?)", domain.GetTableName("hr_departments")), managerFilter)
+			}
 		}
 	}
 

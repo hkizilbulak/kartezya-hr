@@ -361,11 +361,13 @@ func (h *EmployeeHandler) DeleteEmployee(c *gin.Context) {
 // @Param page query int false "Page number (default: 1)"
 // @Param sort query string false "Sort field"
 // @Param direction query string false "Sort direction (ASC/DESC)"
-// @Param id query int false "Filter by employee ID"
 // @Param first_name query string false "Filter by first name"
 // @Param email query string false "Filter by email"
 // @Param company_id query int false "Filter by company ID"
 // @Param department_id query int false "Filter by department ID"
+// @Param company query string false "Filter by company name (case-insensitive, LIKE)"
+// @Param department query string false "Filter by department name (case-insensitive, LIKE)"
+// @Param jobTitle query string false "Filter by job title (case-insensitive, LIKE)"
 // @Param manager query string false "Filter by manager"
 // @Param identity_no query string false "Filter by identity number"
 // @Param gender query string false "Filter by gender"
@@ -410,18 +412,19 @@ func (h *EmployeeHandler) ListEmployees(c *gin.Context) {
 
 	// Parse filter parameters
 	filters := make(map[string]interface{})
-
-	if id := c.Query("id"); id != "" {
-		if parsed, err := strconv.Atoi(id); err == nil && parsed > 0 {
-			filters["id"] = parsed
+	normalizeTextFilter := func(value string) (string, bool) {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" || strings.EqualFold(trimmed, "null") || strings.EqualFold(trimmed, "undefined") {
+			return "", false
 		}
+		return trimmed, true
 	}
 
-	if firstName := c.Query("first_name"); firstName != "" {
+	if firstName, ok := normalizeTextFilter(c.Query("first_name")); ok {
 		filters["first_name"] = firstName
 	}
 
-	if email := c.Query("email"); email != "" {
+	if email, ok := normalizeTextFilter(c.Query("email")); ok {
 		filters["email"] = email
 	}
 
@@ -429,6 +432,22 @@ func (h *EmployeeHandler) ListEmployees(c *gin.Context) {
 		if parsed, err := strconv.Atoi(companyID); err == nil && parsed > 0 {
 			filters["company_id"] = parsed
 		}
+	}
+
+	if company, ok := normalizeTextFilter(c.Query("company")); ok {
+		filters["company"] = company
+	}
+
+	if department, ok := normalizeTextFilter(c.Query("department")); ok {
+		filters["department"] = department
+	}
+
+	jobTitleParam := c.Query("jobTitle")
+	if jobTitleParam == "" {
+		jobTitleParam = c.Query("job_title")
+	}
+	if jobTitle, ok := normalizeTextFilter(jobTitleParam); ok {
+		filters["job_title"] = jobTitle
 	}
 
 	if departmentIDs := c.Query("department_ids"); departmentIDs != "" {
@@ -451,19 +470,19 @@ func (h *EmployeeHandler) ListEmployees(c *gin.Context) {
 		}
 	}
 
-	if manager := c.Query("manager"); manager != "" {
+	if manager, ok := normalizeTextFilter(c.Query("manager")); ok {
 		filters["manager"] = manager
 	}
 
-	if identityNo := c.Query("identity_no"); identityNo != "" {
+	if identityNo, ok := normalizeTextFilter(c.Query("identity_no")); ok {
 		filters["identity_no"] = identityNo
 	}
 
-	if gender := c.Query("gender"); gender != "" {
+	if gender, ok := normalizeTextFilter(c.Query("gender")); ok {
 		filters["gender"] = gender
 	}
 
-	if maritalStatus := c.Query("marital_status"); maritalStatus != "" {
+	if maritalStatus, ok := normalizeTextFilter(c.Query("marital_status")); ok {
 		filters["marital_status"] = maritalStatus
 	}
 
@@ -473,7 +492,8 @@ func (h *EmployeeHandler) ListEmployees(c *gin.Context) {
 		}
 	}
 
-	if status := c.Query("status"); status != "" {
+	filters["status"] = "ACTIVE"
+	if status, ok := normalizeTextFilter(c.Query("status")); ok {
 		filters["status"] = status
 	}
 
