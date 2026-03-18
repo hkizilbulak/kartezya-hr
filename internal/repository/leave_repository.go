@@ -396,7 +396,7 @@ func (r *leaveTypeRepository) GetAll(limit, offset int, sortParams types.SortPar
 
 func (r *leaveTypeRepository) GetLookup() ([]*domain.LeaveType, error) {
 	var leaveTypes []*domain.LeaveType
-	err := r.db.Select("id, name, description").Where("deleted = ?", false).Order("id ASC").Find(&leaveTypes).Error
+	err := r.db.Select("id, name, description, limit_amount").Where("deleted = ?", false).Order("id ASC").Find(&leaveTypes).Error
 	return leaveTypes, err
 }
 
