@@ -16,7 +16,7 @@ type LeaveRepository interface {
 	GetAll(limit, offset int, sortParams types.SortParams) ([]*domain.LeaveRequest, int64, error)
 	GetByEmployeeIDWithLeaveType(employeeID uint, limit, offset int, sortParams types.SortParams) ([]*domain.LeaveRequest, int64, error)
 	GetByEmployeeIDWithLeaveTypeAndStatus(employeeID uint, limit, offset int, sortParams types.SortParams, status string) ([]*domain.LeaveRequest, int64, error)
-	GetAllWithStatus(limit, offset int, sortParams types.SortParams, status string) ([]*domain.LeaveRequest, int64, error)
+	GetAllWithStatus(employeeID *uint, limit, offset int, sortParams types.SortParams, status string) ([]*domain.LeaveRequest, int64, error)
 	Update(leave *domain.LeaveRequest) error
 	Delete(id uint) error
 	GetByEmployeeID(employeeID uint, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error)
@@ -228,7 +228,7 @@ func (r *leaveRepository) GetByDateRange(startDate, endDate string) ([]*domain.L
 	return leaves, err
 }
 
-func (r *leaveRepository) GetAllWithStatus(limit, offset int, sortParams types.SortParams, status string) ([]*domain.LeaveRequest, int64, error) {
+func (r *leaveRepository) GetAllWithStatus(employeeID *uint, limit, offset int, sortParams types.SortParams, status string) ([]*domain.LeaveRequest, int64, error) {
 	var leaves []*domain.LeaveRequest
 	var total int64
 
@@ -236,6 +236,9 @@ func (r *leaveRepository) GetAllWithStatus(limit, offset int, sortParams types.S
 	query := r.db.Model(&domain.LeaveRequest{}).Where("deleted = ?", false)
 	if status != "" {
 		query = query.Where("status = ?", status)
+	}
+	if employeeID != nil {
+		query = query.Where("employee_id = ?", *employeeID)
 	}
 
 	// Count total records
@@ -247,6 +250,9 @@ func (r *leaveRepository) GetAllWithStatus(limit, offset int, sortParams types.S
 	mainQuery := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Where("deleted = ?", false)
 	if status != "" {
 		mainQuery = mainQuery.Where("status = ?", status)
+	}
+	if employeeID != nil {
+		mainQuery = mainQuery.Where("employee_id = ?", *employeeID)
 	}
 
 	// Apply sorting

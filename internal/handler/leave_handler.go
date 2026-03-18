@@ -719,6 +719,7 @@ func (h *LeaveHandler) GetMyLeaveRequests(c *gin.Context) {
 // @Security BearerAuth
 // @Param page query int false "Page number (default: 1)"
 // @Param limit query int false "Items per page (default: 10)"
+// @Param employee_id query int false "Filter by employee ID"
 // @Param status query string false "Filter by status (PENDING, APPROVED, REJECTED)"
 // @Param sort query string false "Sort field (default: created_at)"
 // @Param direction query string false "Sort direction (default: DESC)"
@@ -749,13 +750,23 @@ func (h *LeaveHandler) GetAllLeaveRequests(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	status := c.Query("status") // Optional status filter: PENDING, APPROVED, REJECTED
 
+	var empIDPtr *uint
+	employeeIDStr := c.Query("employee_id")
+	if employeeIDStr != "" {
+		employeeID, err := strconv.ParseUint(employeeIDStr, 10, 32)
+		if err == nil {
+			id := uint(employeeID)
+			empIDPtr = &id
+		}
+	}
+
 	// Parse sorting parameters
 	sortParams := types.SortParams{
 		Sort:      c.DefaultQuery("sort", "created_at"),
 		Direction: c.DefaultQuery("direction", "DESC"),
 	}
 
-	result, err := h.leaveService.GetAllLeaveRequestsPaginated(page, limit, sortParams, status)
+	result, err := h.leaveService.GetAllLeaveRequestsPaginated(empIDPtr, page, limit, sortParams, status)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
