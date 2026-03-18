@@ -590,12 +590,17 @@ func (h *LeaveHandler) UpdateLeaveRequest(c *gin.Context) {
 	leave.Reason = req.Reason
 	leave.ID = id
 
-	if err := h.leaveService.UpdateLeave(leave, userID); err != nil {
+	if err := h.leaveService.UpdateLeave(leave, userID, isAdmin(roles)); err != nil {
 		status := http.StatusInternalServerError
 		if err.Error() == "only pending leave requests can be updated, current status: APPROVED" ||
 			err.Error() == "only pending leave requests can be updated, current status: REJECTED" ||
 			err.Error() == "only pending leave requests can be updated, current status: CANCELLED" {
 			status = http.StatusForbidden
+		}
+		if strings.Contains(err.Error(), "insufficient leave balance") ||
+			strings.Contains(err.Error(), "no leave balance found") ||
+			errors.Is(err, service.ErrLeaveTypeLimitExceeded) {
+			status = http.StatusBadRequest
 		}
 		c.JSON(status, gin.H{
 			"success": false,

@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
@@ -29,12 +30,24 @@ var (
 	ErrLeaveTypeLimitExceeded = errors.New("leave type limit exceeded")
 )
 
+type LeaveTypeLimitExceededError struct {
+	Message string
+}
+
+func (e *LeaveTypeLimitExceededError) Error() string {
+	return e.Message
+}
+
+func (e *LeaveTypeLimitExceededError) Unwrap() error {
+	return ErrLeaveTypeLimitExceeded
+}
+
 type LeaveService interface {
 	// Leave methods
 	CreateLeave(leave *domain.LeaveRequest, userID uint, isAdmin bool) error
 	GetLeaveByID(id uint) (*domain.LeaveRequest, error)
 	GetLeaveByIDFormatted(id uint) (*types.AdminLeaveRequestResponse, error)
-	UpdateLeave(leave *domain.LeaveRequest, userID uint) error
+	UpdateLeave(leave *domain.LeaveRequest, userID uint, isAdmin bool) error
 	DeleteLeave(id uint, userID uint) error
 	GetLeavesByEmployeeID(employeeID uint, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error)
 	GetLeavesByUserID(userID uint, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error)
@@ -247,7 +260,7 @@ func (s *leaveService) GetAllLeaves(page, limit int, sortParams types.SortParams
 	}, nil
 }
 
-func (s *leaveService) UpdateLeave(leave *domain.LeaveRequest, userID uint) error {
+func (s *leaveService) UpdateLeave(leave *domain.LeaveRequest, userID uint, isAdmin bool) error {
 	if leave == nil {
 		return errors.New("leave cannot be nil")
 	}
@@ -291,6 +304,11 @@ func (s *leaveService) UpdateLeave(leave *domain.LeaveRequest, userID uint) erro
 		if pendingLeave.ID != leave.ID {
 			return fmt.Errorf("Seçtiğiniz tarih aralığında bekleyen %s talebiniz olduğundan yeni talebiniz için izin girişi yapamazsınız", leaveType.Name)
 		}
+	}
+
+	// Validate leave balance/limit during update as well to prevent bypassing create-time checks.
+	if err := s.ValidateLeaveBalance(leave.EmployeeID, leave.LeaveTypeID, leave.RequestedDays, isAdmin); err != nil {
+		return err
 	}
 
 	// Clone the existing leave and update only the provided fields
@@ -705,12 +723,20 @@ func (s *leaveService) ValidateLeaveBalance(employeeID, leaveTypeID uint, reques
 		// Check if requested days + used days exceeds limit
 		if totalUsedDays+requestedDays > float64(*leaveType.LimitAmount) {
 			remainingLimit := float64(*leaveType.LimitAmount) - totalUsedDays
-			return fmt.Errorf("%w: %s izin türü için yıllık limitiniz %d gündür. Bu yıl içinde %.1f gün kullanmışsınız. En fazla %.1f gün izin girişi yapabilirsiniz",
-				ErrLeaveTypeLimitExceeded,
-				leaveType.Name,
-				*leaveType.LimitAmount,
-				totalUsedDays,
-				remainingLimit)
+			if remainingLimit < 0 {
+				remainingLimit = 0
+			}
+
+			remainingLimitInt := int(math.Floor(remainingLimit))
+			if remainingLimitInt <= 0 {
+				return &LeaveTypeLimitExceededError{
+					Message: fmt.Sprintf("%s için kullanım limitine ulaştınız. Kalan hakkınız: 0 gün.", leaveType.Name),
+				}
+			}
+
+			return &LeaveTypeLimitExceededError{
+				Message: fmt.Sprintf("%s için kalan hakkınız: %d gün.", leaveType.Name, remainingLimitInt),
+			}
 		}
 	}
 
