@@ -105,8 +105,6 @@ definitions:
         type: integer
       identity_no:
         type: string
-      is_grade_up:
-        type: boolean
       last_name:
         type: string
       leave_balances:
@@ -657,8 +655,6 @@ definitions:
         type: string
       identity_no:
         type: string
-      is_grade_up:
-        type: boolean
       last_name:
         type: string
       leave_date:
@@ -953,8 +949,6 @@ definitions:
         type: string
       identity_no:
         type: string
-      is_grade_up:
-        type: boolean
       last_name:
         type: string
       leave_date:

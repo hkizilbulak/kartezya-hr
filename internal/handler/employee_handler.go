@@ -39,7 +39,6 @@ type CreateEmployeeRequest struct {
 	EmergencyContactName     string   `json:"emergency_contact_name"`
 	EmergencyContactRelation string   `json:"emergency_contact_relation"`
 	GradeID                  *int64   `json:"grade_id"`
-	IsGradeUp                bool     `json:"is_grade_up"`
 	ContractNo               string   `json:"contract_no"`
 	ProfessionStartDate      string   `json:"profession_start_date"`
 	Note                     string   `json:"note"`
@@ -69,7 +68,6 @@ type UpdateEmployeeRequest struct {
 	EmergencyContactName     string   `json:"emergency_contact_name"`
 	EmergencyContactRelation string   `json:"emergency_contact_relation"`
 	GradeID                  *int64   `json:"grade_id"`
-	IsGradeUp                bool     `json:"is_grade_up"`
 	ContractNo               string   `json:"contract_no"`
 	ProfessionStartDate      string   `json:"profession_start_date"`
 	Note                     string   `json:"note"`
@@ -141,7 +139,7 @@ func (h *EmployeeHandler) CreateEmployee(c *gin.Context) {
 		return
 	}
 
-	employee, err := h.employeeService.CreateEmployee(req.Email, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalGap, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.GradeID, req.IsGradeUp, req.ContractNo, req.ProfessionStartDate, req.Note, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo, email, req.Roles)
+	employee, err := h.employeeService.CreateEmployee(req.Email, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalGap, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.GradeID, req.ContractNo, req.ProfessionStartDate, req.Note, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo, email, req.Roles)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -269,7 +267,7 @@ func (h *EmployeeHandler) UpdateEmployee(c *gin.Context) {
 		req.CompanyEmail = email
 	}
 
-	if err := h.employeeService.UpdateEmployee(id, req.Email, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalGap, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.GradeID, req.IsGradeUp, req.ContractNo, req.ProfessionStartDate, req.Note, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo, req.Status, email, requestingUserID, isAdmin(roles), req.Roles); err != nil {
+	if err := h.employeeService.UpdateEmployee(id, req.Email, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalGap, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.GradeID, req.ContractNo, req.ProfessionStartDate, req.Note, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo, req.Status, email, requestingUserID, isAdmin(roles), req.Roles); err != nil {
 		status := http.StatusInternalServerError
 		if err.Error() == "unauthorized to update this employee profile" {
 			status = http.StatusForbidden

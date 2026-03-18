@@ -608,7 +608,6 @@ func (r *employeeRepository) Update(employee *domain.Employee, modifiedBy string
 		"emergency_contact_name":     employee.EmergencyContactName,
 		"emergency_contact_relation": employee.EmergencyContactRelation,
 		"grade_id":                   employee.GradeID,
-		"is_grade_up":                employee.IsGradeUp,
 		"contract_no":                employee.ContractNo,
 		"profession_start_date":      employee.ProfessionStartDate,
 		"note":                       employee.Note,

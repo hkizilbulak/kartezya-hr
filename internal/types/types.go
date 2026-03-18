@@ -98,7 +98,6 @@ type EmployeeResponse struct {
 	EmergencyContactName     string                  `json:"emergency_contact_name"`
 	EmergencyContactRelation string                  `json:"emergency_contact_relation"`
 	GradeID                  *int64                  `json:"grade_id"`
-	IsGradeUp                bool                    `json:"is_grade_up"`
 	ContractNo               string                  `json:"contract_no"`
 	ProfessionStartDate      *string                 `json:"profession_start_date"`
 	Note                     string                  `json:"note"`
@@ -313,7 +312,6 @@ type EmployeeDetailResponse struct {
 	EmergencyContactName     string                        `json:"emergency_contact_name"`
 	EmergencyContactRelation string                        `json:"emergency_contact_relation"`
 	GradeID                  *int64                        `json:"grade_id"`
-	IsGradeUp                bool                          `json:"is_grade_up"`
 	ContractNo               string                        `json:"contract_no"`
 	ProfessionStartDate      *string                       `json:"profession_start_date"`
 	Note                     string                        `json:"note"`

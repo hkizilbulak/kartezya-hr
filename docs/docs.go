@@ -5233,9 +5233,6 @@ const docTemplate = `{
                 "identity_no": {
                     "type": "string"
                 },
-                "is_grade_up": {
-                    "type": "boolean"
-                },
                 "last_name": {
                     "type": "string"
                 },
@@ -6085,9 +6082,6 @@ const docTemplate = `{
                 "identity_no": {
                     "type": "string"
                 },
-                "is_grade_up": {
-                    "type": "boolean"
-                },
                 "last_name": {
                     "type": "string"
                 },
@@ -6526,9 +6520,6 @@ const docTemplate = `{
                 },
                 "identity_no": {
                     "type": "string"
-                },
-                "is_grade_up": {
-                    "type": "boolean"
                 },
                 "last_name": {
                     "type": "string"

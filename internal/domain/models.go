@@ -88,7 +88,6 @@ type Employee struct {
 	EmergencyContactName     string     `json:"emergency_contact_name" gorm:"size:20"`
 	EmergencyContactRelation string     `json:"emergency_contact_relation" gorm:"size:20"`
 	GradeID                  *int64     `json:"grade_id" gorm:"index"`
-	IsGradeUp                bool       `json:"is_grade_up" gorm:"default:false"`
 	ContractNo               string     `json:"contract_no" gorm:"size:255"`
 	ProfessionStartDate      *time.Time `json:"profession_start_date"`
 	Note                     string     `json:"note" gorm:"type:text"`
