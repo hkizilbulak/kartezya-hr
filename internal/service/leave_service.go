@@ -50,6 +50,7 @@ type LeaveService interface {
 	ValidateLeaveBalance(employeeID, leaveTypeID uint, requestedDays float64, isAdmin bool) error
 	DeductLeaveBalance(employeeID, leaveTypeID uint, requestedDays float64, userID uint) error
 	GetMyLeaveBalances(userID uint, page, limit int, sortParams types.SortParams) (*PaginatedResponse, error)
+	GetEmployeeLeaveBalances(employeeID uint, page, limit int, sortParams types.SortParams) (*PaginatedResponse, error)
 
 	// Leave Type methods
 	CreateLeaveType(leaveType *domain.LeaveType, userID uint) error
@@ -807,6 +808,52 @@ func (s *leaveService) GetMyLeaveBalances(userID uint, page, limit int, sortPara
 
 	offset := (page - 1) * limit
 	leaveBalances, total, err := s.leaveBalanceRepo.GetByEmployeeIDPaginated(employee.ID, limit, offset, sortParams)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get leave balances: %w", err)
+	}
+
+	// Convert to MyLeaveBalanceResponse format
+	var responseData []*types.MyLeaveBalanceResponse
+	for _, balance := range leaveBalances {
+		responseData = append(responseData, &types.MyLeaveBalanceResponse{
+			LeaveTypeName: balance.LeaveType.Name,
+			TotalDays:     balance.TotalDays,
+			UsedDays:      balance.UsedDays,
+			RemainingDays: balance.RemainingDays,
+		})
+	}
+
+	return &PaginatedResponse{
+		Data: responseData,
+		Page: PageInfo{
+			Total:      total,
+			Page:       page,
+			Limit:      limit,
+			TotalPages: (total + int64(limit) - 1) / int64(limit),
+			Sort:       sortParams.Sort,
+			Direction:  sortParams.Direction,
+		},
+	}, nil
+}
+
+func (s *leaveService) GetEmployeeLeaveBalances(employeeID uint, page, limit int, sortParams types.SortParams) (*PaginatedResponse, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 10
+	}
+
+	// Set defaults for sorting
+	if sortParams.Sort == "" {
+		sortParams.Sort = "leave_type_id"
+	}
+	if sortParams.Direction == "" {
+		sortParams.Direction = "ASC"
+	}
+
+	offset := (page - 1) * limit
+	leaveBalances, total, err := s.leaveBalanceRepo.GetByEmployeeIDPaginated(employeeID, limit, offset, sortParams)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get leave balances: %w", err)
 	}

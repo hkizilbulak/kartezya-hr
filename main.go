@@ -223,6 +223,7 @@ func main() {
 			balances := leaveRoutes.Group("/balances")
 			{
 				balances.GET("/me", leaveHandler.GetMyLeaveBalances)
+				balances.GET("", authMiddleware.RequireAdmin(), leaveHandler.GetLeaveBalances)
 			}
 
 			// Leave types (Admin only)

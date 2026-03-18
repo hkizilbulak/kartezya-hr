@@ -1030,6 +1030,85 @@ func (h *LeaveHandler) GetMyLeaveBalances(c *gin.Context) {
 	})
 }
 
+// GetLeaveBalances godoc
+// @Summary Get employee leave balances
+// @Description Get paginated leave balances for a specific employee (Admin only)
+// @Tags leave-balances
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param employee_id query int true "Employee ID"
+// @Param page query int false "Page number (default: 1)"
+// @Param limit query int false "Items per page (default: 10)"
+// @Param sort query string false "Sort field (default: leave_type_id)"
+// @Param direction query string false "Sort direction (default: ASC)"
+// @Success 200 {object} APIResponse{data=[]types.MyLeaveBalanceResponse}
+// @Failure 400 {object} APIResponse
+// @Failure 401 {object} APIResponse
+// @Failure 403 {object} APIResponse
+// @Router /leave/balances [get]
+func (h *LeaveHandler) GetLeaveBalances(c *gin.Context) {
+	_, _, roles, ok := getUserContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Authentication required",
+		})
+		return
+	}
+
+	if !isAdmin(roles) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"error":   "Only administrators can view other employees' leave balances",
+		})
+		return
+	}
+
+	employeeIDStr := c.Query("employee_id")
+	if employeeIDStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "employee_id query parameter is required",
+		})
+		return
+	}
+
+	employeeID, err := strconv.ParseUint(employeeIDStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid employee_id",
+		})
+		return
+	}
+
+	// Parse pagination parameters
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+
+	// Parse sorting parameters
+	sortParams := types.SortParams{
+		Sort:      c.DefaultQuery("sort", "leave_type_id"),
+		Direction: c.DefaultQuery("direction", "ASC"),
+	}
+
+	result, err := h.leaveService.GetEmployeeLeaveBalances(uint(employeeID), page, limit, sortParams)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    result.Data,
+		"page":    result.Page,
+	})
+}
+
 // CalculateWorkingDays godoc
 // @Summary Calculate working days between two dates
 // @Description Calculate the number of working days (excluding weekends and holidays) between two dates
