@@ -232,7 +232,7 @@ func (r *employeeRepository) GetAllWithFilters(limit, offset int, sortParams typ
 				Where(fmt.Sprintf("%s.company_id = ?", domain.GetTableName("hr_departments")), companyID)
 		}
 
-		// Department IDs filter - only if company_id is provided (since we need the JOINs)
+		// Department IDs filter
 		if departmentIDs, ok := filters["department_ids"]; ok {
 			if departmentIDSlice, ok := departmentIDs.([]int); ok && len(departmentIDSlice) > 0 {
 				// If company_id was not provided, we need to add the JOINs
@@ -252,65 +252,29 @@ func (r *employeeRepository) GetAllWithFilters(limit, offset int, sortParams typ
 			}
 		}
 
-		// Manager filter - needs department JOIN
+		// Manager filter - needs work_information + department JOINs
 		if manager, ok := filters["manager"]; ok {
-			// If we haven't added JOINs yet, add them now
-			if _, hasCompany := filters["company_id"]; !hasCompany {
-				if _, hasDepartmentIDs := filters["department_ids"]; !hasDepartmentIDs {
-					query = query.Joins(fmt.Sprintf(`JOIN %s ON %s.employee_id = %s.id AND %s.deleted = false`,
-						domain.GetTableName("hr_employee_work_information"),
-						domain.GetTableName("hr_employee_work_information"),
-						domain.GetTableName("hr_employees"),
-						domain.GetTableName("hr_employee_work_information"))).
-						Joins(fmt.Sprintf("JOIN %s ON %s.id = %s.department_id AND %s.deleted = false",
-							domain.GetTableName("hr_departments"),
-							domain.GetTableName("hr_departments"),
-							domain.GetTableName("hr_employee_work_information"),
-							domain.GetTableName("hr_departments")))
-				}
+			hasWorkInfoJoin := false
+			hasDepartmentJoin := false
+			if _, hasCompany := filters["company_id"]; hasCompany {
+				hasWorkInfoJoin = true
+				hasDepartmentJoin = true
+			} else if _, hasDeptIDs := filters["department_ids"]; hasDeptIDs {
+				hasWorkInfoJoin = true
 			}
-			managerFilter := normalizedLikePattern(manager)
-			if managerFilter != "" {
-				query = query.Where(fmt.Sprintf("LOWER(%s.manager) LIKE LOWER(?)", domain.GetTableName("hr_departments")), managerFilter)
+			if !hasWorkInfoJoin {
+				query = query.Joins(fmt.Sprintf(`JOIN %s ON %s.employee_id = %s.id AND %s.deleted = false`,
+					domain.GetTableName("hr_employee_work_information"),
+					domain.GetTableName("hr_employee_work_information"),
+					domain.GetTableName("hr_employees"),
+					domain.GetTableName("hr_employee_work_information")))
 			}
-		}
-
-		// Department IDs filter - only if company_id is provided (since we need the JOINs)
-		if departmentIDs, ok := filters["department_ids"]; ok {
-			if departmentIDSlice, ok := departmentIDs.([]int); ok && len(departmentIDSlice) > 0 {
-				// If company_id was not provided, we need to add the JOINs
-				if _, hasCompany := filters["company_id"]; !hasCompany {
-					query = query.Joins(fmt.Sprintf(`JOIN %s ON %s.employee_id = %s.id AND %s.deleted = false`,
-						domain.GetTableName("hr_employee_work_information"),
-						domain.GetTableName("hr_employee_work_information"),
-						domain.GetTableName("hr_employees"),
-						domain.GetTableName("hr_employee_work_information"))).
-						Joins(fmt.Sprintf("JOIN %s ON %s.id = %s.department_id AND %s.deleted = false",
-							domain.GetTableName("hr_departments"),
-							domain.GetTableName("hr_departments"),
-							domain.GetTableName("hr_employee_work_information"),
-							domain.GetTableName("hr_departments")))
-				}
-				query = query.Where(fmt.Sprintf("%s.department_id IN ?", domain.GetTableName("hr_employee_work_information")), departmentIDSlice)
-			}
-		}
-
-		// Manager filter - needs department JOIN
-		if manager, ok := filters["manager"]; ok {
-			// If we haven't added JOINs yet, add them now
-			if _, hasCompany := filters["company_id"]; !hasCompany {
-				if _, hasDepartmentIDs := filters["department_ids"]; !hasDepartmentIDs {
-					query = query.Joins(fmt.Sprintf(`JOIN %s ON %s.employee_id = %s.id AND %s.deleted = false`,
-						domain.GetTableName("hr_employee_work_information"),
-						domain.GetTableName("hr_employee_work_information"),
-						domain.GetTableName("hr_employees"),
-						domain.GetTableName("hr_employee_work_information"))).
-						Joins(fmt.Sprintf("JOIN %s ON %s.id = %s.department_id AND %s.deleted = false",
-							domain.GetTableName("hr_departments"),
-							domain.GetTableName("hr_departments"),
-							domain.GetTableName("hr_employee_work_information"),
-							domain.GetTableName("hr_departments")))
-				}
+			if !hasDepartmentJoin {
+				query = query.Joins(fmt.Sprintf("JOIN %s ON %s.id = %s.department_id AND %s.deleted = false",
+					domain.GetTableName("hr_departments"),
+					domain.GetTableName("hr_departments"),
+					domain.GetTableName("hr_employee_work_information"),
+					domain.GetTableName("hr_departments")))
 			}
 			managerFilter := normalizedLikePattern(manager)
 			if managerFilter != "" {
