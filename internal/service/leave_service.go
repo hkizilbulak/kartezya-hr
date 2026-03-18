@@ -141,6 +141,18 @@ func (s *leaveService) CreateLeave(leave *domain.LeaveRequest, userID uint, isAd
 		}
 	}
 
+	// Limitli izinler yılda bir kez kullanılabilir.
+	if leaveType.LimitAmount != nil && *leaveType.LimitAmount > 0 {
+		year := leave.StartDate.Year()
+		existingLeaves, err := s.leaveRepo.GetPendingOrApprovedLeavesByEmployeeAndTypeInYear(leave.EmployeeID, leave.LeaveTypeID, year)
+		if err != nil {
+			return fmt.Errorf("failed to check existing limited leaves: %w", err)
+		}
+		if len(existingLeaves) > 0 {
+			return errors.New("Limitli izinler yılda bir kez kullanılabilir. Bu izin türü için daha önce giriş yapılmış.")
+		}
+	}
+
 	// Validate leave balance for non-admin users
 	if err := s.ValidateLeaveBalance(leave.EmployeeID, leave.LeaveTypeID, leave.RequestedDays, isAdmin); err != nil {
 		return err
@@ -192,8 +204,9 @@ func (s *leaveService) GetLeaveByIDFormatted(id uint) (*types.AdminLeaveRequestR
 			LastName:  leave.Employee.LastName,
 		},
 		LeaveType: types.LeaveTypeLookup{
-			ID:   leave.LeaveType.ID,
-			Name: leave.LeaveType.Name,
+			ID:          leave.LeaveType.ID,
+			Name:        leave.LeaveType.Name,
+			LimitAmount: leave.LeaveType.LimitAmount,
 		},
 		StartDate:           leave.StartDate,
 		EndDate:             leave.EndDate,
@@ -291,6 +304,27 @@ func (s *leaveService) UpdateLeave(leave *domain.LeaveRequest, userID uint) erro
 	for _, pendingLeave := range pendingLeaves {
 		if pendingLeave.ID != leave.ID {
 			return fmt.Errorf("Seçtiğiniz tarih aralığında bekleyen %s talebiniz olduğundan yeni talebiniz için izin girişi yapamazsınız", leaveType.Name)
+		}
+	}
+
+	// Limitli izinler yılda bir kez kullanılabilir.
+	if leaveType.LimitAmount != nil && *leaveType.LimitAmount > 0 {
+		year := leave.StartDate.Year()
+		existingLeaves, err := s.leaveRepo.GetPendingOrApprovedLeavesByEmployeeAndTypeInYear(leave.EmployeeID, leave.LeaveTypeID, year)
+		if err != nil {
+			return fmt.Errorf("failed to check existing limited leaves: %w", err)
+		}
+		
+		hasOtherExistingLeave := false
+		for _, existingLeave := range existingLeaves {
+			if existingLeave.ID != leave.ID {
+				hasOtherExistingLeave = true
+				break
+			}
+		}
+		
+		if hasOtherExistingLeave {
+			return errors.New("Limitli izinler yılda bir kez kullanılabilir. Bu izin türü için daha önce giriş yapılmış.")
 		}
 	}
 
@@ -407,8 +441,9 @@ func (s *leaveService) GetMyLeaveRequestsPaginated(userID uint, page, limit int,
 			CreatedAt: leave.CreatedAt,
 			UpdatedAt: leave.UpdatedAt,
 			LeaveType: types.LeaveTypeLookup{
-				ID:   leave.LeaveType.ID,
-				Name: leave.LeaveType.Name,
+				ID:          leave.LeaveType.ID,
+				Name:        leave.LeaveType.Name,
+				LimitAmount: leave.LeaveType.LimitAmount,
 			},
 			StartDate:           leave.StartDate,
 			EndDate:             leave.EndDate,
@@ -487,8 +522,9 @@ func (s *leaveService) GetAllLeaveRequestsPaginated(employeeID *uint, page, limi
 				LastName:  leave.Employee.LastName,
 			},
 			LeaveType: types.LeaveTypeLookup{
-				ID:   leave.LeaveType.ID,
-				Name: leave.LeaveType.Name,
+				ID:          leave.LeaveType.ID,
+				Name:        leave.LeaveType.Name,
+				LimitAmount: leave.LeaveType.LimitAmount,
 			},
 			StartDate:           leave.StartDate,
 			EndDate:             leave.EndDate,
