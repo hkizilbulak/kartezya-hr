@@ -26,6 +26,7 @@ type EmployeeRepository interface {
 	GetEmployeeCountByGender() ([]interface{}, error)
 	GetEmployeeCountByPosition() ([]interface{}, error)
 	GetEmployeeCountByCompanyDepartment() ([]interface{}, error)
+	GetEmployeeCountByGrade() ([]interface{}, error)
 	GetWorkDayReportData(startDate, endDate string, companyID, departmentID *uint) ([]types.WorkDayReportRow, error)
 	GetGradeReportData(companyID, departmentID *uint) ([]types.GradeReportRow, error)
 }
@@ -890,6 +891,37 @@ func (r *employeeRepository) GetEmployeeCountByCompanyDepartment() ([]interface{
 	}
 
 	// Convert to []interface{}
+	var data []interface{}
+	for _, result := range results {
+		data = append(data, result)
+	}
+	return data, nil
+}
+
+// GetEmployeeCountByGrade returns employee count grouped by grade
+func (r *employeeRepository) GetEmployeeCountByGrade() ([]interface{}, error) {
+	type GradeCount struct {
+		GradeName string `json:"grade_name"`
+		Count     int64  `json:"count"`
+	}
+
+	var results []GradeCount
+	err := r.db.Model(&domain.Employee{}).
+		Joins(fmt.Sprintf("LEFT JOIN %s ON %s.id = %s.grade_id AND %s.deleted = false",
+			domain.GetTableName("hr_grades"),
+			domain.GetTableName("hr_grades"),
+			domain.GetTableName("hr_employees"),
+			domain.GetTableName("hr_grades"))).
+		Where(fmt.Sprintf("%s.deleted = ? AND %s.status = ?", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), false, "ACTIVE").
+		Group("COALESCE(" + domain.GetTableName("hr_grades") + ".name, 'Bilinmiyor')").
+		Select("COALESCE(" + domain.GetTableName("hr_grades") + ".name, 'Bilinmiyor') as grade_name, COUNT(*) as count").
+		Order("count DESC").
+		Scan(&results).Error
+
+	if err != nil {
+		return nil, err
+	}
+
 	var data []interface{}
 	for _, result := range results {
 		data = append(data, result)

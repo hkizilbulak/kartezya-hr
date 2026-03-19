@@ -333,6 +333,7 @@ func main() {
 			dashboardRoutes.GET("/employees-by-gender", dashboardHandler.GetEmployeesByGender)
 			dashboardRoutes.GET("/employees-by-position", dashboardHandler.GetEmployeesByPosition)
 			dashboardRoutes.GET("/employees-by-company-department", dashboardHandler.GetEmployeesByCompanyDepartment)
+			dashboardRoutes.GET("/employees-by-grade", dashboardHandler.GetEmployeesByGrade)
 		}
 
 		// Report routes (Admin only)
