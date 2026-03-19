@@ -907,10 +907,18 @@ func (r *employeeRepository) GetEmployeeCountByGrade() ([]interface{}, error) {
 
 	var results []GradeCount
 	err := r.db.Model(&domain.Employee{}).
+		Joins(fmt.Sprintf("LEFT JOIN %s ON %s.employee_id = %s.id AND %s.deleted = false AND %s.start_date <= CURRENT_DATE AND (%s.end_date IS NULL OR %s.end_date >= CURRENT_DATE)",
+			domain.GetTableName("hr_employee_grades"),
+			domain.GetTableName("hr_employee_grades"),
+			domain.GetTableName("hr_employees"),
+			domain.GetTableName("hr_employee_grades"),
+			domain.GetTableName("hr_employee_grades"),
+			domain.GetTableName("hr_employee_grades"),
+			domain.GetTableName("hr_employee_grades"))).
 		Joins(fmt.Sprintf("LEFT JOIN %s ON %s.id = %s.grade_id AND %s.deleted = false",
 			domain.GetTableName("hr_grades"),
 			domain.GetTableName("hr_grades"),
-			domain.GetTableName("hr_employees"),
+			domain.GetTableName("hr_employee_grades"),
 			domain.GetTableName("hr_grades"))).
 		Where(fmt.Sprintf("%s.deleted = ? AND %s.status = ?", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), false, "ACTIVE").
 		Group("COALESCE(" + domain.GetTableName("hr_grades") + ".name, 'Bilinmiyor')").
