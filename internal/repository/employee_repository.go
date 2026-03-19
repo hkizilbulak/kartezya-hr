@@ -803,15 +803,27 @@ func (r *employeeRepository) GetEmployeeCountByPosition() ([]interface{}, error)
 
 	var results []PositionCount
 	err := r.db.Model(&domain.Employee{}).
-		Joins(fmt.Sprintf("JOIN %s ON %s.employee_id = %s.id",
+		Joins(fmt.Sprintf(`JOIN %s ON %s.employee_id = %s.id 
+			AND %s.deleted = false 
+			AND %s.id = (
+				SELECT id FROM %s 
+				WHERE employee_id = %s.id 
+				AND deleted = false 
+				ORDER BY start_date DESC 
+				LIMIT 1
+			)`,
+			domain.GetTableName("hr_employee_work_information"),
+			domain.GetTableName("hr_employee_work_information"),
+			domain.GetTableName("hr_employees"),
+			domain.GetTableName("hr_employee_work_information"),
 			domain.GetTableName("hr_employee_work_information"),
 			domain.GetTableName("hr_employee_work_information"),
 			domain.GetTableName("hr_employees"))).
-		Joins(fmt.Sprintf("JOIN %s ON %s.id = %s.job_position_id",
+		Joins(fmt.Sprintf("JOIN %s ON %s.id = %s.job_position_id AND %s.deleted = false",
 			domain.GetTableName("hr_job_positions"),
 			domain.GetTableName("hr_job_positions"),
-			domain.GetTableName("hr_employee_work_information"))).
-		Where(fmt.Sprintf("%s.deleted = ? AND %s.status = ?", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), false, "ACTIVE").
+			domain.GetTableName("hr_employee_work_information"),
+			domain.GetTableName("hr_job_positions"))).
 		Where(fmt.Sprintf("%s.deleted = ? AND %s.status = ?", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), false, "ACTIVE").
 		Group(fmt.Sprintf("%s.title", domain.GetTableName("hr_job_positions"))).
 		Select(fmt.Sprintf("%s.title as position_title, COUNT(*) as count", domain.GetTableName("hr_job_positions"))).
@@ -840,19 +852,32 @@ func (r *employeeRepository) GetEmployeeCountByCompanyDepartment() ([]interface{
 
 	var results []CompanyDepartmentCount
 	err := r.db.Model(&domain.Employee{}).
-		Joins(fmt.Sprintf("JOIN %s ON %s.employee_id = %s.id",
+		Joins(fmt.Sprintf(`JOIN %s ON %s.employee_id = %s.id 
+			AND %s.deleted = false 
+			AND %s.id = (
+				SELECT id FROM %s 
+				WHERE employee_id = %s.id 
+				AND deleted = false 
+				ORDER BY start_date DESC 
+				LIMIT 1
+			)`,
+			domain.GetTableName("hr_employee_work_information"),
+			domain.GetTableName("hr_employee_work_information"),
+			domain.GetTableName("hr_employees"),
+			domain.GetTableName("hr_employee_work_information"),
 			domain.GetTableName("hr_employee_work_information"),
 			domain.GetTableName("hr_employee_work_information"),
 			domain.GetTableName("hr_employees"))).
-		Joins(fmt.Sprintf("JOIN %s ON %s.id = %s.department_id",
+		Joins(fmt.Sprintf("JOIN %s ON %s.id = %s.department_id AND %s.deleted = false",
 			domain.GetTableName("hr_departments"),
 			domain.GetTableName("hr_departments"),
-			domain.GetTableName("hr_employee_work_information"))).
-		Joins(fmt.Sprintf("JOIN %s ON %s.id = %s.company_id",
-			domain.GetTableName("hr_companies"),
-			domain.GetTableName("hr_companies"),
+			domain.GetTableName("hr_employee_work_information"),
 			domain.GetTableName("hr_departments"))).
-		Where(fmt.Sprintf("%s.deleted = ? AND %s.status = ?", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), false, "ACTIVE").
+		Joins(fmt.Sprintf("JOIN %s ON %s.id = %s.company_id AND %s.deleted = false",
+			domain.GetTableName("hr_companies"),
+			domain.GetTableName("hr_companies"),
+			domain.GetTableName("hr_departments"),
+			domain.GetTableName("hr_companies"))).
 		Where(fmt.Sprintf("%s.deleted = ? AND %s.status = ?", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), false, "ACTIVE").
 		Group(fmt.Sprintf("%s.name, %s.name", domain.GetTableName("hr_companies"), domain.GetTableName("hr_departments"))).
 		Select(fmt.Sprintf("%s.name as company_name, %s.name as department_name, COUNT(*) as count",
