@@ -689,19 +689,19 @@ func (s *leaveService) ValidateLeaveBalance(employeeID, leaveTypeID uint, reques
 	// If leave type has a limit amount, check against approved leaves in current year
 	if leaveType.LimitAmount != nil && *leaveType.LimitAmount > 0 {
 		currentYear := time.Now().Year()
-		
+
 		// Get all approved leaves for this employee and leave type in current year
 		approvedLeaves, err := s.leaveRepo.GetApprovedLeavesByEmployeeAndTypeInYear(employeeID, leaveTypeID, currentYear)
 		if err != nil {
 			return fmt.Errorf("failed to get approved leaves: %w", err)
 		}
-		
+
 		// Calculate total used days from approved leaves
 		var totalUsedDays float64
 		for _, leave := range approvedLeaves {
 			totalUsedDays += leave.RequestedDays
 		}
-		
+
 		// Check if requested days + used days exceeds limit
 		if totalUsedDays+requestedDays > float64(*leaveType.LimitAmount) {
 			remainingLimit := float64(*leaveType.LimitAmount) - totalUsedDays
@@ -1049,8 +1049,8 @@ func (s *leaveService) DeleteLeaveType(id uint, userID uint) error {
 	return nil
 }
 
-// CalculateWorkingDays calculates the actual number of working days excluding weekends
-// It takes into account weekends and half-day leaves
+// CalculateWorkingDays calculates the actual number of working days excluding weekends and holidays
+// It takes into account weekends, holidays (full-day and half-day), and half-day leaves
 // isStartDateFullDay and isFinishDateFullDay parameters indicate if the start/end dates are full or half days
 func (s *leaveService) CalculateWorkingDays(startDate, endDate time.Time, isStartDateFullDay, isFinishDateFullDay bool) (float64, error) {
 	if startDate.After(endDate) {
@@ -1061,7 +1061,30 @@ func (s *leaveService) CalculateWorkingDays(startDate, endDate time.Time, isStar
 	startDate = time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, startDate.Location())
 	endDate = time.Date(endDate.Year(), endDate.Month(), endDate.Day(), 0, 0, 0, 0, endDate.Location())
 
-	// Count working days (excluding weekends only)
+	// Get holidays between the date range
+	holidays, err := s.holidayRepo.GetHolidaysBetweenDates(startDate, endDate)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get holidays: %w", err)
+	}
+
+	// Create a map of holiday dates with their full-day/half-day status
+	// map[date_string]holidayDayValue where holidayDayValue is 1.0 for full-day, 0.5 for half-day
+	holidayMap := make(map[string]float64)
+	for _, holiday := range holidays {
+		// Normalize holiday date to midnight
+		holidayDate := time.Date(holiday.HolidayDate.Year(), holiday.HolidayDate.Month(), holiday.HolidayDate.Day(), 0, 0, 0, 0, holiday.HolidayDate.Location())
+		dateKey := holidayDate.Format("2006-01-02")
+
+		// If it's a full-day holiday, it takes the entire day (1.0)
+		// If it's a half-day holiday, it only takes half the day (0.5)
+		if holiday.IsFullDay {
+			holidayMap[dateKey] = 1.0
+		} else {
+			holidayMap[dateKey] = 0.5
+		}
+	}
+
+	// Count working days (excluding weekends and considering holidays)
 	workingDays := 0.0
 	currentDate := startDate
 
@@ -1071,9 +1094,13 @@ func (s *leaveService) CalculateWorkingDays(startDate, endDate time.Time, isStar
 		dayOfWeek := currentDate.Weekday()
 		isWeekend := dayOfWeek == time.Saturday || dayOfWeek == time.Sunday
 
-		// Count working days if it's not a weekend
+		// Check if it's a holiday and get its value (1.0 for full-day, 0.5 for half-day, 0 if not a holiday)
+		dateKey := currentDate.Format("2006-01-02")
+		holidayDayValue, isHoliday := holidayMap[dateKey]
+
+		// Skip weekends entirely
 		if !isWeekend {
-			dayValue := 1.0 // Default to full day
+			dayValue := 1.0 // Default to full working day
 
 			// Apply half-day rules for start and end dates
 			if currentDate.Equal(startDate) && !isStartDateFullDay {
@@ -1092,7 +1119,19 @@ func (s *leaveService) CalculateWorkingDays(startDate, endDate time.Time, isStar
 				}
 			}
 
-			// Count the day value (could be 1.0 or 0.5)
+			// If this day is a holiday, subtract the holiday impact
+			if isHoliday {
+				// If it's a full-day holiday (1.0), no working day counts
+				// If it's a half-day holiday (0.5), only half working day counts
+				dayValue = dayValue - holidayDayValue
+
+				// Ensure dayValue doesn't go negative
+				if dayValue < 0 {
+					dayValue = 0
+				}
+			}
+
+			// Add the calculated day value
 			workingDays += dayValue
 		}
 
