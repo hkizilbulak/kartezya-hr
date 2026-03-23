@@ -127,6 +127,7 @@ func (s *lookupService) GetLeaveTypesLookup() ([]types.LeaveTypeLookup, error) {
 			ID:          leaveType.ID,
 			Name:        leaveType.Name,
 			Description: leaveType.Description,
+			LimitAmount: leaveType.LimitAmount,
 		}
 	}
 

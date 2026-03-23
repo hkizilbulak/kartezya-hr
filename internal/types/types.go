@@ -12,6 +12,7 @@ type LeaveTypeLookup struct {
 	ID          uint   `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	LimitAmount *int   `json:"limit_amount"`
 }
 
 // Grade response DTO

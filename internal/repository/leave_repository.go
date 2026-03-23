@@ -16,7 +16,7 @@ type LeaveRepository interface {
 	GetAll(limit, offset int, sortParams types.SortParams) ([]*domain.LeaveRequest, int64, error)
 	GetByEmployeeIDWithLeaveType(employeeID uint, limit, offset int, sortParams types.SortParams) ([]*domain.LeaveRequest, int64, error)
 	GetByEmployeeIDWithLeaveTypeAndStatus(employeeID uint, limit, offset int, sortParams types.SortParams, status string) ([]*domain.LeaveRequest, int64, error)
-	GetAllWithStatus(limit, offset int, sortParams types.SortParams, status string) ([]*domain.LeaveRequest, int64, error)
+	GetAllWithStatus(employeeID *uint, limit, offset int, sortParams types.SortParams, status string) ([]*domain.LeaveRequest, int64, error)
 	Update(leave *domain.LeaveRequest) error
 	Delete(id uint) error
 	GetByEmployeeID(employeeID uint, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error)
@@ -27,6 +27,7 @@ type LeaveRepository interface {
 	GetPendingLeavesByEmployeeIDAndDateRange(employeeID uint, leaveTypeID uint, startDate, endDate time.Time) ([]*domain.LeaveRequest, error)
 	GetUsedLeaveDaysByEmployeesInDateRange(employeeIDs []uint, startDate, endDate string) (map[uint]float64, error)
 	GetApprovedLeavesByEmployeeAndTypeInYear(employeeID uint, leaveTypeID uint, year int) ([]*domain.LeaveRequest, error)
+	GetPendingOrApprovedLeavesByEmployeeAndTypeInYear(employeeID uint, leaveTypeID uint, year int) ([]*domain.LeaveRequest, error)
 }
 
 // LeaveTypeRepository interface for leave types
@@ -228,7 +229,7 @@ func (r *leaveRepository) GetByDateRange(startDate, endDate string) ([]*domain.L
 	return leaves, err
 }
 
-func (r *leaveRepository) GetAllWithStatus(limit, offset int, sortParams types.SortParams, status string) ([]*domain.LeaveRequest, int64, error) {
+func (r *leaveRepository) GetAllWithStatus(employeeID *uint, limit, offset int, sortParams types.SortParams, status string) ([]*domain.LeaveRequest, int64, error) {
 	var leaves []*domain.LeaveRequest
 	var total int64
 
@@ -236,6 +237,9 @@ func (r *leaveRepository) GetAllWithStatus(limit, offset int, sortParams types.S
 	query := r.db.Model(&domain.LeaveRequest{}).Where("deleted = ?", false)
 	if status != "" {
 		query = query.Where("status = ?", status)
+	}
+	if employeeID != nil {
+		query = query.Where("employee_id = ?", *employeeID)
 	}
 
 	// Count total records
@@ -247,6 +251,9 @@ func (r *leaveRepository) GetAllWithStatus(limit, offset int, sortParams types.S
 	mainQuery := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Where("deleted = ?", false)
 	if status != "" {
 		mainQuery = mainQuery.Where("status = ?", status)
+	}
+	if employeeID != nil {
+		mainQuery = mainQuery.Where("employee_id = ?", *employeeID)
 	}
 
 	// Apply sorting
@@ -389,7 +396,7 @@ func (r *leaveTypeRepository) GetAll(limit, offset int, sortParams types.SortPar
 
 func (r *leaveTypeRepository) GetLookup() ([]*domain.LeaveType, error) {
 	var leaveTypes []*domain.LeaveType
-	err := r.db.Select("id, name, description").Where("deleted = ?", false).Order("id ASC").Find(&leaveTypes).Error
+	err := r.db.Select("id, name, description, limit_amount").Where("deleted = ?", false).Order("id ASC").Find(&leaveTypes).Error
 	return leaveTypes, err
 }
 
@@ -450,6 +457,31 @@ func (r *leaveRepository) GetApprovedLeavesByEmployeeAndTypeInYear(employeeID ui
 		Where("employee_id = ?", employeeID).
 		Where("leave_type_id = ?", leaveTypeID).
 		Where("status = ?", "APPROVED").
+		Where("deleted = ?", false).
+		Where("start_date >= ? AND start_date <= ?", yearStart, yearEnd).
+		Order("start_date DESC").
+		Find(&leaves).Error
+	
+	if err != nil {
+		return nil, err
+	}
+	
+	return leaves, nil
+}
+
+// GetPendingOrApprovedLeavesByEmployeeAndTypeInYear returns all pending or approved leave requests for an employee
+// of a specific leave type within a given year
+func (r *leaveRepository) GetPendingOrApprovedLeavesByEmployeeAndTypeInYear(employeeID uint, leaveTypeID uint, year int) ([]*domain.LeaveRequest, error) {
+	var leaves []*domain.LeaveRequest
+	
+	// Calculate start and end of the year
+	yearStart := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+	yearEnd := time.Date(year, 12, 31, 23, 59, 59, 999999999, time.UTC)
+	
+	err := r.db.
+		Where("employee_id = ?", employeeID).
+		Where("leave_type_id = ?", leaveTypeID).
+		Where("status IN (?, ?)", "PENDING", "APPROVED").
 		Where("deleted = ?", false).
 		Where("start_date >= ? AND start_date <= ?", yearStart, yearEnd).
 		Order("start_date DESC").

@@ -55,6 +55,11 @@ type CompanyDepartmentChartData struct {
 	Count          int64  `json:"count"`
 }
 
+type GradeChartData struct {
+	GradeName string `json:"grade_name"`
+	Count     int64  `json:"count"`
+}
+
 // GetDashboardData godoc
 // @Summary Get dashboard data
 // @Description Get all dashboard statistics in a single request
@@ -221,6 +226,43 @@ func (h *DashboardHandler) GetEmployeesByCompanyDepartment(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   "Failed to fetch employees by company and department",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    data,
+	})
+}
+
+// GetEmployeesByGrade godoc
+// @Summary Get employees count by grade
+// @Description Get employee statistics grouped by grade
+// @Tags dashboard
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} APIResponse{data=[]GradeChartData}
+// @Failure 401 {object} APIResponse
+// @Failure 500 {object} APIResponse
+// @Router /dashboard/employees-by-grade [get]
+func (h *DashboardHandler) GetEmployeesByGrade(c *gin.Context) {
+	_, _, _, ok := getUserContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Authentication required",
+		})
+		return
+	}
+
+	data, err := h.employeeService.GetEmployeeCountByGrade()
+	if err != nil {
+		log.Printf("Error fetching employees by grade: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to fetch employees by grade",
 		})
 		return
 	}

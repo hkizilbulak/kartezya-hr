@@ -24,6 +24,7 @@ type EmployeeService interface {
 	GetEmployeeCountByGender() ([]interface{}, error)
 	GetEmployeeCountByPosition() ([]interface{}, error)
 	GetEmployeeCountByCompanyDepartment() ([]interface{}, error)
+	GetEmployeeCountByGrade() ([]interface{}, error)
 }
 
 type employeeService struct {
@@ -877,6 +878,11 @@ func (s *employeeService) GetEmployeeCountByPosition() ([]interface{}, error) {
 // GetEmployeeCountByCompanyDepartment returns employee count grouped by company and department
 func (s *employeeService) GetEmployeeCountByCompanyDepartment() ([]interface{}, error) {
 	return s.employeeRepo.GetEmployeeCountByCompanyDepartment()
+}
+
+// GetEmployeeCountByGrade returns employee count grouped by grade
+func (s *employeeService) GetEmployeeCountByGrade() ([]interface{}, error) {
+	return s.employeeRepo.GetEmployeeCountByGrade()
 }
 
 // assignRolesToUser assigns roles to a user based on role names

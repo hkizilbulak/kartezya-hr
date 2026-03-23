@@ -39,7 +39,7 @@ type LeaveService interface {
 	GetLeavesByEmployeeID(employeeID uint, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error)
 	GetLeavesByUserID(userID uint, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error)
 	GetMyLeaveRequestsPaginated(userID uint, page, limit int, sortParams types.SortParams, status string) (*PaginatedResponse, error)
-	GetAllLeaveRequestsPaginated(page, limit int, sortParams types.SortParams, status string) (*PaginatedResponse, error)
+	GetAllLeaveRequestsPaginated(employeeID *uint, page, limit int, sortParams types.SortParams, status string) (*PaginatedResponse, error)
 	GetLeavesByStatus(status string, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error)
 	GetLeavesByDateRange(startDate, endDate string) ([]*domain.LeaveRequest, error)
 	ApproveLeave(id uint, userID uint) error
@@ -50,6 +50,7 @@ type LeaveService interface {
 	ValidateLeaveBalance(employeeID, leaveTypeID uint, requestedDays float64, isAdmin bool) error
 	DeductLeaveBalance(employeeID, leaveTypeID uint, requestedDays float64, userID uint) error
 	GetMyLeaveBalances(userID uint, page, limit int, sortParams types.SortParams) (*PaginatedResponse, error)
+	GetEmployeeLeaveBalances(employeeID uint, page, limit int, sortParams types.SortParams) (*PaginatedResponse, error)
 
 	// Leave Type methods
 	CreateLeaveType(leaveType *domain.LeaveType, userID uint) error
@@ -60,6 +61,7 @@ type LeaveService interface {
 
 	// Working days calculation
 	CalculateWorkingDays(startDate, endDate time.Time, isStartDateFullDay, isFinishDateFullDay bool) (float64, error)
+	CalculateEndDate(startDate time.Time, requestedDays float64, isStartDateFullDay, isFinishDateFullDay bool) (time.Time, error)
 }
 
 type leaveService struct {
@@ -140,6 +142,18 @@ func (s *leaveService) CreateLeave(leave *domain.LeaveRequest, userID uint, isAd
 		}
 	}
 
+	// Limitli izinler yılda bir kez kullanılabilir.
+	if leaveType.LimitAmount != nil && *leaveType.LimitAmount > 0 {
+		year := leave.StartDate.Year()
+		existingLeaves, err := s.leaveRepo.GetPendingOrApprovedLeavesByEmployeeAndTypeInYear(leave.EmployeeID, leave.LeaveTypeID, year)
+		if err != nil {
+			return fmt.Errorf("failed to check existing limited leaves: %w", err)
+		}
+		if len(existingLeaves) > 0 {
+			return errors.New("Limitli izinler yılda bir kez kullanılabilir. Bu izin türü için daha önce giriş yapılmış.")
+		}
+	}
+
 	// Validate leave balance for non-admin users
 	if err := s.ValidateLeaveBalance(leave.EmployeeID, leave.LeaveTypeID, leave.RequestedDays, isAdmin); err != nil {
 		return err
@@ -191,8 +205,9 @@ func (s *leaveService) GetLeaveByIDFormatted(id uint) (*types.AdminLeaveRequestR
 			LastName:  leave.Employee.LastName,
 		},
 		LeaveType: types.LeaveTypeLookup{
-			ID:   leave.LeaveType.ID,
-			Name: leave.LeaveType.Name,
+			ID:          leave.LeaveType.ID,
+			Name:        leave.LeaveType.Name,
+			LimitAmount: leave.LeaveType.LimitAmount,
 		},
 		StartDate:           leave.StartDate,
 		EndDate:             leave.EndDate,
@@ -290,6 +305,27 @@ func (s *leaveService) UpdateLeave(leave *domain.LeaveRequest, userID uint) erro
 	for _, pendingLeave := range pendingLeaves {
 		if pendingLeave.ID != leave.ID {
 			return fmt.Errorf("Seçtiğiniz tarih aralığında bekleyen %s talebiniz olduğundan yeni talebiniz için izin girişi yapamazsınız", leaveType.Name)
+		}
+	}
+
+	// Limitli izinler yılda bir kez kullanılabilir.
+	if leaveType.LimitAmount != nil && *leaveType.LimitAmount > 0 {
+		year := leave.StartDate.Year()
+		existingLeaves, err := s.leaveRepo.GetPendingOrApprovedLeavesByEmployeeAndTypeInYear(leave.EmployeeID, leave.LeaveTypeID, year)
+		if err != nil {
+			return fmt.Errorf("failed to check existing limited leaves: %w", err)
+		}
+		
+		hasOtherExistingLeave := false
+		for _, existingLeave := range existingLeaves {
+			if existingLeave.ID != leave.ID {
+				hasOtherExistingLeave = true
+				break
+			}
+		}
+		
+		if hasOtherExistingLeave {
+			return errors.New("Limitli izinler yılda bir kez kullanılabilir. Bu izin türü için daha önce giriş yapılmış.")
 		}
 	}
 
@@ -406,8 +442,9 @@ func (s *leaveService) GetMyLeaveRequestsPaginated(userID uint, page, limit int,
 			CreatedAt: leave.CreatedAt,
 			UpdatedAt: leave.UpdatedAt,
 			LeaveType: types.LeaveTypeLookup{
-				ID:   leave.LeaveType.ID,
-				Name: leave.LeaveType.Name,
+				ID:          leave.LeaveType.ID,
+				Name:        leave.LeaveType.Name,
+				LimitAmount: leave.LeaveType.LimitAmount,
 			},
 			StartDate:           leave.StartDate,
 			EndDate:             leave.EndDate,
@@ -439,7 +476,7 @@ func (s *leaveService) GetMyLeaveRequestsPaginated(userID uint, page, limit int,
 	}, nil
 }
 
-func (s *leaveService) GetAllLeaveRequestsPaginated(page, limit int, sortParams types.SortParams, status string) (*PaginatedResponse, error) {
+func (s *leaveService) GetAllLeaveRequestsPaginated(employeeID *uint, page, limit int, sortParams types.SortParams, status string) (*PaginatedResponse, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -456,7 +493,7 @@ func (s *leaveService) GetAllLeaveRequestsPaginated(page, limit int, sortParams 
 	}
 
 	offset := (page - 1) * limit
-	leaves, total, err := s.leaveRepo.GetAllWithStatus(limit, offset, sortParams, status)
+	leaves, total, err := s.leaveRepo.GetAllWithStatus(employeeID, limit, offset, sortParams, status)
 	if err != nil {
 		return nil, err
 	}
@@ -486,8 +523,9 @@ func (s *leaveService) GetAllLeaveRequestsPaginated(page, limit int, sortParams 
 				LastName:  leave.Employee.LastName,
 			},
 			LeaveType: types.LeaveTypeLookup{
-				ID:   leave.LeaveType.ID,
-				Name: leave.LeaveType.Name,
+				ID:          leave.LeaveType.ID,
+				Name:        leave.LeaveType.Name,
+				LimitAmount: leave.LeaveType.LimitAmount,
 			},
 			StartDate:           leave.StartDate,
 			EndDate:             leave.EndDate,
@@ -835,6 +873,52 @@ func (s *leaveService) GetMyLeaveBalances(userID uint, page, limit int, sortPara
 	}, nil
 }
 
+func (s *leaveService) GetEmployeeLeaveBalances(employeeID uint, page, limit int, sortParams types.SortParams) (*PaginatedResponse, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 10
+	}
+
+	// Set defaults for sorting
+	if sortParams.Sort == "" {
+		sortParams.Sort = "leave_type_id"
+	}
+	if sortParams.Direction == "" {
+		sortParams.Direction = "ASC"
+	}
+
+	offset := (page - 1) * limit
+	leaveBalances, total, err := s.leaveBalanceRepo.GetByEmployeeIDPaginated(employeeID, limit, offset, sortParams)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get leave balances: %w", err)
+	}
+
+	// Convert to MyLeaveBalanceResponse format
+	var responseData []*types.MyLeaveBalanceResponse
+	for _, balance := range leaveBalances {
+		responseData = append(responseData, &types.MyLeaveBalanceResponse{
+			LeaveTypeName: balance.LeaveType.Name,
+			TotalDays:     balance.TotalDays,
+			UsedDays:      balance.UsedDays,
+			RemainingDays: balance.RemainingDays,
+		})
+	}
+
+	return &PaginatedResponse{
+		Data: responseData,
+		Page: PageInfo{
+			Total:      total,
+			Page:       page,
+			Limit:      limit,
+			TotalPages: (total + int64(limit) - 1) / int64(limit),
+			Sort:       sortParams.Sort,
+			Direction:  sortParams.Direction,
+		},
+	}, nil
+}
+
 // ReverseLeaveBalance reverses the leave balance deduction when an approved leave is cancelled
 func (s *leaveService) ReverseLeaveBalance(employeeID, leaveTypeID uint, requestedDays float64, userID uint) error {
 	// Get leave balance record for employee and leave type
@@ -1145,4 +1229,35 @@ func (s *leaveService) CalculateWorkingDays(startDate, endDate time.Time, isStar
 	}
 
 	return workingDays, nil
+}
+
+// CalculateEndDate calculates the end date given a start date and requested working days
+func (s *leaveService) CalculateEndDate(startDate time.Time, requestedDays float64, isStartDateFullDay, isFinishDateFullDay bool) (time.Time, error) {
+	if requestedDays <= 0 {
+		return time.Time{}, errors.New("requested days must be greater than 0")
+	}
+
+	currentDate := time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, startDate.Location())
+	
+	for {
+		days, err := s.CalculateWorkingDays(startDate, currentDate, isStartDateFullDay, isFinishDateFullDay)
+		if err != nil {
+			return time.Time{}, err
+		}
+		
+		if days == requestedDays {
+			return currentDate, nil
+		}
+		
+		if days > requestedDays {
+			return time.Time{}, errors.New("impossible to reach exactly the requested days with the given full/half day settings")
+		}
+
+		currentDate = currentDate.AddDate(0, 0, 1)
+
+		// Hard limit to prevent infinite loops (e.g. searching for 1000 days or due to zero progress)
+		if currentDate.Sub(startDate).Hours() > 24*365*10 {
+			return time.Time{}, errors.New("requested days too large or calculation loop exceeded limit")
+		}
+	}
 }
