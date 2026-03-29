@@ -130,6 +130,23 @@ func (s *leaveService) CreateLeave(leave *domain.LeaveRequest, userID uint, isAd
 
 	// Check for birthday leave restrictions (Doğum Günü İzni)
 	if leaveType.Name == "Doğum Günü İzni" || leaveType.Name == "Birthday Leave" {
+		// Check if employee has completed one year of employment
+		employee, err := s.employeeRepo.GetByID(leave.EmployeeID)
+		if err != nil {
+			return fmt.Errorf("failed to get employee: %w", err)
+		}
+		
+		if employee.HireDate == nil {
+			return errors.New("İşe başlama tarihi bulunamadığı için doğum günü izni kullanılamaz")
+		}
+		
+		// Calculate if employee has completed one year
+		oneYearAfterHire := employee.HireDate.AddDate(1, 0, 0)
+		now := time.Now()
+		if now.Before(oneYearAfterHire) {
+			return errors.New("Doğum günü izni kullanabilmek için en az 1 yıl çalışma sürenizi doldurmuş olmanız gerekmektedir")
+		}
+		
 		// Check if requested days exceeds 1 day limit
 		if leave.RequestedDays > 1 {
 			return errors.New("Doğum günü izni en fazla 1 gün girilebilir")
