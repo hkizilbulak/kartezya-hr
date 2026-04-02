@@ -27,7 +27,7 @@ type EmployeeRepository interface {
 	GetEmployeeCountByPosition() ([]interface{}, error)
 	GetEmployeeCountByCompanyDepartment() ([]interface{}, error)
 	GetEmployeeCountByGrade() ([]interface{}, error)
-	GetWorkDayReportData(startDate, endDate string, companyID, departmentID *uint) ([]types.WorkDayReportRow, error)
+	GetWorkDayReportData(startDate, endDate string, companyID *uint, departmentIDs []uint) ([]types.WorkDayReportRow, error)
 	GetGradeReportData(companyID, departmentID *uint) ([]types.GradeReportRow, error)
 }
 
@@ -938,7 +938,7 @@ func (r *employeeRepository) GetEmployeeCountByGrade() ([]interface{}, error) {
 }
 
 // GetWorkDayReportData executes the work day report SQL query
-func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, companyID, departmentID *uint) ([]types.WorkDayReportRow, error) {
+func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, companyID *uint, departmentIDs []uint) ([]types.WorkDayReportRow, error) {
 	var rows []types.WorkDayReportRow
 
 	// Build base query with numbered parameters for PostgreSQL
@@ -1039,11 +1039,16 @@ func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, com
 		paramCounter++
 	}
 
-	// Add department filter if provided
-	if departmentID != nil {
-		query += fmt.Sprintf("\n\t\t\tAND d.id = $%d", paramCounter)
-		params = append(params, *departmentID)
-		paramCounter++
+	// Add department filter with IN operator if provided
+	if len(departmentIDs) > 0 {
+		placeholders := make([]string, 0, len(departmentIDs))
+		for _, departmentID := range departmentIDs {
+			placeholders = append(placeholders, fmt.Sprintf("$%d", paramCounter))
+			params = append(params, departmentID)
+			paramCounter++
+		}
+
+		query += fmt.Sprintf("\n\t\t\tAND d.id IN (%s)", strings.Join(placeholders, ", "))
 	}
 
 	// Add GROUP BY and ORDER BY

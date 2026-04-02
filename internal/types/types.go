@@ -327,10 +327,25 @@ type EmployeeDetailResponse struct {
 
 // WorkDayReportFilter represents the filter criteria for work day report
 type WorkDayReportFilter struct {
-	StartDate    time.Time `json:"start_date"`
-	EndDate      time.Time `json:"end_date"`
-	CompanyID    *uint     `json:"company_id"`
-	DepartmentID *uint     `json:"department_id"`
+	StartDate     time.Time `json:"start_date"`
+	EndDate       time.Time `json:"end_date"`
+	CompanyID     *uint     `json:"company_id"`
+	DepartmentIDs []uint    `json:"department_ids"`
+}
+
+// ColumnConfig represents export column metadata from UI
+type ColumnConfig struct {
+	Key   string `json:"key" binding:"required"`
+	Label string `json:"label" binding:"required"`
+}
+
+// WorkDayReportExportRequest represents request payload for dynamic work day Excel export
+type WorkDayReportExportRequest struct {
+	StartDate     string         `json:"start_date" binding:"required"`
+	EndDate       string         `json:"end_date" binding:"required"`
+	CompanyID     *uint          `json:"company_id"`
+	DepartmentIDs []uint         `json:"department_ids"`
+	ExportColumns []ColumnConfig `json:"export_columns" binding:"required"`
 }
 
 // WorkDayReportRow represents a single row in the work day report
