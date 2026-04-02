@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"kartezya-hr/internal/service"
@@ -30,7 +31,8 @@ func NewReportHandler(reportService service.ReportService) *ReportHandler {
 // @Param start_date query string true "Start Date (YYYY-MM-DD)"
 // @Param end_date query string true "End Date (YYYY-MM-DD)"
 // @Param company_id query uint false "Company ID"
-// @Param department_id query uint false "Department ID"
+// @Param department_ids query []int false "Department IDs (supports repeated param or comma separated), example: department_ids=1&department_ids=2 or department_ids=1,2"
+// @Param department_id query int false "Legacy single department ID (backward compatibility)"
 // @Param is_active query bool false "Is Active" default(true)
 // @Success 200 {object} types.WorkDayReportResponse
 // @Failure 400 {object} map[string]string
@@ -42,7 +44,8 @@ func (h *ReportHandler) GetWorkDayReport(c *gin.Context) {
 	startDateStr := c.Query("start_date")
 	endDateStr := c.Query("end_date")
 	companyIDStr := c.Query("company_id")
-	departmentIDStr := c.Query("department_id")
+	departmentIDsQuery := c.QueryArray("department_ids")
+	legacyDepartmentID := c.Query("department_id")
 
 	// Parse dates
 	startDate, err := time.Parse("2006-01-02", startDateStr)
@@ -69,23 +72,46 @@ func (h *ReportHandler) GetWorkDayReport(c *gin.Context) {
 		companyID = &uid
 	}
 
-	var departmentID *uint
-	if departmentIDStr != "" {
-		id, err := strconv.ParseUint(departmentIDStr, 10, 32)
-		if err != nil {
+	var departmentIDs []uint
+	if len(departmentIDsQuery) == 0 {
+		singleValue := c.Query("department_ids")
+		if singleValue != "" {
+			departmentIDsQuery = append(departmentIDsQuery, singleValue)
+		}
+	}
+
+	for _, queryValue := range departmentIDsQuery {
+		for _, rawID := range strings.Split(queryValue, ",") {
+			trimmedID := strings.TrimSpace(rawID)
+			if trimmedID == "" {
+				continue
+			}
+
+			id, parseErr := strconv.ParseUint(trimmedID, 10, 32)
+			if parseErr != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid department_ids. Use uint values (comma separated or repeated query params)"})
+				return
+			}
+
+			departmentIDs = append(departmentIDs, uint(id))
+		}
+	}
+
+	if legacyDepartmentID != "" {
+		id, parseErr := strconv.ParseUint(legacyDepartmentID, 10, 32)
+		if parseErr != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid department_id"})
 			return
 		}
-		uid := uint(id)
-		departmentID = &uid
+		departmentIDs = append(departmentIDs, uint(id))
 	}
 
 	// Create filter
 	filter := &types.WorkDayReportFilter{
-		StartDate:    startDate,
-		EndDate:      endDate,
-		CompanyID:    companyID,
-		DepartmentID: departmentID,
+		StartDate:     startDate,
+		EndDate:       endDate,
+		CompanyID:     companyID,
+		DepartmentIDs: departmentIDs,
 	}
 
 	// Get report
@@ -96,6 +122,35 @@ func (h *ReportHandler) GetWorkDayReport(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, report)
+}
+
+// ExportWorkDayReportExcel godoc
+// @Summary Export Work Day Report as Excel
+// @Description Export work day report with dynamic export_columns and multiple department_ids
+// @Tags reports
+// @Accept json
+// @Produce application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+// @Param request body types.WorkDayReportExportRequest true "Export request"
+// @Success 200 {file} binary
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /reports/work-day/export [post]
+// @Security BearerAuth
+func (h *ReportHandler) ExportWorkDayReportExcel(c *gin.Context) {
+	var request types.WorkDayReportExportRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	excelFile, err := h.reportService.ExportWorkDayReportExcel(&request)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Header("Content-Disposition", "attachment; filename=work-day-report.xlsx")
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", excelFile)
 }
 
 // GetGradeReport godoc

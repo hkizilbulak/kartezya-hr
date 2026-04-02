@@ -2,14 +2,18 @@ package service
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	"kartezya-hr/internal/repository"
 	"kartezya-hr/internal/types"
+
+	"github.com/xuri/excelize/v2"
 )
 
 type ReportService interface {
 	GetWorkDayReport(filter *types.WorkDayReportFilter) (*types.WorkDayReportResponse, error)
+	ExportWorkDayReportExcel(request *types.WorkDayReportExportRequest) ([]byte, error)
 	GetGradeReportData(filter *types.GradeReportFilter) (*types.GradeReportResponse, error)
 }
 
@@ -47,7 +51,7 @@ func (s *reportService) GetWorkDayReport(filter *types.WorkDayReportFilter) (*ty
 		startDateStr,
 		endDateStr,
 		filter.CompanyID,
-		filter.DepartmentID,
+		filter.DepartmentIDs,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get work day report data: %w", err)
@@ -71,6 +75,98 @@ func (s *reportService) GetWorkDayReport(filter *types.WorkDayReportFilter) (*ty
 		TotalHolidayDays: totalHolidayDays,
 		Rows:             rows,
 	}, nil
+}
+
+func (s *reportService) ExportWorkDayReportExcel(request *types.WorkDayReportExportRequest) ([]byte, error) {
+	startDate, err := time.Parse("2006-01-02", request.StartDate)
+	if err != nil {
+		return nil, fmt.Errorf("invalid start_date format: %w", err)
+	}
+
+	endDate, err := time.Parse("2006-01-02", request.EndDate)
+	if err != nil {
+		return nil, fmt.Errorf("invalid end_date format: %w", err)
+	}
+
+	if len(request.ExportColumns) == 0 {
+		return nil, fmt.Errorf("export_columns cannot be empty")
+	}
+
+	filter := &types.WorkDayReportFilter{
+		StartDate:     startDate,
+		EndDate:       endDate,
+		CompanyID:     request.CompanyID,
+		DepartmentIDs: request.DepartmentIDs,
+	}
+
+	report, err := s.GetWorkDayReport(filter)
+	if err != nil {
+		return nil, err
+	}
+
+	f := excelize.NewFile()
+	sheetName := "Work Day Report"
+	f.SetSheetName("Sheet1", sheetName)
+
+	for colIndex, col := range request.ExportColumns {
+		headerCell, cellErr := excelize.CoordinatesToCellName(colIndex+1, 1)
+		if cellErr != nil {
+			return nil, fmt.Errorf("failed to create header cell: %w", cellErr)
+		}
+		if err = f.SetCellValue(sheetName, headerCell, col.Label); err != nil {
+			return nil, fmt.Errorf("failed to write header value: %w", err)
+		}
+	}
+
+	for rowIndex, row := range report.Rows {
+		for colIndex, col := range request.ExportColumns {
+			value, valueErr := getFieldValueByJSONKey(row, col.Key)
+			if valueErr != nil {
+				return nil, valueErr
+			}
+
+			dataCell, cellErr := excelize.CoordinatesToCellName(colIndex+1, rowIndex+2)
+			if cellErr != nil {
+				return nil, fmt.Errorf("failed to create data cell: %w", cellErr)
+			}
+
+			if err = f.SetCellValue(sheetName, dataCell, value); err != nil {
+				return nil, fmt.Errorf("failed to write data value: %w", err)
+			}
+		}
+	}
+
+	buffer, err := f.WriteToBuffer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate excel: %w", err)
+	}
+
+	return buffer.Bytes(), nil
+}
+
+func getFieldValueByJSONKey(row types.WorkDayReportRow, key string) (interface{}, error) {
+	v := reflect.ValueOf(row)
+	t := reflect.TypeOf(row)
+
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		jsonTag := field.Tag.Get("json")
+		if jsonTag != key {
+			continue
+		}
+
+		fieldValue := v.Field(i)
+		if fieldValue.Kind() == reflect.Ptr {
+			if fieldValue.IsNil() {
+				return "", nil
+			}
+			return fieldValue.Elem().Interface(), nil
+		}
+
+		return fieldValue.Interface(), nil
+	}
+
+	return nil, fmt.Errorf("unsupported export column key: %s", key)
 }
 
 // calculateHolidayDays calculates the number of public holiday days in a date range
