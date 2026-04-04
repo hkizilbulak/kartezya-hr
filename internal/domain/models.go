@@ -1,9 +1,12 @@
 package domain
 
 import (
+	"fmt"
 	"time"
 
 	"kartezya-hr/internal/config"
+
+	"gorm.io/gorm"
 )
 
 // Global config variable for table naming
@@ -424,4 +427,126 @@ func (LeaveDocument) TableName() string {
 // AuditLog table name
 func (AuditLog) TableName() string {
 	return GetTableName("hr_audit_logs")
+}
+
+// ==================== Document Management System (DYS) ====================
+
+// Attachment Related Type Enum - Defines which module the attachment belongs to
+type AttachmentRelatedType int
+
+const (
+	AttachmentRelatedTypeExpense  AttachmentRelatedType = 1 // Masraf
+	AttachmentRelatedTypeLeave    AttachmentRelatedType = 2 // İzin
+	AttachmentRelatedTypeUser     AttachmentRelatedType = 3 // Kullanıcı/Profil
+	AttachmentRelatedTypeEmployee AttachmentRelatedType = 4 // Çalışan Özlük Dosyası
+	AttachmentRelatedTypeContract AttachmentRelatedType = 5 // Sözleşme
+)
+
+// AttachmentType Enum - Defines document category
+type AttachmentType int
+
+const (
+	AttachmentTypeInvoice       AttachmentType = 1  // Fatura
+	AttachmentTypeMedicalReport AttachmentType = 2  // Sağlık Raporu
+	AttachmentTypeAvatar        AttachmentType = 3  // Profil Resmi
+	AttachmentTypeReceipt       AttachmentType = 4  // Makbuz
+	AttachmentTypeContract      AttachmentType = 5  // Sözleşme
+	AttachmentTypeIdentity      AttachmentType = 6  // Kimlik
+	AttachmentTypeDiploma       AttachmentType = 7  // Diploma
+	AttachmentTypeCertificate   AttachmentType = 8  // Sertifika
+	AttachmentTypeOther         AttachmentType = 99 // Diğer
+)
+
+// AttachmentStatus Enum - Defines attachment lifecycle status
+type AttachmentStatus int
+
+const (
+	AttachmentStatusTemporary AttachmentStatus = 1 // Geçici (yüklenmiş ama henüz ilişkilendirilmemiş)
+	AttachmentStatusLinked    AttachmentStatus = 2 // İlişkilendirilmiş (bir kayda bağlanmış)
+	AttachmentStatusArchived  AttachmentStatus = 3 // Arşivlenmiş (silinmiş gibi ama fiziksel olarak durur)
+)
+
+// Attachment represents a generic document/file in the system
+// This is the Single Source of Truth for all file uploads across all modules
+type Attachment struct {
+	ID          string                `json:"id" gorm:"primaryKey;type:varchar(36)"`          // UUID as string
+	OwnerID     uint                  `json:"owner_id" gorm:"not null;index"`                 // User who uploaded the file
+	RelatedType AttachmentRelatedType `json:"related_type" gorm:"not null;index"`             // Which module (Expense, Leave, User, etc.)
+	RelatedID   *uint                 `json:"related_id" gorm:"index"`                        // Related record ID (nullable until linked)
+	Type        AttachmentType        `json:"type" gorm:"not null"`                           // Document category (Invoice, Medical, etc.)
+	Status      AttachmentStatus      `json:"status" gorm:"not null;index;default:1"`         // Lifecycle status (Temporary, Linked, Archived)
+	FileName    string                `json:"file_name" gorm:"type:varchar(255);not null"`    // Original filename
+	Path        string                `json:"path" gorm:"type:varchar(500);not null"`         // Storage path (e.g., expense/2026/04/uuid_name.pdf)
+	ContentType string                `json:"content_type" gorm:"type:varchar(100);not null"` // MIME type
+	FileSize    int64                 `json:"file_size" gorm:"not null"`                      // File size in bytes
+	Hash        string                `json:"hash" gorm:"type:varchar(64);index"`             // SHA256 hash for duplicate detection
+	CreatedAt   time.Time             `json:"created_at"`
+	UpdatedAt   time.Time             `json:"updated_at"`
+
+	// Relationships
+	Owner User `json:"owner,omitempty" gorm:"foreignKey:OwnerID"`
+}
+
+// Attachment table name
+func (Attachment) TableName() string {
+	return GetTableName("hr_attachments")
+}
+
+// BeforeCreate hook to generate UUID
+func (a *Attachment) BeforeCreate(tx *gorm.DB) error {
+	if a.ID == "" {
+		a.ID = GenerateUUID()
+	}
+	return nil
+}
+
+// GenerateUUID generates a new UUID string
+func GenerateUUID() string {
+	// Simple UUID generation without external dependency
+	// Using timestamp + random for uniqueness
+	return fmt.Sprintf("%d-%d", time.Now().UnixNano(), time.Now().Unix())
+}
+
+// ExpenseRequest represents an expense claim/reimbursement request
+type ExpenseRequest struct {
+	AuditableModel
+	EmployeeID       uint       `json:"employee_id" gorm:"not null;index"`
+	ExpenseTypeID    uint       `json:"expense_type_id" gorm:"not null;index"`
+	Amount           float64    `json:"amount" gorm:"not null"`                      // Expense amount
+	Currency         string     `json:"currency" gorm:"size:3;default:TRY"`          // Currency code (TRY, USD, EUR)
+	ExpenseDate      time.Time  `json:"expense_date" gorm:"not null"`                // Date of expense
+	Description      string     `json:"description" gorm:"type:text"`                // Expense description/notes
+	Status           string     `json:"status" gorm:"size:20;default:PENDING;index"` // PENDING, APPROVED, REJECTED, PAID
+	ApprovedBy       *uint      `json:"approved_by"`                                 // Admin who approved
+	ApprovedAt       *time.Time `json:"approved_at"`                                 // Approval timestamp
+	RejectedAt       *time.Time `json:"rejected_at"`                                 // Rejection timestamp
+	RejectionReason  string     `json:"rejection_reason" gorm:"type:text"`           // Reason for rejection
+	PaidAt           *time.Time `json:"paid_at"`                                     // Payment timestamp
+	PaymentReference string     `json:"payment_reference" gorm:"size:255"`           // Payment reference/transaction ID
+
+	// Relationships
+	Employee    *Employee    `json:"employee,omitempty" gorm:"foreignKey:EmployeeID"`
+	ExpenseType *ExpenseType `json:"expense_type,omitempty" gorm:"foreignKey:ExpenseTypeID"`
+	Approver    *User        `json:"approver,omitempty" gorm:"foreignKey:ApprovedBy"`
+
+	// Computed fields (not stored in DB)
+	DocumentCount int `json:"document_count" gorm:"-"` // Number of attached documents
+}
+
+func (ExpenseRequest) TableName() string {
+	return GetTableName("hr_expense_requests")
+}
+
+// ExpenseType represents predefined expense categories
+type ExpenseType struct {
+	AuditableModel
+	Name            string   `json:"name" gorm:"not null;uniqueIndex"`
+	Description     string   `json:"description" gorm:"type:text"`
+	RequiresReceipt bool     `json:"requires_receipt" gorm:"default:true"` // Whether receipt/invoice is mandatory
+	MaxAmount       *float64 `json:"max_amount"`                           // Maximum allowed amount (null = no limit)
+	Active          bool     `json:"active" gorm:"default:true"`           // Active/Inactive status
+}
+
+func (ExpenseType) TableName() string {
+	return GetTableName("hr_expense_types")
 }

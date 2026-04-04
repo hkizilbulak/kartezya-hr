@@ -17,6 +17,7 @@ type Config struct {
 	App      AppConfig
 	Email    EmailConfig
 	OAuth    OAuthConfig
+	Storage  StorageConfig
 }
 
 type DatabaseConfig struct {
@@ -59,6 +60,25 @@ type OAuthConfig struct {
 	YandexClientID     string
 	YandexClientSecret string
 	YandexRedirectURL  string
+}
+
+type StorageConfig struct {
+	Provider string // "local", "s3", "backblaze", "azure"
+	BasePath string // Local storage base path
+	BaseURL  string // Base URL for file access
+
+	// S3/Backblaze B2 Configuration
+	S3Endpoint  string // S3-compatible endpoint (e.g., Backblaze B2)
+	S3Bucket    string // Bucket name
+	S3Region    string // Region (optional for some providers)
+	S3BasePath  string // Base path prefix in bucket (e.g., "documents", "attachments/hr")
+	S3AccessKey string // Access key ID
+	S3SecretKey string // Secret access key
+
+	// Azure Blob Configuration (future use)
+	AzureAccount   string
+	AzureContainer string
+	AzureAccessKey string
 }
 
 func Load() *Config {
@@ -118,6 +138,17 @@ func Load() *Config {
 			YandexClientID:     getEnv("YANDEX_CLIENT_ID", ""),
 			YandexClientSecret: getEnv("YANDEX_CLIENT_SECRET", ""),
 			YandexRedirectURL:  getEnv("YANDEX_REDIRECT_URL", "http://localhost:8080/api/v1/auth/yandex/callback"),
+		},
+		Storage: StorageConfig{
+			Provider:    getEnv("STORAGE_PROVIDER", "local"), // Options: local, s3, backblaze, azure
+			BasePath:    getEnv("STORAGE_BASE_PATH", "./uploads"),
+			BaseURL:     getEnv("STORAGE_BASE_URL", "http://localhost:8080"),
+			S3Endpoint:  getEnv("S3_ENDPOINT", ""), // e.g., https://s3.eu-central-003.backblazeb2.com
+			S3Bucket:    getEnv("S3_BUCKET", ""),
+			S3Region:    getEnv("S3_REGION", ""),
+			S3BasePath:  getEnv("S3_BASE_PATH", "documents"), // Base path prefix in bucket
+			S3AccessKey: getEnv("S3_ACCESS_KEY", ""),
+			S3SecretKey: getEnv("S3_SECRET_KEY", ""),
 		},
 	}
 }

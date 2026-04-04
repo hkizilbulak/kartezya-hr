@@ -3,24 +3,28 @@ package jobs
 import (
 	"log"
 
+	"kartezya-hr/internal/service"
+
 	"github.com/robfig/cron/v3"
 	"gorm.io/gorm"
 )
 
 // Scheduler manages all scheduled jobs
 type Scheduler struct {
-	cron            *cron.Cron
-	leaveBalanceJob *LeaveBalanceJob
+	cron               *cron.Cron
+	leaveBalanceJob    *LeaveBalanceJob
+	documentCleanupJob *DocumentCleanupJob
 }
 
 // NewScheduler creates a new job scheduler
-func NewScheduler(db *gorm.DB) *Scheduler {
+func NewScheduler(db *gorm.DB, documentService service.DocumentService) *Scheduler {
 	// Create cron with seconds precision
 	c := cron.New(cron.WithSeconds())
 
 	return &Scheduler{
-		cron:            c,
-		leaveBalanceJob: NewLeaveBalanceJob(db),
+		cron:               c,
+		leaveBalanceJob:    NewLeaveBalanceJob(db),
+		documentCleanupJob: NewDocumentCleanupJob(documentService, 24), // Clean files older than 24 hours
 	}
 }
 
@@ -36,6 +40,15 @@ func (s *Scheduler) Start() {
 		log.Printf("[Scheduler] Failed to schedule leave balance job: %v", err)
 	} else {
 		log.Println("[Scheduler] Leave balance update job scheduled to run daily at 06:00")
+	}
+
+	// Schedule document cleanup job - every day at 03:00:00
+	// "0 0 3 * * *" = at 03:00:00 every day
+	_, err = s.cron.AddFunc("0 0 3 * * *", s.documentCleanupJob.Run)
+	if err != nil {
+		log.Printf("[Scheduler] Failed to schedule document cleanup job: %v", err)
+	} else {
+		log.Println("[Scheduler] Document cleanup job scheduled to run daily at 03:00")
 	}
 
 	// Start the cron scheduler

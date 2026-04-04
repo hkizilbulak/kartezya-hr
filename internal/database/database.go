@@ -102,6 +102,9 @@ func (d *Database) Migrate() error {
 		&domain.LeaveBalance{},
 		&domain.LeaveRequest{},
 		&domain.LeaveDocument{},
+		&domain.ExpenseType{},    // Expense Management
+		&domain.ExpenseRequest{}, // Expense Management
+		&domain.Attachment{},     // Document Management System (for all modules)
 		// Note: AuditLog is excluded - it's created by schema.sql
 	)
 
