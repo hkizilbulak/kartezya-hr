@@ -40,8 +40,8 @@ type LeaveService interface {
 	DeleteLeave(id uint, userID uint) error
 	GetLeavesByEmployeeID(employeeID uint, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error)
 	GetLeavesByUserID(userID uint, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error)
-	GetMyLeaveRequestsPaginated(userID uint, page, limit int, sortParams types.SortParams, status string) (*PaginatedResponse, error)
-	GetAllLeaveRequestsPaginated(employeeID *uint, page, limit int, sortParams types.SortParams, status string) (*PaginatedResponse, error)
+	GetMyLeaveRequestsPaginated(userID uint, page, limit int, sortParams types.SortParams, status string, leaveTypeID *uint, startDate *string, endDate *string) (*PaginatedResponse, error)
+	GetAllLeaveRequestsPaginated(employeeID *uint, page, limit int, sortParams types.SortParams, status string, leaveTypeID *uint, startDate *string, endDate *string) (*PaginatedResponse, error)
 	GetLeavesByStatus(status string, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error)
 	GetLeavesByDateRange(startDate, endDate string) ([]*domain.LeaveRequest, error)
 	ApproveLeave(id uint, userID uint) error
@@ -430,7 +430,7 @@ func (s *leaveService) GetLeavesByUserID(userID uint, sortBy string, sortDir typ
 	return s.leaveRepo.GetByEmployeeID(employee.ID, sortBy, sortDir)
 }
 
-func (s *leaveService) GetMyLeaveRequestsPaginated(userID uint, page, limit int, sortParams types.SortParams, status string) (*PaginatedResponse, error) {
+func (s *leaveService) GetMyLeaveRequestsPaginated(userID uint, page, limit int, sortParams types.SortParams, status string, leaveTypeID *uint, startDate *string, endDate *string) (*PaginatedResponse, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -453,14 +453,8 @@ func (s *leaveService) GetMyLeaveRequestsPaginated(userID uint, page, limit int,
 	}
 
 	offset := (page - 1) * limit
-	var leaves []*domain.LeaveRequest
-	var total int64
 
-	if status != "" {
-		leaves, total, err = s.leaveRepo.GetByEmployeeIDWithLeaveTypeAndStatus(employee.ID, limit, offset, sortParams, status)
-	} else {
-		leaves, total, err = s.leaveRepo.GetByEmployeeIDWithLeaveType(employee.ID, limit, offset, sortParams)
-	}
+	leaves, total, err := s.leaveRepo.GetAllWithStatus(&employee.ID, limit, offset, sortParams, status, leaveTypeID, startDate, endDate)
 
 	if err != nil {
 		return nil, err
@@ -513,7 +507,7 @@ func (s *leaveService) GetMyLeaveRequestsPaginated(userID uint, page, limit int,
 	}, nil
 }
 
-func (s *leaveService) GetAllLeaveRequestsPaginated(employeeID *uint, page, limit int, sortParams types.SortParams, status string) (*PaginatedResponse, error) {
+func (s *leaveService) GetAllLeaveRequestsPaginated(employeeID *uint, page, limit int, sortParams types.SortParams, status string, leaveTypeID *uint, startDate *string, endDate *string) (*PaginatedResponse, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -530,7 +524,7 @@ func (s *leaveService) GetAllLeaveRequestsPaginated(employeeID *uint, page, limi
 	}
 
 	offset := (page - 1) * limit
-	leaves, total, err := s.leaveRepo.GetAllWithStatus(employeeID, limit, offset, sortParams, status)
+	leaves, total, err := s.leaveRepo.GetAllWithStatus(employeeID, limit, offset, sortParams, status, leaveTypeID, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}

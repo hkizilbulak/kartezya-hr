@@ -13,7 +13,7 @@ type ExpenseRepository interface {
 	FindByID(id uint) (*domain.ExpenseRequest, error)
 	FindByEmployeeID(employeeID uint, sortBy string, sortDir types.SortDirection) ([]*domain.ExpenseRequest, error)
 	FindByStatus(status string, sortBy string, sortDir types.SortDirection) ([]*domain.ExpenseRequest, error)
-	GetAll(employeeID *uint, page, limit int, sortParams types.SortParams, status string) ([]*domain.ExpenseRequest, int64, error)
+	GetAll(employeeID *uint, page, limit int, sortParams types.SortParams, status string, expenseTypeID *uint, startDate *string, endDate *string) ([]*domain.ExpenseRequest, int64, error)
 	Update(expense *domain.ExpenseRequest) error
 	Delete(id uint) error
 }
@@ -85,7 +85,7 @@ func (r *expenseRepository) FindByStatus(status string, sortBy string, sortDir t
 	return expenses, err
 }
 
-func (r *expenseRepository) GetAll(employeeID *uint, page, limit int, sortParams types.SortParams, status string) ([]*domain.ExpenseRequest, int64, error) {
+func (r *expenseRepository) GetAll(employeeID *uint, page, limit int, sortParams types.SortParams, status string, expenseTypeID *uint, startDate *string, endDate *string) ([]*domain.ExpenseRequest, int64, error) {
 	var expenses []*domain.ExpenseRequest
 	var total int64
 
@@ -100,6 +100,17 @@ func (r *expenseRepository) GetAll(employeeID *uint, page, limit int, sortParams
 	// Filter by status
 	if status != "" {
 		query = query.Where("status = ?", status)
+	}
+
+	if expenseTypeID != nil {
+		query = query.Where("expense_type_id = ?", *expenseTypeID)
+	}
+	if startDate != nil && *startDate != "" {
+		query = query.Where("expense_date >= ?", *startDate)
+	}
+	if endDate != nil && *endDate != "" {
+		// Include full day
+		query = query.Where("expense_date <= ?", *endDate+" 23:59:59")
 	}
 
 	// Count total

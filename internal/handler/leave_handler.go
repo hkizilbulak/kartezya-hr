@@ -689,13 +689,31 @@ func (h *LeaveHandler) GetMyLeaveRequests(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	status := c.Query("status") // Optional status filter: PENDING, APPROVED, REJECTED
 
+	var leaveTypeID *uint
+	if layTypeIDStr := c.Query("leave_type_id"); layTypeIDStr != "" {
+		if layTypeID, err := strconv.ParseUint(layTypeIDStr, 10, 32); err == nil {
+			id := uint(layTypeID)
+			leaveTypeID = &id
+		}
+	}
+
+	var startDate *string
+	if start := c.Query("start_date"); start != "" {
+		startDate = &start
+	}
+
+	var endDate *string
+	if end := c.Query("end_date"); end != "" {
+		endDate = &end
+	}
+
 	// Parse sorting parameters
 	sortParams := types.SortParams{
 		Sort:      c.DefaultQuery("sort", "created_at"),
 		Direction: c.DefaultQuery("direction", "DESC"),
 	}
 
-	result, err := h.leaveService.GetMyLeaveRequestsPaginated(userID, page, limit, sortParams, status)
+	result, err := h.leaveService.GetMyLeaveRequestsPaginated(userID, page, limit, sortParams, status, leaveTypeID, startDate, endDate)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -761,13 +779,31 @@ func (h *LeaveHandler) GetAllLeaveRequests(c *gin.Context) {
 		}
 	}
 
+	var leaveTypeID *uint
+	if layTypeIDStr := c.Query("leave_type_id"); layTypeIDStr != "" {
+		if layTypeID, err := strconv.ParseUint(layTypeIDStr, 10, 32); err == nil {
+			id := uint(layTypeID)
+			leaveTypeID = &id
+		}
+	}
+
+	var startDate *string
+	if start := c.Query("start_date"); start != "" {
+		startDate = &start
+	}
+
+	var endDate *string
+	if end := c.Query("end_date"); end != "" {
+		endDate = &end
+	}
+
 	// Parse sorting parameters
 	sortParams := types.SortParams{
 		Sort:      c.DefaultQuery("sort", "created_at"),
 		Direction: c.DefaultQuery("direction", "DESC"),
 	}
 
-	result, err := h.leaveService.GetAllLeaveRequestsPaginated(empIDPtr, page, limit, sortParams, status)
+	result, err := h.leaveService.GetAllLeaveRequestsPaginated(empIDPtr, page, limit, sortParams, status, leaveTypeID, startDate, endDate)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,

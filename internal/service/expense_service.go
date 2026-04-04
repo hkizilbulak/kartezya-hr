@@ -26,8 +26,8 @@ type ExpenseService interface {
 	CreateExpenseRequest(expense *domain.ExpenseRequest, userID uint) error
 	GetExpenseRequestByID(id uint) (*domain.ExpenseRequest, error)
 	GetMyExpenseRequests(userID uint, sortBy string, sortDir types.SortDirection) ([]*domain.ExpenseRequest, error)
-	GetMyExpenseRequestsPaginated(userID uint, page, limit int, sortParams types.SortParams, status string) (*PaginatedResponse, error)
-	GetAllExpenseRequestsPaginated(employeeID *uint, page, limit int, sortParams types.SortParams, status string) (*PaginatedResponse, error)
+	GetMyExpenseRequestsPaginated(userID uint, page, limit int, sortParams types.SortParams, status string, expenseTypeID *uint, startDate *string, endDate *string) (*PaginatedResponse, error)
+	GetAllExpenseRequestsPaginated(employeeID *uint, page, limit int, sortParams types.SortParams, status string, expenseTypeID *uint, startDate *string, endDate *string) (*PaginatedResponse, error)
 	UpdateExpenseRequest(expense *domain.ExpenseRequest, userID uint) error
 	DeleteExpenseRequest(id uint, userID uint, isAdmin bool) error
 	ApproveExpenseRequest(id uint, userID uint) error
@@ -130,13 +130,13 @@ func (s *expenseService) GetMyExpenseRequests(userID uint, sortBy string, sortDi
 }
 
 // GetMyExpenseRequestsPaginated retrieves paginated expense requests for a user
-func (s *expenseService) GetMyExpenseRequestsPaginated(userID uint, page, limit int, sortParams types.SortParams, status string) (*PaginatedResponse, error) {
+func (s *expenseService) GetMyExpenseRequestsPaginated(userID uint, page, limit int, sortParams types.SortParams, status string, expenseTypeID *uint, startDate *string, endDate *string) (*PaginatedResponse, error) {
 	employee, err := s.employeeRepo.GetByUserID(userID)
 	if err != nil {
 		return nil, errors.New("employee not found for this user")
 	}
 
-	expenses, total, err := s.expenseRepo.GetAll(&employee.ID, page, limit, sortParams, status)
+	expenses, total, err := s.expenseRepo.GetAll(&employee.ID, page, limit, sortParams, status, expenseTypeID, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}
@@ -163,8 +163,8 @@ func (s *expenseService) GetMyExpenseRequestsPaginated(userID uint, page, limit 
 }
 
 // GetAllExpenseRequestsPaginated retrieves all expense requests (admin)
-func (s *expenseService) GetAllExpenseRequestsPaginated(employeeID *uint, page, limit int, sortParams types.SortParams, status string) (*PaginatedResponse, error) {
-	expenses, total, err := s.expenseRepo.GetAll(employeeID, page, limit, sortParams, status)
+func (s *expenseService) GetAllExpenseRequestsPaginated(employeeID *uint, page, limit int, sortParams types.SortParams, status string, expenseTypeID *uint, startDate *string, endDate *string) (*PaginatedResponse, error) {
+	expenses, total, err := s.expenseRepo.GetAll(employeeID, page, limit, sortParams, status, expenseTypeID, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}

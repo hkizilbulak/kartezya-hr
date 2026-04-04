@@ -134,12 +134,30 @@ func (h *ExpenseHandler) GetMyExpenseRequests(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	status := c.Query("status")
 
+	var expenseTypeID *uint
+	if extTypeIDStr := c.Query("expense_type_id"); extTypeIDStr != "" {
+		if extTypeID, err := strconv.ParseUint(extTypeIDStr, 10, 32); err == nil {
+			id := uint(extTypeID)
+			expenseTypeID = &id
+		}
+	}
+
+	var startDate *string
+	if start := c.Query("start_date"); start != "" {
+		startDate = &start
+	}
+
+	var endDate *string
+	if end := c.Query("end_date"); end != "" {
+		endDate = &end
+	}
+
 	sortParams := types.SortParams{
 		Sort:      c.DefaultQuery("sort", "created_at"),
 		Direction: c.DefaultQuery("direction", "DESC"),
 	}
 
-	result, err := h.expenseService.GetMyExpenseRequestsPaginated(userID, page, limit, sortParams, status)
+	result, err := h.expenseService.GetMyExpenseRequestsPaginated(userID, page, limit, sortParams, status, expenseTypeID, startDate, endDate)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -202,12 +220,30 @@ func (h *ExpenseHandler) GetAllExpenseRequests(c *gin.Context) {
 		}
 	}
 
+	var expenseTypeID *uint
+	if extTypeIDStr := c.Query("expense_type_id"); extTypeIDStr != "" {
+		if extTypeID, err := strconv.ParseUint(extTypeIDStr, 10, 32); err == nil {
+			id := uint(extTypeID)
+			expenseTypeID = &id
+		}
+	}
+
+	var startDate *string
+	if start := c.Query("start_date"); start != "" {
+		startDate = &start
+	}
+
+	var endDate *string
+	if end := c.Query("end_date"); end != "" {
+		endDate = &end
+	}
+
 	sortParams := types.SortParams{
 		Sort:      c.DefaultQuery("sort", "created_at"),
 		Direction: c.DefaultQuery("direction", "DESC"),
 	}
 
-	result, err := h.expenseService.GetAllExpenseRequestsPaginated(employeeID, page, limit, sortParams, status)
+	result, err := h.expenseService.GetAllExpenseRequestsPaginated(employeeID, page, limit, sortParams, status, expenseTypeID, startDate, endDate)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
