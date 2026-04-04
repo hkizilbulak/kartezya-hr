@@ -141,7 +141,7 @@ func (h *DocumentHandler) GetDocumentURL(c *gin.Context) {
 }
 
 // GetMyDocuments retrieves all documents uploaded by current user
-// GET /api/documents/my
+// GET /api/documents/me
 func (h *DocumentHandler) GetMyDocuments(c *gin.Context) {
 	// Get authenticated user
 	userID, exists := c.Get("userID")
@@ -200,9 +200,52 @@ func (h *DocumentHandler) GetRelatedDocuments(c *gin.Context) {
 		return
 	}
 
+	limitStr := c.DefaultQuery("limit", "100")
+	pageStr := c.DefaultQuery("page", "1")
+	sortStr := c.DefaultQuery("sort", "created_at")
+	directionStr := c.DefaultQuery("direction", "DESC")
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 {
+		limit = 100
+	}
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page <= 0 {
+		page = 1
+	}
+
+	// Calculate pagination offsets if using paginated DB query,
+	// but since GetRelatedDocuments currently returns all mapped
+	// documents, we'll manually slice the array to simulate pagination.
+	total := len(attachments)
+	totalPages := 1
+	if limit > 0 {
+		totalPages = (total + limit - 1) / limit
+	}
+
+	startIndex := (page - 1) * limit
+	endIndex := startIndex + limit
+
+	if startIndex > total {
+		startIndex = total
+	}
+	if endIndex > total {
+		endIndex = total
+	}
+
+	paginatedAttachments := attachments[startIndex:endIndex]
+
 	c.JSON(http.StatusOK, gin.H{
-		"data":  attachments,
-		"count": len(attachments),
+		"data": paginatedAttachments,
+		"page": gin.H{
+			"total":       total,
+			"page":        page,
+			"limit":       limit,
+			"total_pages": totalPages,
+			"sort":        sortStr,
+			"direction":   directionStr,
+		},
 	})
 }
 
@@ -268,4 +311,111 @@ func (h *DocumentHandler) LinkDocuments(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Documents linked successfully"})
+}
+
+// GetUserDocuments retrieves documents for a specific user
+// GET /api/v1/documents/user/:id
+func (h *DocumentHandler) GetUserDocuments(c *gin.Context) {
+	// Parse user ID from URL
+	ownerIDStr := c.Param("id")
+	ownerID, err := strconv.Atoi(ownerIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	attachments, err := h.documentService.GetUserDocuments(uint(ownerID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve documents"})
+		return
+	}
+
+	// Handle pagination and sort from query params
+	pageStr := c.DefaultQuery("page", "1")
+	limitStr := c.DefaultQuery("limit", "10")
+	sort := c.DefaultQuery("sort", "id")
+	direction := c.DefaultQuery("direction", "ASC")
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 {
+		limit = 100
+	}
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page <= 0 {
+		page = 1
+	}
+
+	total := len(attachments)
+	totalPages := 1
+	if limit > 0 {
+		totalPages = (total + limit - 1) / limit
+	}
+
+	startIndex := (page - 1) * limit
+	endIndex := startIndex + limit
+
+	if startIndex > total {
+		startIndex = total
+	}
+	if endIndex > total {
+		endIndex = total
+	}
+
+	paginatedAttachments := append([]domain.Attachment(nil), attachments[startIndex:endIndex]...)
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": paginatedAttachments,
+		"page": gin.H{
+			"total":       total,
+			"page":        page,
+			"limit":       limit,
+			"total_pages": totalPages,
+			"sort":        sort,
+			"direction":   direction,
+		},
+	})
+}
+
+// DownloadDocument returns the actual file for download
+// GET /api/v1/documents/:id/download
+func (h *DocumentHandler) DownloadDocument(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	roles, _ := c.Get("roles")
+
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	documentID := c.Param("id")
+	if documentID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Document ID is required"})
+		return
+	}
+
+	var rolesSlice []string
+	if rolesList, ok := roles.([]string); ok {
+		rolesSlice = rolesList
+	}
+
+	// Ensure user can access the document
+	_, err := h.documentService.GetDocument(documentID, userID.(uint), rolesSlice)
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+
+	url, err := h.documentService.GetDocumentURL(documentID, userID.(uint), rolesSlice, 60)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"url": url,
+		},
+	})
 }

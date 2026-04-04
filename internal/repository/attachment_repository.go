@@ -65,6 +65,17 @@ func (r *attachmentRepository) FindByOwnerID(ownerID uint) ([]domain.Attachment,
 // FindByRelatedRecord retrieves all attachments linked to a specific record
 func (r *attachmentRepository) FindByRelatedRecord(relatedType domain.AttachmentRelatedType, relatedID uint) ([]domain.Attachment, error) {
 	var attachments []domain.Attachment
+
+	// For Employee attachments, also consider records where the user is the owner,
+	// even if they are not explicitly or properly linked yet.
+	if relatedType == domain.AttachmentRelatedTypeEmployee {
+		err := r.db.Where("related_type = ? AND (related_id = ? OR owner_id = ?) AND status != ?",
+			relatedType, relatedID, relatedID, domain.AttachmentStatusArchived).
+			Order("created_at DESC").
+			Find(&attachments).Error
+		return attachments, err
+	}
+
 	err := r.db.Where("related_type = ? AND related_id = ? AND status = ?",
 		relatedType, relatedID, domain.AttachmentStatusLinked).
 		Order("created_at DESC").

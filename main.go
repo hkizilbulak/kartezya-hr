@@ -386,8 +386,10 @@ func main() {
 		{
 			// All authenticated users can upload and manage their own documents
 			documentRoutes.POST("/upload", documentHandler.UploadDocument)
-			documentRoutes.GET("/my", documentHandler.GetMyDocuments)
+			documentRoutes.GET("/me", documentHandler.GetMyDocuments)
+			documentRoutes.GET("/user/:id", documentHandler.GetUserDocuments)
 			documentRoutes.GET("/:id", documentHandler.GetDocument)
+			documentRoutes.GET("/:id/download", documentHandler.DownloadDocument)
 			documentRoutes.GET("/:id/url", documentHandler.GetDocumentURL)
 			documentRoutes.DELETE("/:id", documentHandler.DeleteDocument)
 
