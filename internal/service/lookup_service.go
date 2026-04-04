@@ -124,10 +124,11 @@ func (s *lookupService) GetLeaveTypesLookup() ([]types.LeaveTypeLookup, error) {
 	lookupData := make([]types.LeaveTypeLookup, len(leaveTypes))
 	for i, leaveType := range leaveTypes {
 		lookupData[i] = types.LeaveTypeLookup{
-			ID:          leaveType.ID,
-			Name:        leaveType.Name,
-			Description: leaveType.Description,
-			LimitAmount: leaveType.LimitAmount,
+			ID:                 leaveType.ID,
+			Name:               leaveType.Name,
+			Description:        leaveType.Description,
+			LimitAmount:        leaveType.LimitAmount,
+			IsRequiredDocument: leaveType.IsRequiredDocument,
 		}
 	}
 

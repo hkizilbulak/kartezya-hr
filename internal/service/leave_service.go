@@ -3,6 +3,8 @@ package service
 import (
 	"errors"
 	"fmt"
+	"mime/multipart"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -62,6 +64,12 @@ type LeaveService interface {
 	// Working days calculation
 	CalculateWorkingDays(startDate, endDate time.Time, isStartDateFullDay, isFinishDateFullDay bool) (float64, error)
 	CalculateEndDate(startDate time.Time, requestedDays float64, isStartDateFullDay, isFinishDateFullDay bool) (time.Time, error)
+
+	// Leave Document methods (using Attachment system)
+	UploadLeaveDocument(leaveRequestID uint, file *multipart.FileHeader, userID uint) (*domain.Attachment, error)
+	GetLeaveDocuments(leaveRequestID uint, userID uint, isAdmin bool) ([]domain.Attachment, error)
+	DeleteLeaveDocument(documentID string, userID uint, isAdmin bool) error
+	DownloadLeaveDocument(documentID string, userID uint, isAdmin bool) (string, error)
 }
 
 type leaveService struct {
@@ -70,6 +78,8 @@ type leaveService struct {
 	leaveBalanceRepo repository.LeaveBalanceRepository
 	employeeRepo     repository.EmployeeRepository
 	holidayRepo      repository.HolidayRepository
+	attachmentRepo   repository.AttachmentRepository
+	storage          StorageProvider
 	auditService     AuditService
 }
 
@@ -79,6 +89,8 @@ func NewLeaveService(
 	leaveBalanceRepo repository.LeaveBalanceRepository,
 	employeeRepo repository.EmployeeRepository,
 	holidayRepo repository.HolidayRepository,
+	attachmentRepo repository.AttachmentRepository,
+	storage StorageProvider,
 	auditService AuditService,
 ) LeaveService {
 	return &leaveService{
@@ -87,6 +99,8 @@ func NewLeaveService(
 		leaveBalanceRepo: leaveBalanceRepo,
 		employeeRepo:     employeeRepo,
 		holidayRepo:      holidayRepo,
+		attachmentRepo:   attachmentRepo,
+		storage:          storage,
 		auditService:     auditService,
 	}
 }
@@ -135,18 +149,18 @@ func (s *leaveService) CreateLeave(leave *domain.LeaveRequest, userID uint, isAd
 		if err != nil {
 			return fmt.Errorf("failed to get employee: %w", err)
 		}
-		
+
 		if employee.HireDate == nil {
 			return errors.New("İşe başlama tarihi bulunamadığı için doğum günü izni kullanılamaz")
 		}
-		
+
 		// Calculate if employee has completed one year
 		oneYearAfterHire := employee.HireDate.AddDate(1, 0, 0)
 		now := time.Now()
 		if now.Before(oneYearAfterHire) {
 			return errors.New("Doğum günü izni kullanabilmek için en az 1 yıl çalışma sürenizi doldurmuş olmanız gerekmektedir")
 		}
-		
+
 		// Check if requested days exceeds 1 day limit
 		if leave.RequestedDays > 1 {
 			return errors.New("Doğum günü izni en fazla 1 gün girilebilir")
@@ -222,9 +236,10 @@ func (s *leaveService) GetLeaveByIDFormatted(id uint) (*types.AdminLeaveRequestR
 			LastName:  leave.Employee.LastName,
 		},
 		LeaveType: types.LeaveTypeLookup{
-			ID:          leave.LeaveType.ID,
-			Name:        leave.LeaveType.Name,
-			LimitAmount: leave.LeaveType.LimitAmount,
+			ID:                 leave.LeaveType.ID,
+			Name:               leave.LeaveType.Name,
+			LimitAmount:        leave.LeaveType.LimitAmount,
+			IsRequiredDocument: leave.LeaveType.IsRequiredDocument,
 		},
 		StartDate:           leave.StartDate,
 		EndDate:             leave.EndDate,
@@ -332,7 +347,7 @@ func (s *leaveService) UpdateLeave(leave *domain.LeaveRequest, userID uint) erro
 		if err != nil {
 			return fmt.Errorf("failed to check existing limited leaves: %w", err)
 		}
-		
+
 		hasOtherExistingLeave := false
 		for _, existingLeave := range existingLeaves {
 			if existingLeave.ID != leave.ID {
@@ -340,7 +355,7 @@ func (s *leaveService) UpdateLeave(leave *domain.LeaveRequest, userID uint) erro
 				break
 			}
 		}
-		
+
 		if hasOtherExistingLeave {
 			return errors.New("Limitli izinler yılda bir kez kullanılabilir. Bu izin türü için daha önce giriş yapılmış.")
 		}
@@ -454,6 +469,9 @@ func (s *leaveService) GetMyLeaveRequestsPaginated(userID uint, page, limit int,
 	// Convert to MyLeaveRequestResponse format
 	var responseData []*types.MyLeaveRequestResponse
 	for _, leave := range leaves {
+		// Get document count
+		docCount, _ := s.attachmentRepo.CountByRelatedRecord(domain.AttachmentRelatedTypeLeave, leave.ID)
+
 		responseData = append(responseData, &types.MyLeaveRequestResponse{
 			ID:        leave.ID,
 			CreatedAt: leave.CreatedAt,
@@ -477,6 +495,7 @@ func (s *leaveService) GetMyLeaveRequestsPaginated(userID uint, page, limit int,
 			CancelReason:        leave.CancelReason,
 			CancelledAt:         leave.CancelledAt,
 			Comments:            leave.Comments,
+			DocumentCount:       int(docCount),
 		})
 	}
 
@@ -527,6 +546,9 @@ func (s *leaveService) GetAllLeaveRequestsPaginated(employeeID *uint, page, limi
 			}
 		}
 
+		// Get document count
+		docCount, _ := s.attachmentRepo.CountByRelatedRecord(domain.AttachmentRelatedTypeLeave, leave.ID)
+
 		responseData = append(responseData, &types.AdminLeaveRequestResponse{
 			ID:         leave.ID,
 			CreatedAt:  leave.CreatedAt,
@@ -560,6 +582,7 @@ func (s *leaveService) GetAllLeaveRequestsPaginated(employeeID *uint, page, limi
 			CancelReason:        leave.CancelReason,
 			CancelledAt:         leave.CancelledAt,
 			Comments:            leave.Comments,
+			DocumentCount:       int(docCount),
 		})
 	}
 
@@ -1255,17 +1278,17 @@ func (s *leaveService) CalculateEndDate(startDate time.Time, requestedDays float
 	}
 
 	currentDate := time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, startDate.Location())
-	
+
 	for {
 		days, err := s.CalculateWorkingDays(startDate, currentDate, isStartDateFullDay, isFinishDateFullDay)
 		if err != nil {
 			return time.Time{}, err
 		}
-		
+
 		if days == requestedDays {
 			return currentDate, nil
 		}
-		
+
 		if days > requestedDays {
 			return time.Time{}, errors.New("impossible to reach exactly the requested days with the given full/half day settings")
 		}
@@ -1277,4 +1300,199 @@ func (s *leaveService) CalculateEndDate(startDate time.Time, requestedDays float
 			return time.Time{}, errors.New("requested days too large or calculation loop exceeded limit")
 		}
 	}
+}
+
+// ==================== Leave Document Methods ====================
+
+// UploadLeaveDocument uploads a document for a leave request using Attachment system
+func (s *leaveService) UploadLeaveDocument(leaveRequestID uint, file *multipart.FileHeader, userID uint) (*domain.Attachment, error) {
+	// Check if leave request exists
+	leave, err := s.leaveRepo.GetByID(leaveRequestID)
+	if err != nil {
+		return nil, errors.New("leave request not found")
+	}
+
+	// Get employee to check ownership
+	employee, err := s.employeeRepo.GetByUserID(userID)
+	if err != nil {
+		return nil, errors.New("employee not found")
+	}
+
+	// Only the owner can upload documents (admin can also upload via their own user context)
+	if leave.EmployeeID != employee.ID {
+		return nil, errors.New("you can only upload documents to your own leave requests")
+	}
+
+	// Documents can be uploaded to any leave (not just PENDING like expenses)
+	// This allows uploading medical reports after sick leave approval, etc.
+
+	// Upload using attachment helper
+	attachment, err := s.uploadLeaveAttachment(file, userID, leaveRequestID, domain.AttachmentTypeMedicalReport)
+	if err != nil {
+		return nil, err
+	}
+
+	return attachment, nil
+}
+
+// uploadLeaveAttachment is a helper function to upload leave attachments
+func (s *leaveService) uploadLeaveAttachment(file *multipart.FileHeader, ownerID uint, leaveRequestID uint, docType domain.AttachmentType) (*domain.Attachment, error) {
+	// Open the file
+	src, err := file.Open()
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+	defer src.Close()
+
+	// Generate unique filename
+	timestamp := time.Now().Format("20060102150405")
+	filename := fmt.Sprintf("leave_%d_%s_%s", leaveRequestID, timestamp, filepath.Base(file.Filename))
+	storagePath := fmt.Sprintf("leaves/%d/%s", leaveRequestID, filename)
+
+	// Upload to storage
+	if err := s.storage.Upload(src, storagePath); err != nil {
+		return nil, fmt.Errorf("failed to upload file: %w", err)
+	}
+
+	// Create attachment record
+	relatedID := leaveRequestID
+	attachment := &domain.Attachment{
+		ID:          domain.GenerateUUID(),
+		OwnerID:     ownerID,
+		RelatedType: domain.AttachmentRelatedTypeLeave,
+		RelatedID:   &relatedID,
+		Type:        docType,
+		Status:      domain.AttachmentStatusLinked,
+		FileName:    file.Filename,
+		Path:        storagePath,
+		ContentType: file.Header.Get("Content-Type"),
+		FileSize:    file.Size,
+	}
+
+	if err := s.attachmentRepo.Create(attachment); err != nil {
+		// Try to cleanup uploaded file
+		_ = s.storage.Delete(storagePath)
+		return nil, fmt.Errorf("failed to create attachment record: %w", err)
+	}
+
+	// Audit log
+	_ = s.auditService.CreateAuditLog("attachment", 0, "UPLOAD", nil, attachment, fmt.Sprintf("user_%d", ownerID))
+
+	return attachment, nil
+}
+
+// GetLeaveDocuments retrieves all documents for a leave request
+func (s *leaveService) GetLeaveDocuments(leaveRequestID uint, userID uint, isAdmin bool) ([]domain.Attachment, error) {
+	// Check if leave request exists
+	leave, err := s.leaveRepo.GetByID(leaveRequestID)
+	if err != nil {
+		return nil, errors.New("leave request not found")
+	}
+
+	// Check permission: admin or owner can view
+	if !isAdmin {
+		employee, err := s.employeeRepo.GetByUserID(userID)
+		if err != nil {
+			return nil, errors.New("employee not found")
+		}
+		if leave.EmployeeID != employee.ID {
+			return nil, errors.New("you can only view documents of your own leave requests")
+		}
+	}
+
+	// Get all attachments for this leave request
+	attachments, err := s.attachmentRepo.FindByRelatedRecord(domain.AttachmentRelatedTypeLeave, leaveRequestID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch documents: %w", err)
+	}
+
+	return attachments, nil
+}
+
+// DeleteLeaveDocument deletes a document
+func (s *leaveService) DeleteLeaveDocument(documentID string, userID uint, isAdmin bool) error {
+	// Get attachment
+	attachment, err := s.attachmentRepo.FindByID(documentID)
+	if err != nil {
+		return errors.New("document not found")
+	}
+
+	// Verify it's a leave document
+	if attachment.RelatedType != domain.AttachmentRelatedTypeLeave || attachment.RelatedID == nil {
+		return errors.New("invalid leave document")
+	}
+
+	// Get leave request
+	leave, err := s.leaveRepo.GetByID(*attachment.RelatedID)
+	if err != nil {
+		return errors.New("leave request not found")
+	}
+
+	// Check permission: admin or owner can delete
+	if !isAdmin {
+		employee, err := s.employeeRepo.GetByUserID(userID)
+		if err != nil {
+			return errors.New("employee not found")
+		}
+		if leave.EmployeeID != employee.ID {
+			return errors.New("you can only delete documents of your own leave requests")
+		}
+	}
+
+	// Documents can be deleted from any leave status (not restricted to PENDING)
+
+	// Delete from storage
+	if err := s.storage.Delete(attachment.Path); err != nil {
+		// Log error but continue with database deletion
+		fmt.Printf("Failed to delete file from storage: %v\n", err)
+	}
+
+	// Delete from database
+	if err := s.attachmentRepo.Delete(documentID); err != nil {
+		return fmt.Errorf("failed to delete attachment record: %w", err)
+	}
+
+	// Audit log
+	_ = s.auditService.CreateAuditLog("attachment", 0, "DELETE", attachment, nil, fmt.Sprintf("user_%d", userID))
+
+	return nil
+}
+
+// DownloadLeaveDocument generates a download URL for a document
+func (s *leaveService) DownloadLeaveDocument(documentID string, userID uint, isAdmin bool) (string, error) {
+	// Get attachment
+	attachment, err := s.attachmentRepo.FindByID(documentID)
+	if err != nil {
+		return "", errors.New("document not found")
+	}
+
+	// Verify it's a leave document
+	if attachment.RelatedType != domain.AttachmentRelatedTypeLeave || attachment.RelatedID == nil {
+		return "", errors.New("invalid leave document")
+	}
+
+	// Get leave request
+	leave, err := s.leaveRepo.GetByID(*attachment.RelatedID)
+	if err != nil {
+		return "", errors.New("leave request not found")
+	}
+
+	// Check permission: admin or owner can download
+	if !isAdmin {
+		employee, err := s.employeeRepo.GetByUserID(userID)
+		if err != nil {
+			return "", errors.New("employee not found")
+		}
+		if leave.EmployeeID != employee.ID {
+			return "", errors.New("you can only download documents of your own leave requests")
+		}
+	}
+
+	// Generate presigned URL (valid for 15 minutes)
+	url, err := s.storage.GeneratePresignedURL(attachment.Path, 15)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate download URL: %w", err)
+	}
+
+	return url, nil
 }

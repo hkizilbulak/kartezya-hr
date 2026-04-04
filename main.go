@@ -113,7 +113,7 @@ func main() {
 	emailService := service.NewEmailService(cfg, userRepo)
 	documentService := service.NewDocumentService(attachmentRepo, storageProvider, cfg)
 	employeeService := service.NewEmployeeService(employeeRepo, userRepo, userRoleRepo, roleRepo, authService, auditService, workInfoRepo, emailService)
-	leaveService := service.NewLeaveService(leaveRepo, leaveTypeRepo, leaveBalanceRepo, employeeRepo, holidayRepo, auditService)
+	leaveService := service.NewLeaveService(leaveRepo, leaveTypeRepo, leaveBalanceRepo, employeeRepo, holidayRepo, attachmentRepo, storageProvider, auditService)
 	departmentService := service.NewDepartmentService(departmentRepo, companyRepo, auditService)
 	companyService := service.NewCompanyService(companyRepo, departmentRepo, departmentService, auditService)
 	jobPositionService := service.NewJobPositionService(jobPositionRepo, auditService)
@@ -249,12 +249,20 @@ func main() {
 				requests.PUT("/:id", leaveHandler.UpdateLeaveRequest)
 				requests.POST("/:id/cancel", leaveHandler.CancelLeaveRequest)
 
+				// Document routes
+				requests.POST("/:id/documents", leaveHandler.UploadLeaveDocument)
+				requests.GET("/:id/documents", leaveHandler.GetLeaveDocuments)
+
 				// Admin only routes
 				requests.GET("/:id", authMiddleware.RequireAdmin(), leaveHandler.GetLeaveRequestByID)
 				requests.GET("", authMiddleware.RequireAdmin(), leaveHandler.GetAllLeaveRequests)
 				requests.POST("/:id/approve", authMiddleware.RequireAdmin(), leaveHandler.ApproveLeaveRequest)
 				requests.POST("/:id/reject", authMiddleware.RequireAdmin(), leaveHandler.RejectLeaveRequest)
 			}
+
+			// Leave document operations (by document ID)
+			leaveRoutes.DELETE("/documents/:id", leaveHandler.DeleteLeaveDocument)
+			leaveRoutes.GET("/documents/:id/download", leaveHandler.DownloadLeaveDocument)
 
 			// Leave balances
 			balances := leaveRoutes.Group("/balances")

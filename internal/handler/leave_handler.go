@@ -1204,3 +1204,213 @@ func (h *LeaveHandler) CalculateWorkingDays(c *gin.Context) {
 		},
 	})
 }
+
+// ==================== Leave Document Handlers ====================
+
+// UploadLeaveDocument godoc
+// @Summary Upload leave document
+// @Description Upload a medical report or other document for a leave request
+// @Tags leave-documents
+// @Accept multipart/form-data
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Leave Request ID"
+// @Param file formData file true "Document file"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Router /leave/requests/{id}/documents [post]
+func (h *LeaveHandler) UploadLeaveDocument(c *gin.Context) {
+	// Get user from context
+	userID, _, _, ok := getUserContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Authentication required",
+		})
+		return
+	}
+
+	// Get leave request ID from URL
+	idParam := c.Param("id")
+	leaveRequestID, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid leave request ID",
+		})
+		return
+	}
+
+	// Get file from form
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "No file uploaded",
+		})
+		return
+	}
+
+	// Upload document
+	document, err := h.leaveService.UploadLeaveDocument(uint(leaveRequestID), file, userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Document uploaded successfully",
+		"data":    document,
+	})
+}
+
+// GetLeaveDocuments godoc
+// @Summary Get leave documents
+// @Description Get all documents for a leave request
+// @Tags leave-documents
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Leave Request ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Router /leave/requests/{id}/documents [get]
+func (h *LeaveHandler) GetLeaveDocuments(c *gin.Context) {
+	// Get user from context
+	userID, _, roles, ok := getUserContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Authentication required",
+		})
+		return
+	}
+
+	// Get leave request ID from URL
+	idParam := c.Param("id")
+	leaveRequestID, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid leave request ID",
+		})
+		return
+	}
+
+	// Get documents
+	documents, err := h.leaveService.GetLeaveDocuments(uint(leaveRequestID), userID, isAdmin(roles))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    documents,
+	})
+}
+
+// DeleteLeaveDocument godoc
+// @Summary Delete leave document
+// @Description Delete a document from a leave request
+// @Tags leave-documents
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Document ID (UUID)"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Router /leave/documents/{id} [delete]
+func (h *LeaveHandler) DeleteLeaveDocument(c *gin.Context) {
+	// Get user from context
+	userID, _, roles, ok := getUserContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Authentication required",
+		})
+		return
+	}
+
+	// Get document ID from URL (UUID string)
+	documentID := c.Param("id")
+	if documentID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid document ID",
+		})
+		return
+	}
+
+	// Delete document
+	if err := h.leaveService.DeleteLeaveDocument(documentID, userID, isAdmin(roles)); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Document deleted successfully",
+	})
+}
+
+// DownloadLeaveDocument godoc
+// @Summary Download leave document
+// @Description Get download URL for a leave document
+// @Tags leave-documents
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Document ID (UUID)"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Router /leave/documents/{id}/download [get]
+func (h *LeaveHandler) DownloadLeaveDocument(c *gin.Context) {
+	// Get user from context
+	userID, _, roles, ok := getUserContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Authentication required",
+		})
+		return
+	}
+
+	// Get document ID from URL (UUID string)
+	documentID := c.Param("id")
+	if documentID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid document ID",
+		})
+		return
+	}
+
+	// Get download URL
+	url, err := h.leaveService.DownloadLeaveDocument(documentID, userID, isAdmin(roles))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"url": url,
+		},
+	})
+}

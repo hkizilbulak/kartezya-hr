@@ -9,10 +9,11 @@ type CompanyLookup struct {
 }
 
 type LeaveTypeLookup struct {
-	ID          uint   `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	LimitAmount *int   `json:"limit_amount"`
+	ID                 uint   `json:"id"`
+	Name               string `json:"name"`
+	Description        string `json:"description"`
+	LimitAmount        *int   `json:"limit_amount"`
+	IsRequiredDocument bool   `json:"is_required_document"`
 }
 
 // Grade response DTO
@@ -217,6 +218,7 @@ type MyLeaveRequestResponse struct {
 	CancelReason        string          `json:"cancel_reason"`
 	CancelledAt         *time.Time      `json:"cancelled_at"`
 	Comments            string          `json:"comments"`
+	DocumentCount       int             `json:"document_count"` // Number of attached documents
 }
 
 type EmployeeLookup struct {
@@ -250,6 +252,7 @@ type AdminLeaveRequestResponse struct {
 	CancelReason        string          `json:"cancel_reason"`
 	CancelledAt         *time.Time      `json:"cancelled_at"`
 	Comments            string          `json:"comments"`
+	DocumentCount       int             `json:"document_count"` // Number of attached documents
 }
 
 // LeaveBalance response DTO for My Leave Balances
