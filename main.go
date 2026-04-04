@@ -57,11 +57,6 @@ func main() {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
-	// Initialize and start scheduled jobs
-	scheduler := jobs.NewScheduler(db.DB)
-	scheduler.Start()
-	defer scheduler.Stop()
-
 	// Seed database with default data
 	/*if err := seedDatabase(db); err != nil {
 		log.Printf("Warning: Failed to seed database: %v", err)
@@ -84,11 +79,39 @@ func main() {
 	gradeRepo := repository.NewGradeRepository(db.DB)
 	employeeGradeRepo := repository.NewEmployeeGradeRepository(db.DB)
 	employeeContractRepo := repository.NewEmployeeContractRepository(db.DB)
+	attachmentRepo := repository.NewAttachmentRepository(db.DB)
+	expenseRepo := repository.NewExpenseRepository(db.DB)
+	expenseTypeRepo := repository.NewExpenseTypeRepository(db.DB)
+
+	// Initialize storage provider
+	var storageProvider service.StorageProvider
+	switch cfg.Storage.Provider {
+	case "local":
+		storageProvider = service.NewLocalStorageProvider(cfg.Storage.BasePath, cfg.Storage.BaseURL)
+	case "s3", "backblaze":
+		s3Provider, err := service.NewS3StorageProvider(
+			cfg.Storage.S3Endpoint,
+			cfg.Storage.S3Region,
+			cfg.Storage.S3Bucket,
+			cfg.Storage.S3BasePath,
+			cfg.Storage.S3AccessKey,
+			cfg.Storage.S3SecretKey,
+		)
+		if err != nil {
+			log.Fatalf("Failed to initialize S3 storage: %v", err)
+		}
+		storageProvider = s3Provider
+		log.Printf("Using S3-compatible storage: %s (bucket: %s, base path: %s)", cfg.Storage.S3Endpoint, cfg.Storage.S3Bucket, cfg.Storage.S3BasePath)
+	default:
+		log.Printf("Unknown storage provider: %s, using local storage", cfg.Storage.Provider)
+		storageProvider = service.NewLocalStorageProvider(cfg.Storage.BasePath, cfg.Storage.BaseURL)
+	}
 
 	// Initialize services
 	auditService := service.NewAuditService(auditRepo)
 	authService := service.NewAuthService(userRepo, userRoleRepo, roleRepo, auditService, cfg)
 	emailService := service.NewEmailService(cfg, userRepo)
+	documentService := service.NewDocumentService(attachmentRepo, storageProvider, cfg)
 	employeeService := service.NewEmployeeService(employeeRepo, userRepo, userRoleRepo, roleRepo, authService, auditService, workInfoRepo, emailService)
 	leaveService := service.NewLeaveService(leaveRepo, leaveTypeRepo, leaveBalanceRepo, employeeRepo, holidayRepo, auditService)
 	departmentService := service.NewDepartmentService(departmentRepo, companyRepo, auditService)
@@ -99,6 +122,7 @@ func main() {
 	gradeService := service.NewGradeService(gradeRepo, auditService)
 	employeeGradeService := service.NewEmployeeGradeService(employeeGradeRepo, employeeRepo, gradeRepo, auditService)
 	employeeContractService := service.NewEmployeeContractService(employeeContractRepo, employeeRepo, auditService)
+	expenseService := service.NewExpenseService(expenseRepo, expenseTypeRepo, employeeRepo, auditService)
 	reportService := service.NewReportService(employeeRepo, workInfoRepo, leaveRepo, holidayRepo, leaveService)
 
 	// Initialize handlers
@@ -115,6 +139,13 @@ func main() {
 	employeeGradeHandler := handler.NewEmployeeGradeHandler(employeeGradeService, employeeService)
 	employeeContractHandler := handler.NewEmployeeContractHandler(employeeContractService, employeeService)
 	reportHandler := handler.NewReportHandler(reportService)
+	documentHandler := handler.NewDocumentHandler(documentService)
+	expenseHandler := handler.NewExpenseHandler(expenseService)
+
+	// Initialize and start scheduled jobs
+	scheduler := jobs.NewScheduler(db.DB, documentService)
+	scheduler.Start()
+	defer scheduler.Stop()
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -334,6 +365,58 @@ func main() {
 			dashboardRoutes.GET("/employees-by-position", dashboardHandler.GetEmployeesByPosition)
 			dashboardRoutes.GET("/employees-by-company-department", dashboardHandler.GetEmployeesByCompanyDepartment)
 			dashboardRoutes.GET("/employees-by-grade", dashboardHandler.GetEmployeesByGrade)
+		}
+
+		// Document Management System (DYS) routes
+		documentRoutes := protected.Group("/documents")
+		{
+			// All authenticated users can upload and manage their own documents
+			documentRoutes.POST("/upload", documentHandler.UploadDocument)
+			documentRoutes.GET("/my", documentHandler.GetMyDocuments)
+			documentRoutes.GET("/:id", documentHandler.GetDocument)
+			documentRoutes.GET("/:id/url", documentHandler.GetDocumentURL)
+			documentRoutes.DELETE("/:id", documentHandler.DeleteDocument)
+
+			// Get documents related to a specific record (Expense, Leave, etc.)
+			documentRoutes.GET("/related/:type/:id", documentHandler.GetRelatedDocuments)
+
+			// Link documents to a record (used internally by other services)
+			documentRoutes.POST("/link", documentHandler.LinkDocuments)
+		}
+
+		// Expense Management routes
+		expenseRoutes := protected.Group("/expense")
+		{
+			// Expense Requests
+			requestRoutes := expenseRoutes.Group("/requests")
+			{
+				// Employee routes
+				requestRoutes.POST("", expenseHandler.CreateExpenseRequest)
+				requestRoutes.GET("/me", expenseHandler.GetMyExpenseRequests)
+				requestRoutes.PUT("/:id", expenseHandler.UpdateExpenseRequest)
+
+				// Shared routes
+				requestRoutes.GET("/:id", expenseHandler.GetExpenseRequestByID)
+				requestRoutes.DELETE("/:id", expenseHandler.DeleteExpenseRequest)
+
+				// Admin only routes
+				requestRoutes.GET("", authMiddleware.RequireAdmin(), expenseHandler.GetAllExpenseRequests)
+				requestRoutes.POST("/:id/approve", authMiddleware.RequireAdmin(), expenseHandler.ApproveExpenseRequest)
+				requestRoutes.POST("/:id/reject", authMiddleware.RequireAdmin(), expenseHandler.RejectExpenseRequest)
+				requestRoutes.POST("/:id/pay", authMiddleware.RequireAdmin(), expenseHandler.MarkExpenseAsPaid)
+			}
+
+			// Expense Types
+			typeRoutes := expenseRoutes.Group("/types")
+			{
+				typeRoutes.GET("/active", expenseHandler.GetActiveExpenseTypes)
+
+				// Admin only routes
+				typeRoutes.GET("", authMiddleware.RequireAdmin(), expenseHandler.GetExpenseTypes)
+				typeRoutes.POST("", authMiddleware.RequireAdmin(), expenseHandler.CreateExpenseType)
+				typeRoutes.PUT("/:id", authMiddleware.RequireAdmin(), expenseHandler.UpdateExpenseType)
+				typeRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), expenseHandler.DeleteExpenseType)
+			}
 		}
 
 		// Report routes (Admin only)
