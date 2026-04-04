@@ -14,10 +14,11 @@ import (
 
 // Define expense status constants
 const (
-	ExpenseStatusPending  = "PENDING"
-	ExpenseStatusApproved = "APPROVED"
-	ExpenseStatusRejected = "REJECTED"
-	ExpenseStatusPaid     = "PAID"
+	ExpenseStatusPending   = "PENDING"
+	ExpenseStatusApproved  = "APPROVED"
+	ExpenseStatusRejected  = "REJECTED"
+	ExpenseStatusPaid      = "PAID"
+	ExpenseStatusCancelled = "CANCELLED"
 )
 
 type ExpenseService interface {
@@ -250,13 +251,15 @@ func (s *expenseService) DeleteExpenseRequest(id uint, userID uint, isAdmin bool
 		return errors.New("only pending expense requests can be deleted")
 	}
 
-	if err := s.expenseRepo.Delete(id); err != nil {
+	expense.Status = ExpenseStatusCancelled
+	expense.ModifiedBy = fmt.Sprintf("%d", userID)
+
+	if err := s.expenseRepo.Update(expense); err != nil {
 		return err
 	}
 
 	// Audit log
-	s.auditService.CreateAuditLog("ExpenseRequest", id, "DELETE", expense, nil, fmt.Sprintf("%d", userID))
-
+	s.auditService.CreateAuditLog("ExpenseRequest", id, "CANCEL", nil, expense, fmt.Sprintf("%d", userID))
 	return nil
 }
 
