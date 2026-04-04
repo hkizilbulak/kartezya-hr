@@ -865,3 +865,213 @@ func (h *ExpenseHandler) DeleteExpenseType(c *gin.Context) {
 		"message": "Expense type deleted successfully",
 	})
 }
+
+// ==================== Expense Document Handlers ====================
+
+// UploadExpenseDocument godoc
+// @Summary Upload expense document
+// @Description Upload a receipt/invoice for an expense request
+// @Tags expense-documents
+// @Accept multipart/form-data
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Expense Request ID"
+// @Param file formData file true "Document file"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Router /expense/requests/{id}/documents [post]
+func (h *ExpenseHandler) UploadExpenseDocument(c *gin.Context) {
+	// Get user from context
+	userID, _, _, ok := getUserContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Authentication required",
+		})
+		return
+	}
+
+	// Get expense request ID from URL
+	idParam := c.Param("id")
+	expenseRequestID, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid expense request ID",
+		})
+		return
+	}
+
+	// Get file from form
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "No file uploaded",
+		})
+		return
+	}
+
+	// Upload document
+	document, err := h.expenseService.UploadExpenseDocument(uint(expenseRequestID), file, userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Document uploaded successfully",
+		"data":    document,
+	})
+}
+
+// GetExpenseDocuments godoc
+// @Summary Get expense documents
+// @Description Get all documents for an expense request
+// @Tags expense-documents
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Expense Request ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Router /expense/requests/{id}/documents [get]
+func (h *ExpenseHandler) GetExpenseDocuments(c *gin.Context) {
+	// Get user from context
+	userID, _, roles, ok := getUserContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Authentication required",
+		})
+		return
+	}
+
+	// Get expense request ID from URL
+	idParam := c.Param("id")
+	expenseRequestID, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid expense request ID",
+		})
+		return
+	}
+
+	// Get documents
+	documents, err := h.expenseService.GetExpenseDocuments(uint(expenseRequestID), userID, isAdmin(roles))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    documents,
+	})
+}
+
+// DeleteExpenseDocument godoc
+// @Summary Delete expense document
+// @Description Delete a document from an expense request
+// @Tags expense-documents
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Document ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Router /expense/documents/{id} [delete]
+func (h *ExpenseHandler) DeleteExpenseDocument(c *gin.Context) {
+	// Get user from context
+	userID, _, roles, ok := getUserContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Authentication required",
+		})
+		return
+	}
+
+	// Get document ID from URL (UUID string)
+	documentID := c.Param("id")
+	if documentID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid document ID",
+		})
+		return
+	}
+
+	// Delete document
+	if err := h.expenseService.DeleteExpenseDocument(documentID, userID, isAdmin(roles)); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Document deleted successfully",
+	})
+}
+
+// DownloadExpenseDocument godoc
+// @Summary Download expense document
+// @Description Get download URL for an expense document
+// @Tags expense-documents
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Document ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Router /expense/documents/{id}/download [get]
+func (h *ExpenseHandler) DownloadExpenseDocument(c *gin.Context) {
+	// Get user from context
+	userID, _, roles, ok := getUserContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Authentication required",
+		})
+		return
+	}
+
+	// Get document ID from URL (UUID string)
+	documentID := c.Param("id")
+	if documentID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid document ID",
+		})
+		return
+	}
+
+	// Get download URL
+	url, err := h.expenseService.DownloadExpenseDocument(documentID, userID, isAdmin(roles))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"url": url,
+		},
+	})
+}

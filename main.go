@@ -122,7 +122,7 @@ func main() {
 	gradeService := service.NewGradeService(gradeRepo, auditService)
 	employeeGradeService := service.NewEmployeeGradeService(employeeGradeRepo, employeeRepo, gradeRepo, auditService)
 	employeeContractService := service.NewEmployeeContractService(employeeContractRepo, employeeRepo, auditService)
-	expenseService := service.NewExpenseService(expenseRepo, expenseTypeRepo, employeeRepo, auditService)
+	expenseService := service.NewExpenseService(expenseRepo, expenseTypeRepo, attachmentRepo, employeeRepo, storageProvider, auditService)
 	reportService := service.NewReportService(employeeRepo, workInfoRepo, leaveRepo, holidayRepo, leaveService)
 
 	// Initialize handlers
@@ -179,6 +179,12 @@ func main() {
 			"version": cfg.App.Version,
 		})
 	})
+
+	// Serve static files for local storage (uploads)
+	if cfg.Storage.Provider == "local" {
+		router.Static("/uploads", cfg.Storage.BasePath)
+		log.Printf("Serving static files from %s at /uploads", cfg.Storage.BasePath)
+	}
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")
@@ -399,11 +405,22 @@ func main() {
 				requestRoutes.GET("/:id", expenseHandler.GetExpenseRequestByID)
 				requestRoutes.DELETE("/:id", expenseHandler.DeleteExpenseRequest)
 
+				// Document routes (employee and admin)
+				requestRoutes.POST("/:id/documents", expenseHandler.UploadExpenseDocument)
+				requestRoutes.GET("/:id/documents", expenseHandler.GetExpenseDocuments)
+
 				// Admin only routes
 				requestRoutes.GET("", authMiddleware.RequireAdmin(), expenseHandler.GetAllExpenseRequests)
 				requestRoutes.POST("/:id/approve", authMiddleware.RequireAdmin(), expenseHandler.ApproveExpenseRequest)
 				requestRoutes.POST("/:id/reject", authMiddleware.RequireAdmin(), expenseHandler.RejectExpenseRequest)
 				requestRoutes.POST("/:id/pay", authMiddleware.RequireAdmin(), expenseHandler.MarkExpenseAsPaid)
+			}
+
+			// Expense Documents
+			documentRoutes := expenseRoutes.Group("/documents")
+			{
+				documentRoutes.DELETE("/:id", expenseHandler.DeleteExpenseDocument)
+				documentRoutes.GET("/:id/download", expenseHandler.DownloadExpenseDocument)
 			}
 
 			// Expense Types

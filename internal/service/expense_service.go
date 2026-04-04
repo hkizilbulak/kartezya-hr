@@ -3,6 +3,8 @@ package service
 import (
 	"errors"
 	"fmt"
+	"mime/multipart"
+	"path/filepath"
 	"time"
 
 	"kartezya-hr/internal/domain"
@@ -31,6 +33,12 @@ type ExpenseService interface {
 	RejectExpenseRequest(id uint, rejectionReason string, userID uint) error
 	MarkAsPaid(id uint, paymentReference string, userID uint) error
 
+	// Expense Document methods (using Attachment system)
+	UploadExpenseDocument(expenseRequestID uint, file *multipart.FileHeader, userID uint) (*domain.Attachment, error)
+	GetExpenseDocuments(expenseRequestID uint, userID uint, isAdmin bool) ([]domain.Attachment, error)
+	DeleteExpenseDocument(documentID string, userID uint, isAdmin bool) error
+	DownloadExpenseDocument(documentID string, userID uint, isAdmin bool) (string, error)
+
 	// Expense Type methods
 	CreateExpenseType(expenseType *domain.ExpenseType, createdBy string) error
 	GetExpenseTypeByID(id uint) (*domain.ExpenseType, error)
@@ -43,20 +51,26 @@ type ExpenseService interface {
 type expenseService struct {
 	expenseRepo     repository.ExpenseRepository
 	expenseTypeRepo repository.ExpenseTypeRepository
+	attachmentRepo  repository.AttachmentRepository
 	employeeRepo    repository.EmployeeRepository
+	storage         StorageProvider
 	auditService    AuditService
 }
 
 func NewExpenseService(
 	expenseRepo repository.ExpenseRepository,
 	expenseTypeRepo repository.ExpenseTypeRepository,
+	attachmentRepo repository.AttachmentRepository,
 	employeeRepo repository.EmployeeRepository,
+	storage StorageProvider,
 	auditService AuditService,
 ) ExpenseService {
 	return &expenseService{
 		expenseRepo:     expenseRepo,
 		expenseTypeRepo: expenseTypeRepo,
+		attachmentRepo:  attachmentRepo,
 		employeeRepo:    employeeRepo,
+		storage:         storage,
 		auditService:    auditService,
 	}
 }
@@ -126,6 +140,14 @@ func (s *expenseService) GetMyExpenseRequestsPaginated(userID uint, page, limit 
 		return nil, err
 	}
 
+	// Calculate document count for each expense request
+	for _, expense := range expenses {
+		count, err := s.attachmentRepo.CountByRelatedRecord(domain.AttachmentRelatedTypeExpense, expense.ID)
+		if err == nil {
+			expense.DocumentCount = int(count)
+		}
+	}
+
 	return &PaginatedResponse{
 		Data: expenses,
 		Page: PageInfo{
@@ -144,6 +166,14 @@ func (s *expenseService) GetAllExpenseRequestsPaginated(employeeID *uint, page, 
 	expenses, total, err := s.expenseRepo.GetAll(employeeID, page, limit, sortParams, status)
 	if err != nil {
 		return nil, err
+	}
+
+	// Calculate document count for each expense request
+	for _, expense := range expenses {
+		count, err := s.attachmentRepo.CountByRelatedRecord(domain.AttachmentRelatedTypeExpense, expense.ID)
+		if err == nil {
+			expense.DocumentCount = int(count)
+		}
 	}
 
 	return &PaginatedResponse{
@@ -351,4 +381,199 @@ func (s *expenseService) UpdateExpenseType(expenseType *domain.ExpenseType, modi
 
 func (s *expenseService) DeleteExpenseType(id uint) error {
 	return s.expenseTypeRepo.Delete(id)
+}
+
+// ==================== Expense Document Methods ====================
+
+// UploadExpenseDocument uploads a document for an expense request using Attachment system
+func (s *expenseService) UploadExpenseDocument(expenseRequestID uint, file *multipart.FileHeader, userID uint) (*domain.Attachment, error) {
+	// Check if expense request exists and user has permission
+	expense, err := s.expenseRepo.FindByID(expenseRequestID)
+	if err != nil {
+		return nil, errors.New("expense request not found")
+	}
+
+	// Get employee to check ownership
+	employee, err := s.employeeRepo.GetByUserID(userID)
+	if err != nil {
+		return nil, errors.New("employee not found")
+	}
+
+	// Only the owner can upload documents
+	if expense.EmployeeID != employee.ID {
+		return nil, errors.New("you can only upload documents to your own expense requests")
+	}
+
+	// Only PENDING requests can have documents uploaded
+	if expense.Status != ExpenseStatusPending {
+		return nil, errors.New("documents can only be uploaded to pending expense requests")
+	}
+
+	// Upload using document service with expense-specific type
+	attachment, err := s.uploadExpenseAttachment(file, userID, expenseRequestID, domain.AttachmentTypeReceipt)
+	if err != nil {
+		return nil, err
+	}
+
+	return attachment, nil
+}
+
+// uploadExpenseAttachment is a helper function to upload expense attachments
+func (s *expenseService) uploadExpenseAttachment(file *multipart.FileHeader, ownerID uint, expenseRequestID uint, docType domain.AttachmentType) (*domain.Attachment, error) {
+	// Open the file
+	src, err := file.Open()
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+	defer src.Close()
+
+	// Generate unique filename
+	timestamp := time.Now().Format("20060102150405")
+	filename := fmt.Sprintf("expense_%d_%s_%s", expenseRequestID, timestamp, filepath.Base(file.Filename))
+	storagePath := fmt.Sprintf("expenses/%d/%s", expenseRequestID, filename)
+
+	// Upload to storage
+	if err := s.storage.Upload(src, storagePath); err != nil {
+		return nil, fmt.Errorf("failed to upload file: %w", err)
+	}
+
+	// Create attachment record
+	relatedID := expenseRequestID
+	attachment := &domain.Attachment{
+		ID:          domain.GenerateUUID(),
+		OwnerID:     ownerID,
+		RelatedType: domain.AttachmentRelatedTypeExpense,
+		RelatedID:   &relatedID,
+		Type:        docType,
+		Status:      domain.AttachmentStatusLinked,
+		FileName:    file.Filename,
+		Path:        storagePath,
+		ContentType: file.Header.Get("Content-Type"),
+		FileSize:    file.Size,
+	}
+
+	if err := s.attachmentRepo.Create(attachment); err != nil {
+		// Try to cleanup uploaded file
+		_ = s.storage.Delete(storagePath)
+		return nil, fmt.Errorf("failed to create attachment record: %w", err)
+	}
+
+	// Audit log
+	_ = s.auditService.CreateAuditLog("attachment", 0, "UPLOAD", nil, attachment, fmt.Sprintf("user_%d", ownerID))
+
+	return attachment, nil
+}
+
+// GetExpenseDocuments retrieves all documents for an expense request
+func (s *expenseService) GetExpenseDocuments(expenseRequestID uint, userID uint, isAdmin bool) ([]domain.Attachment, error) {
+	// Check if expense request exists
+	expense, err := s.expenseRepo.FindByID(expenseRequestID)
+	if err != nil {
+		return nil, errors.New("expense request not found")
+	}
+
+	// Check permission: admin or owner can view
+	if !isAdmin {
+		employee, err := s.employeeRepo.GetByUserID(userID)
+		if err != nil {
+			return nil, errors.New("employee not found")
+		}
+		if expense.EmployeeID != employee.ID {
+			return nil, errors.New("you can only view documents of your own expense requests")
+		}
+	}
+
+	// Get attachments for this expense
+	return s.attachmentRepo.FindByRelatedRecord(domain.AttachmentRelatedTypeExpense, expenseRequestID)
+}
+
+// DeleteExpenseDocument deletes a document
+func (s *expenseService) DeleteExpenseDocument(documentID string, userID uint, isAdmin bool) error {
+	// Get attachment
+	attachment, err := s.attachmentRepo.FindByID(documentID)
+	if err != nil {
+		return errors.New("document not found")
+	}
+
+	// Verify it's an expense document
+	if attachment.RelatedType != domain.AttachmentRelatedTypeExpense || attachment.RelatedID == nil {
+		return errors.New("invalid expense document")
+	}
+
+	// Get expense request
+	expense, err := s.expenseRepo.FindByID(*attachment.RelatedID)
+	if err != nil {
+		return errors.New("expense request not found")
+	}
+
+	// Check permission: admin or owner can delete
+	if !isAdmin {
+		employee, err := s.employeeRepo.GetByUserID(userID)
+		if err != nil {
+			return errors.New("employee not found")
+		}
+		if expense.EmployeeID != employee.ID {
+			return errors.New("you can only delete documents of your own expense requests")
+		}
+	}
+
+	// Only PENDING requests can have documents deleted
+	if expense.Status != ExpenseStatusPending {
+		return errors.New("documents can only be deleted from pending expense requests")
+	}
+
+	// Delete from storage
+	if err := s.storage.Delete(attachment.Path); err != nil {
+		// Log error but continue with database deletion
+		fmt.Printf("Failed to delete file from storage: %v\n", err)
+	}
+
+	// Delete from database
+	if err := s.attachmentRepo.Delete(documentID); err != nil {
+		return fmt.Errorf("failed to delete attachment record: %w", err)
+	}
+
+	// Audit log
+	_ = s.auditService.CreateAuditLog("attachment", 0, "DELETE", attachment, nil, fmt.Sprintf("user_%d", userID))
+
+	return nil
+}
+
+// DownloadExpenseDocument generates a download URL for a document
+func (s *expenseService) DownloadExpenseDocument(documentID string, userID uint, isAdmin bool) (string, error) {
+	// Get attachment
+	attachment, err := s.attachmentRepo.FindByID(documentID)
+	if err != nil {
+		return "", errors.New("document not found")
+	}
+
+	// Verify it's an expense document
+	if attachment.RelatedType != domain.AttachmentRelatedTypeExpense || attachment.RelatedID == nil {
+		return "", errors.New("invalid expense document")
+	}
+
+	// Get expense request
+	expense, err := s.expenseRepo.FindByID(*attachment.RelatedID)
+	if err != nil {
+		return "", errors.New("expense request not found")
+	}
+
+	// Check permission: admin or owner can download
+	if !isAdmin {
+		employee, err := s.employeeRepo.GetByUserID(userID)
+		if err != nil {
+			return "", errors.New("employee not found")
+		}
+		if expense.EmployeeID != employee.ID {
+			return "", errors.New("you can only download documents of your own expense requests")
+		}
+	}
+
+	// Generate presigned URL (valid for 15 minutes)
+	url, err := s.storage.GeneratePresignedURL(attachment.Path, 15)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate download URL: %w", err)
+	}
+
+	return url, nil
 }

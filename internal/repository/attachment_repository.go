@@ -14,6 +14,7 @@ type AttachmentRepository interface {
 	FindByID(id string) (*domain.Attachment, error)
 	FindByOwnerID(ownerID uint) ([]domain.Attachment, error)
 	FindByRelatedRecord(relatedType domain.AttachmentRelatedType, relatedID uint) ([]domain.Attachment, error)
+	CountByRelatedRecord(relatedType domain.AttachmentRelatedType, relatedID uint) (int64, error)
 	FindTemporaryOlderThan(hours int) ([]domain.Attachment, error)
 	UpdateStatus(id string, status domain.AttachmentStatus, relatedID *uint) error
 	Delete(id string) error
@@ -69,6 +70,16 @@ func (r *attachmentRepository) FindByRelatedRecord(relatedType domain.Attachment
 		Order("created_at DESC").
 		Find(&attachments).Error
 	return attachments, err
+}
+
+// CountByRelatedRecord counts attachments linked to a specific record
+func (r *attachmentRepository) CountByRelatedRecord(relatedType domain.AttachmentRelatedType, relatedID uint) (int64, error) {
+	var count int64
+	err := r.db.Model(&domain.Attachment{}).
+		Where("related_type = ? AND related_id = ? AND status = ?",
+			relatedType, relatedID, domain.AttachmentStatusLinked).
+		Count(&count).Error
+	return count, err
 }
 
 // FindTemporaryOlderThan finds temporary attachments older than specified hours (for cleanup job)

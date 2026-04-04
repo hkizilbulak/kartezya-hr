@@ -528,6 +528,9 @@ type ExpenseRequest struct {
 	Employee    *Employee    `json:"employee,omitempty" gorm:"foreignKey:EmployeeID"`
 	ExpenseType *ExpenseType `json:"expense_type,omitempty" gorm:"foreignKey:ExpenseTypeID"`
 	Approver    *User        `json:"approver,omitempty" gorm:"foreignKey:ApprovedBy"`
+
+	// Computed fields (not stored in DB)
+	DocumentCount int `json:"document_count" gorm:"-"` // Number of attached documents
 }
 
 func (ExpenseRequest) TableName() string {
