@@ -42,8 +42,8 @@ type ExpenseService interface {
 	// Expense Type methods
 	CreateExpenseType(expenseType *domain.ExpenseType, createdBy string) error
 	GetExpenseTypeByID(id uint) (*domain.ExpenseType, error)
-	GetAllExpenseTypes(page, limit int, sortParams types.SortParams) (*PaginatedResponse, error)
-	GetActiveExpenseTypes() ([]*domain.ExpenseType, error)
+	GetAllExpenseTypes(page, limit int, sortParams types.SortParams, roleID *uint) (*PaginatedResponse, error)
+	GetActiveExpenseTypes(roles []string) ([]*domain.ExpenseType, error)
 	UpdateExpenseType(expenseType *domain.ExpenseType, modifiedBy string) error
 	DeleteExpenseType(id uint) error
 }
@@ -353,9 +353,9 @@ func (s *expenseService) GetExpenseTypeByID(id uint) (*domain.ExpenseType, error
 	return s.expenseTypeRepo.FindByID(id)
 }
 
-func (s *expenseService) GetAllExpenseTypes(page, limit int, sortParams types.SortParams) (*PaginatedResponse, error) {
+func (s *expenseService) GetAllExpenseTypes(page, limit int, sortParams types.SortParams, roleID *uint) (*PaginatedResponse, error) {
 	offset := (page - 1) * limit
-	expenseTypes, total, err := s.expenseTypeRepo.GetAll(limit, offset, sortParams)
+	expenseTypes, total, err := s.expenseTypeRepo.GetAll(limit, offset, sortParams, roleID)
 	if err != nil {
 		return nil, err
 	}
@@ -373,8 +373,8 @@ func (s *expenseService) GetAllExpenseTypes(page, limit int, sortParams types.So
 	}, nil
 }
 
-func (s *expenseService) GetActiveExpenseTypes() ([]*domain.ExpenseType, error) {
-	return s.expenseTypeRepo.GetActive()
+func (s *expenseService) GetActiveExpenseTypes(roles []string) ([]*domain.ExpenseType, error) {
+	return s.expenseTypeRepo.GetActive(roles)
 }
 
 func (s *expenseService) UpdateExpenseType(expenseType *domain.ExpenseType, modifiedBy string) error {

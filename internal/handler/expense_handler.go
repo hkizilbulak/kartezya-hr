@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
@@ -32,6 +33,26 @@ type UpdateExpenseRequestDTO struct {
 	Currency      *string  `json:"currency" binding:"omitempty,oneof=TRY USD EUR"`
 	ExpenseDate   *string  `json:"expense_date"` // Date string in YYYY-MM-DD format
 	Description   *string  `json:"description"`
+}
+
+// CreateExpenseTypeRequestDTO represents DTO for creating expense type
+type CreateExpenseTypeRequestDTO struct {
+	Name            string   `json:"name" binding:"required"`
+	Description     string   `json:"description"`
+	RequiresReceipt bool     `json:"requires_receipt"`
+	MaxAmount       *float64 `json:"max_amount"`
+	Active          bool     `json:"active"`
+	RoleID          *uint    `json:"role_id"`
+}
+
+// UpdateExpenseTypeRequestDTO represents DTO for updating expense type
+type UpdateExpenseTypeRequestDTO struct {
+	Name            *string         `json:"name"`
+	Description     *string         `json:"description"`
+	RequiresReceipt *bool           `json:"requires_receipt"`
+	MaxAmount       *float64        `json:"max_amount"`
+	Active          *bool           `json:"active"`
+	RoleID          json.RawMessage `json:"role_id"`
 }
 
 func NewExpenseHandler(expenseService service.ExpenseService) *ExpenseHandler {
@@ -646,6 +667,7 @@ func (h *ExpenseHandler) MarkExpenseAsPaid(c *gin.Context) {
 // @Security BearerAuth
 // @Param page query int false "Page number (default: 1)"
 // @Param limit query int false "Items per page (default: 10)"
+// @Param role_id query int false "Role ID to filter by"
 // @Success 200 {object} APIResponse
 // @Failure 401 {object} APIResponse
 // @Failure 403 {object} APIResponse
@@ -676,7 +698,15 @@ func (h *ExpenseHandler) GetExpenseTypes(c *gin.Context) {
 		Direction: c.DefaultQuery("direction", "ASC"),
 	}
 
-	result, err := h.expenseService.GetAllExpenseTypes(page, limit, sortParams)
+	var roleID *uint
+	if roleIDStr := c.Query("role_id"); roleIDStr != "" {
+		if id, err := strconv.ParseUint(roleIDStr, 10, 32); err == nil {
+			idUint := uint(id)
+			roleID = &idUint
+		}
+	}
+
+	result, err := h.expenseService.GetAllExpenseTypes(page, limit, sortParams, roleID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -703,7 +733,7 @@ func (h *ExpenseHandler) GetExpenseTypes(c *gin.Context) {
 // @Failure 401 {object} APIResponse
 // @Router /expense/types/active [get]
 func (h *ExpenseHandler) GetActiveExpenseTypes(c *gin.Context) {
-	_, _, _, ok := getUserContext(c)
+	_, _, roles, ok := getUserContext(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -712,7 +742,7 @@ func (h *ExpenseHandler) GetActiveExpenseTypes(c *gin.Context) {
 		return
 	}
 
-	expenseTypes, err := h.expenseService.GetActiveExpenseTypes()
+	expenseTypes, err := h.expenseService.GetActiveExpenseTypes(roles)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -734,7 +764,7 @@ func (h *ExpenseHandler) GetActiveExpenseTypes(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param request body domain.ExpenseType true "Expense type data"
+// @Param request body CreateExpenseTypeRequestDTO true "Expense type data"
 // @Success 201 {object} APIResponse
 // @Failure 400 {object} APIResponse
 // @Failure 401 {object} APIResponse
@@ -758,13 +788,22 @@ func (h *ExpenseHandler) CreateExpenseType(c *gin.Context) {
 		return
 	}
 
-	var expenseType domain.ExpenseType
-	if err := c.ShouldBindJSON(&expenseType); err != nil {
+	var dto CreateExpenseTypeRequestDTO
+	if err := c.ShouldBindJSON(&dto); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   err.Error(),
 		})
 		return
+	}
+
+	expenseType := domain.ExpenseType{
+		Name:            dto.Name,
+		Description:     dto.Description,
+		RequiresReceipt: dto.RequiresReceipt,
+		MaxAmount:       dto.MaxAmount,
+		Active:          dto.Active,
+		RoleID:          dto.RoleID,
 	}
 
 	if err := h.expenseService.CreateExpenseType(&expenseType, strconv.FormatUint(uint64(userID), 10)); err != nil {
@@ -778,7 +817,6 @@ func (h *ExpenseHandler) CreateExpenseType(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true,
 		"data":    expenseType,
-		"message": "Expense type created successfully",
 	})
 }
 
@@ -790,11 +828,12 @@ func (h *ExpenseHandler) CreateExpenseType(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path int true "Expense Type ID"
-// @Param request body domain.ExpenseType true "Expense type data"
+// @Param request body UpdateExpenseTypeRequestDTO true "Expense type update data"
 // @Success 200 {object} APIResponse
 // @Failure 400 {object} APIResponse
 // @Failure 401 {object} APIResponse
 // @Failure 403 {object} APIResponse
+// @Failure 404 {object} APIResponse
 // @Router /expense/types/{id} [put]
 func (h *ExpenseHandler) UpdateExpenseType(c *gin.Context) {
 	userID, _, roles, ok := getUserContext(c)
@@ -814,17 +853,17 @@ func (h *ExpenseHandler) UpdateExpenseType(c *gin.Context) {
 		return
 	}
 
-	id, err := parseUintParam(c, "id")
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"error":   "Invalid expense type ID",
+			"error":   "Invalid ID",
 		})
 		return
 	}
 
-	var expenseType domain.ExpenseType
-	if err := c.ShouldBindJSON(&expenseType); err != nil {
+	var dto UpdateExpenseTypeRequestDTO
+	if err := c.ShouldBindJSON(&dto); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   err.Error(),
@@ -832,9 +871,51 @@ func (h *ExpenseHandler) UpdateExpenseType(c *gin.Context) {
 		return
 	}
 
-	expenseType.ID = id
+	// Get existing
+	expenseType, err := h.expenseService.GetExpenseTypeByID(uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
 
-	if err := h.expenseService.UpdateExpenseType(&expenseType, strconv.FormatUint(uint64(userID), 10)); err != nil {
+	// Update fields
+	if dto.Name != nil {
+		expenseType.Name = *dto.Name
+	}
+	if dto.Description != nil {
+		expenseType.Description = *dto.Description
+	}
+	if dto.RequiresReceipt != nil {
+		expenseType.RequiresReceipt = *dto.RequiresReceipt
+	}
+	if dto.MaxAmount != nil {
+		expenseType.MaxAmount = dto.MaxAmount // Keep pointer logic
+	}
+	if dto.Active != nil {
+		expenseType.Active = *dto.Active
+	}
+	// RoleID: nil json.RawMessage = field absent (no change)
+	// "null" = explicitly set to null → clear role
+	// number = set to that role
+	if len(dto.RoleID) > 0 {
+		if string(dto.RoleID) == "null" {
+			expenseType.RoleID = nil
+		} else {
+			var roleID uint
+			if err := json.Unmarshal(dto.RoleID, &roleID); err == nil {
+				if roleID == 0 {
+					expenseType.RoleID = nil
+				} else {
+					expenseType.RoleID = &roleID
+				}
+			}
+		}
+	}
+
+	if err := h.expenseService.UpdateExpenseType(expenseType, strconv.FormatUint(uint64(userID), 10)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   err.Error(),
@@ -845,7 +926,6 @@ func (h *ExpenseHandler) UpdateExpenseType(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data":    expenseType,
-		"message": "Expense type updated successfully",
 	})
 }
 

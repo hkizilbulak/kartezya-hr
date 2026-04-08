@@ -21,8 +21,8 @@ type ExpenseRepository interface {
 type ExpenseTypeRepository interface {
 	Create(expenseType *domain.ExpenseType, createdBy string) error
 	FindByID(id uint) (*domain.ExpenseType, error)
-	GetAll(limit, offset int, sortParams types.SortParams) ([]*domain.ExpenseType, int64, error)
-	GetActive() ([]*domain.ExpenseType, error)
+	GetAll(limit, offset int, sortParams types.SortParams, roleID *uint) ([]*domain.ExpenseType, int64, error)
+	GetActive(roles []string) ([]*domain.ExpenseType, error)
 	Update(expenseType *domain.ExpenseType, modifiedBy string) error
 	Delete(id uint) error
 }
@@ -165,11 +165,15 @@ func (r *expenseTypeRepository) FindByID(id uint) (*domain.ExpenseType, error) {
 	return &expenseType, err
 }
 
-func (r *expenseTypeRepository) GetAll(limit, offset int, sortParams types.SortParams) ([]*domain.ExpenseType, int64, error) {
+func (r *expenseTypeRepository) GetAll(limit, offset int, sortParams types.SortParams, roleID *uint) ([]*domain.ExpenseType, int64, error) {
 	var expenseTypes []*domain.ExpenseType
 	var total int64
 
 	query := r.db.Where("deleted = ?", false)
+
+	if roleID != nil {
+		query = query.Where("role_id = ? OR role_id IS NULL", *roleID)
+	}
 
 	// Count total
 	query.Model(&domain.ExpenseType{}).Count(&total)
@@ -196,15 +200,40 @@ func (r *expenseTypeRepository) GetAll(limit, offset int, sortParams types.SortP
 	return expenseTypes, total, err
 }
 
-func (r *expenseTypeRepository) GetActive() ([]*domain.ExpenseType, error) {
+func (r *expenseTypeRepository) GetActive(roles []string) ([]*domain.ExpenseType, error) {
 	var expenseTypes []*domain.ExpenseType
-	err := r.db.Where("deleted = ? AND active = ?", false, true).Order("name ASC").Find(&expenseTypes).Error
+
+	tableName := domain.ExpenseType{}.TableName()
+	rolesTableName := "hr_roles"
+
+	db := r.db.Table(tableName).
+		Select(tableName+".*").
+		Joins("LEFT JOIN "+rolesTableName+" ON "+rolesTableName+".id = "+tableName+".role_id").
+		Where(tableName+".deleted = ? AND "+tableName+".active = ?", false, true)
+
+	if len(roles) > 0 {
+		db = db.Where(tableName+".role_id IS NULL OR "+rolesTableName+".name IN ?", roles)
+	} else {
+		db = db.Where(tableName + ".role_id IS NULL")
+	}
+
+	err := db.Order(tableName + ".name ASC").Scan(&expenseTypes).Error
 	return expenseTypes, err
 }
 
 func (r *expenseTypeRepository) Update(expenseType *domain.ExpenseType, modifiedBy string) error {
 	expenseType.ModifiedBy = modifiedBy
-	return r.db.Save(expenseType).Error
+	// Use Updates with map to ensure nil/NULL values (like role_id) are persisted correctly.
+	// r.db.Save() skips zero-value pointer fields; explicit map forces NULL write.
+	return r.db.Model(expenseType).Updates(map[string]interface{}{
+		"name":             expenseType.Name,
+		"description":      expenseType.Description,
+		"requires_receipt": expenseType.RequiresReceipt,
+		"max_amount":       expenseType.MaxAmount,
+		"active":           expenseType.Active,
+		"role_id":          expenseType.RoleID,
+		"modified_by":      modifiedBy,
+	}).Error
 }
 
 func (r *expenseTypeRepository) Delete(id uint) error {

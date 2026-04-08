@@ -216,6 +216,104 @@ definitions:
       work_email:
         type: string
     type: object
+  domain.ExpenseRequest:
+    properties:
+      amount:
+        description: Expense amount
+        type: number
+      approved_at:
+        description: Approval timestamp
+        type: string
+      approved_by:
+        description: Admin who approved
+        type: integer
+      approver:
+        $ref: '#/definitions/domain.User'
+      created_at:
+        type: string
+      created_by:
+        type: string
+      currency:
+        description: Currency code (TRY, USD, EUR)
+        type: string
+      deleted:
+        type: boolean
+      description:
+        description: Expense description/notes
+        type: string
+      document_count:
+        description: Computed fields (not stored in DB)
+        type: integer
+      employee:
+        allOf:
+        - $ref: '#/definitions/domain.Employee'
+        description: Relationships
+      employee_id:
+        type: integer
+      expense_date:
+        description: Date of expense
+        type: string
+      expense_type:
+        $ref: '#/definitions/domain.ExpenseType'
+      expense_type_id:
+        type: integer
+      id:
+        type: integer
+      modified_by:
+        type: string
+      paid_at:
+        description: Payment timestamp
+        type: string
+      payment_reference:
+        description: Payment reference/transaction ID
+        type: string
+      rejected_at:
+        description: Rejection timestamp
+        type: string
+      rejection_reason:
+        description: Reason for rejection
+        type: string
+      status:
+        description: PENDING, APPROVED, REJECTED, PAID
+        type: string
+      updated_at:
+        type: string
+    type: object
+  domain.ExpenseType:
+    properties:
+      active:
+        description: Active/Inactive status
+        type: boolean
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      description:
+        type: string
+      id:
+        type: integer
+      max_amount:
+        description: Maximum allowed amount (null = no limit)
+        type: number
+      modified_by:
+        type: string
+      name:
+        type: string
+      requires_receipt:
+        description: Whether receipt/invoice is mandatory
+        type: boolean
+      role:
+        allOf:
+        - $ref: '#/definitions/domain.Role'
+        description: Relationships
+      role_id:
+        description: Role required to see/use this expense type (null = all can see)
+        type: integer
+      updated_at:
+        type: string
+    type: object
   domain.Grade:
     properties:
       created_at:
@@ -524,10 +622,11 @@ definitions:
         type: boolean
       is_start_date_full_day:
         type: boolean
+      requested_days:
+        type: number
       start_date:
         type: string
     required:
-    - end_date
     - start_date
     type: object
   handler.CalculateWorkingDaysResponse:
@@ -685,6 +784,47 @@ definitions:
     - first_name
     - last_name
     type: object
+  handler.CreateExpenseRequestDTO:
+    properties:
+      amount:
+        type: number
+      currency:
+        enum:
+        - TRY
+        - USD
+        - EUR
+        type: string
+      description:
+        type: string
+      expense_date:
+        description: Date string in YYYY-MM-DD format
+        type: string
+      expense_type_id:
+        type: integer
+    required:
+    - amount
+    - currency
+    - description
+    - expense_date
+    - expense_type_id
+    type: object
+  handler.CreateExpenseTypeRequestDTO:
+    properties:
+      active:
+        type: boolean
+      description:
+        type: string
+      max_amount:
+        type: number
+      name:
+        type: string
+      requires_receipt:
+        type: boolean
+      role_id:
+        type: integer
+    required:
+    - name
+    type: object
   handler.CreateGradeRequest:
     properties:
       description:
@@ -780,6 +920,13 @@ definitions:
       count:
         type: integer
       gender:
+        type: string
+    type: object
+  handler.GradeChartData:
+    properties:
+      count:
+        type: integer
+      grade_name:
         type: string
     type: object
   handler.LoginRequest:
@@ -979,6 +1126,21 @@ definitions:
     - first_name
     - last_name
     type: object
+  handler.UpdateExpenseTypeRequestDTO:
+    properties:
+      active:
+        type: boolean
+      description:
+        type: string
+      max_amount:
+        type: number
+      name:
+        type: string
+      requires_receipt:
+        type: boolean
+      role_id:
+        type: integer
+    type: object
   handler.UpdateGradeRequest:
     properties:
       description:
@@ -1147,6 +1309,9 @@ definitions:
         type: string
       deleted:
         type: boolean
+      document_count:
+        description: Number of attached documents
+        type: integer
       employee:
         $ref: '#/definitions/types.EmployeeLookup'
       end_date:
@@ -1180,6 +1345,16 @@ definitions:
         type: string
       updated_at:
         type: string
+    type: object
+  types.ColumnConfig:
+    properties:
+      key:
+        type: string
+      label:
+        type: string
+    required:
+    - key
+    - label
     type: object
   types.CompanyLookup:
     properties:
@@ -1367,6 +1542,10 @@ definitions:
         type: string
       id:
         type: integer
+      is_required_document:
+        type: boolean
+      limit_amount:
+        type: integer
       name:
         type: string
     type: object
@@ -1397,6 +1576,19 @@ definitions:
       updated_at:
         type: string
     type: object
+  types.MyLeaveBalanceResponse:
+    properties:
+      leave_type_name:
+        type: string
+      remaining_days:
+        type: number
+      total_days:
+        type: number
+      used_days:
+        type: number
+      year:
+        type: integer
+    type: object
   types.MyLeaveRequestResponse:
     properties:
       approved_at:
@@ -1409,6 +1601,9 @@ definitions:
         type: string
       created_at:
         type: string
+      document_count:
+        description: Number of attached documents
+        type: integer
       end_date:
         type: string
       id:
@@ -1435,6 +1630,27 @@ definitions:
         type: string
       updated_at:
         type: string
+    type: object
+  types.WorkDayReportExportRequest:
+    properties:
+      company_id:
+        type: integer
+      department_ids:
+        items:
+          type: integer
+        type: array
+      end_date:
+        type: string
+      export_columns:
+        items:
+          $ref: '#/definitions/types.ColumnConfig'
+        type: array
+      start_date:
+        type: string
+    required:
+    - end_date
+    - export_columns
+    - start_date
     type: object
   types.WorkDayReportResponse:
     properties:
@@ -2121,6 +2337,38 @@ paths:
       security:
       - BearerAuth: []
       summary: Get employees count by gender
+      tags:
+      - dashboard
+  /dashboard/employees-by-grade:
+    get:
+      consumes:
+      - application/json
+      description: Get employee statistics grouped by grade
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/handler.GradeChartData'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get employees count by grade
       tags:
       - dashboard
   /dashboard/employees-by-position:
@@ -2872,10 +3120,6 @@ paths:
         in: query
         name: direction
         type: string
-      - description: Filter by employee ID
-        in: query
-        name: id
-        type: integer
       - description: Filter by first name
         in: query
         name: first_name
@@ -2892,6 +3136,18 @@ paths:
         in: query
         name: department_id
         type: integer
+      - description: Filter by company name (case-insensitive, LIKE)
+        in: query
+        name: company
+        type: string
+      - description: Filter by department name (case-insensitive, LIKE)
+        in: query
+        name: department
+        type: string
+      - description: Filter by job title (case-insensitive, LIKE)
+        in: query
+        name: jobTitle
+        type: string
       - description: Filter by manager
         in: query
         name: manager
@@ -3158,6 +3414,638 @@ paths:
       summary: Update my employee profile
       tags:
       - employees
+  /expense/documents/{id}:
+    delete:
+      description: Delete a document from an expense request
+      parameters:
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete expense document
+      tags:
+      - expense-documents
+  /expense/documents/{id}/download:
+    get:
+      description: Get download URL for an expense document
+      parameters:
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Download expense document
+      tags:
+      - expense-documents
+  /expense/requests:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated list of all expense requests (Admin only)
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10)'
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by employee ID
+        in: query
+        name: employee_id
+        type: integer
+      - description: Filter by status (PENDING, APPROVED, REJECTED, PAID)
+        in: query
+        name: status
+        type: string
+      - description: 'Sort field (default: created_at)'
+        in: query
+        name: sort
+        type: string
+      - description: 'Sort direction (default: DESC)'
+        in: query
+        name: direction
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get all expense requests
+      tags:
+      - expense-requests
+    post:
+      consumes:
+      - application/json
+      description: Create a new expense request
+      parameters:
+      - description: Expense request data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateExpenseRequestDTO'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create expense request
+      tags:
+      - expense-requests
+  /expense/requests/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete an expense request (only pending requests)
+      parameters:
+      - description: Expense Request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete expense request
+      tags:
+      - expense-requests
+    get:
+      consumes:
+      - application/json
+      description: Get expense request details by ID
+      parameters:
+      - description: Expense Request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get expense request by ID
+      tags:
+      - expense-requests
+    put:
+      consumes:
+      - application/json
+      description: Update an existing expense request (only pending requests)
+      parameters:
+      - description: Expense Request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Expense request data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/domain.ExpenseRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update expense request
+      tags:
+      - expense-requests
+  /expense/requests/{id}/approve:
+    post:
+      consumes:
+      - application/json
+      description: Approve an expense request (Admin only)
+      parameters:
+      - description: Expense Request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Approve expense request
+      tags:
+      - expense-requests
+  /expense/requests/{id}/documents:
+    get:
+      description: Get all documents for an expense request
+      parameters:
+      - description: Expense Request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get expense documents
+      tags:
+      - expense-documents
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a receipt/invoice for an expense request
+      parameters:
+      - description: Expense Request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Document file
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Upload expense document
+      tags:
+      - expense-documents
+  /expense/requests/{id}/pay:
+    post:
+      consumes:
+      - application/json
+      description: Mark an approved expense request as paid (Admin only)
+      parameters:
+      - description: Expense Request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Payment reference
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Mark expense as paid
+      tags:
+      - expense-requests
+  /expense/requests/{id}/reject:
+    post:
+      consumes:
+      - application/json
+      description: Reject an expense request (Admin only)
+      parameters:
+      - description: Expense Request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Rejection reason
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Reject expense request
+      tags:
+      - expense-requests
+  /expense/requests/me:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated expense requests for the authenticated employee
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10)'
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by status (PENDING, APPROVED, REJECTED, PAID)
+        in: query
+        name: status
+        type: string
+      - description: 'Sort field (default: created_at)'
+        in: query
+        name: sort
+        type: string
+      - description: 'Sort direction (default: DESC)'
+        in: query
+        name: direction
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my expense requests
+      tags:
+      - expense-requests
+  /expense/types:
+    get:
+      consumes:
+      - application/json
+      description: Get all expense types with pagination (Admin only)
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10)'
+        in: query
+        name: limit
+        type: integer
+      - description: Role ID to filter by
+        in: query
+        name: role_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get expense types
+      tags:
+      - expense-types
+    post:
+      consumes:
+      - application/json
+      description: Create a new expense type (Admin only)
+      parameters:
+      - description: Expense type data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateExpenseTypeRequestDTO'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create expense type
+      tags:
+      - expense-types
+  /expense/types/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete an expense type (Admin only)
+      parameters:
+      - description: Expense Type ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete expense type
+      tags:
+      - expense-types
+    put:
+      consumes:
+      - application/json
+      description: Update an existing expense type (Admin only)
+      parameters:
+      - description: Expense Type ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Expense type update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateExpenseTypeRequestDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update expense type
+      tags:
+      - expense-types
+  /expense/types/active:
+    get:
+      consumes:
+      - application/json
+      description: Get all active expense types (for dropdown)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get active expense types
+      tags:
+      - expense-types
   /grades:
     get:
       consumes:
@@ -3631,6 +4519,64 @@ paths:
       summary: Create leave type
       tags:
       - leave-types
+  /leave/balances:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated leave balances for a specific employee (Admin only)
+      parameters:
+      - description: Employee ID
+        in: query
+        name: employee_id
+        required: true
+        type: integer
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10)'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Sort field (default: leave_type_id)'
+        in: query
+        name: sort
+        type: string
+      - description: 'Sort direction (default: ASC)'
+        in: query
+        name: direction
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.MyLeaveBalanceResponse'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get employee leave balances
+      tags:
+      - leave-balances
   /leave/balances/me:
     get:
       consumes:
@@ -3718,6 +4664,70 @@ paths:
       summary: Calculate working days between two dates
       tags:
       - leave-requests
+  /leave/documents/{id}:
+    delete:
+      description: Delete a document from a leave request
+      parameters:
+      - description: Document ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete leave document
+      tags:
+      - leave-documents
+  /leave/documents/{id}/download:
+    get:
+      description: Get download URL for a leave document
+      parameters:
+      - description: Document ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Download leave document
+      tags:
+      - leave-documents
   /leave/requests:
     get:
       consumes:
@@ -3731,6 +4741,10 @@ paths:
       - description: 'Items per page (default: 10)'
         in: query
         name: limit
+        type: integer
+      - description: Filter by employee ID
+        in: query
+        name: employee_id
         type: integer
       - description: Filter by status (PENDING, APPROVED, REJECTED)
         in: query
@@ -3966,6 +4980,76 @@ paths:
       summary: Cancel leave request
       tags:
       - leave-requests
+  /leave/requests/{id}/documents:
+    get:
+      description: Get all documents for a leave request
+      parameters:
+      - description: Leave Request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get leave documents
+      tags:
+      - leave-documents
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a medical report or other document for a leave request
+      parameters:
+      - description: Leave Request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Document file
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Upload leave document
+      tags:
+      - leave-documents
   /leave/requests/{id}/reject:
     post:
       consumes:
@@ -4412,7 +5496,15 @@ paths:
         in: query
         name: company_id
         type: integer
-      - description: Department ID
+      - collectionFormat: csv
+        description: 'Department IDs (supports repeated param or comma separated),
+          example: department_ids=1&department_ids=2 or department_ids=1,2'
+        in: query
+        items:
+          type: integer
+        name: department_ids
+        type: array
+      - description: Legacy single department ID (backward compatibility)
         in: query
         name: department_id
         type: integer
@@ -4443,6 +5535,43 @@ paths:
       security:
       - BearerAuth: []
       summary: Get Work Day Report
+      tags:
+      - reports
+  /reports/work-day/export:
+    post:
+      consumes:
+      - application/json
+      description: Export work day report with dynamic export_columns and multiple
+        department_ids
+      parameters:
+      - description: Export request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/types.WorkDayReportExportRequest'
+      produces:
+      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Export Work Day Report as Excel
       tags:
       - reports
   /work-information:

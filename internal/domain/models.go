@@ -545,6 +545,10 @@ type ExpenseType struct {
 	RequiresReceipt bool     `json:"requires_receipt" gorm:"default:true"` // Whether receipt/invoice is mandatory
 	MaxAmount       *float64 `json:"max_amount"`                           // Maximum allowed amount (null = no limit)
 	Active          bool     `json:"active" gorm:"default:true"`           // Active/Inactive status
+	RoleID          *uint    `json:"role_id"`                              // Role required to see/use this expense type (null = all can see)
+
+	// Relationships
+	Role *Role `json:"role,omitempty" gorm:"foreignKey:RoleID"`
 }
 
 func (ExpenseType) TableName() string {

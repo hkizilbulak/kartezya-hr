@@ -14,6 +14,7 @@ type LookupService interface {
 	GetJobPositionsLookup() ([]types.JobPositionLookup, error)
 	GetLeaveTypesLookup() ([]types.LeaveTypeLookup, error)
 	GetGradesLookup() ([]types.GradeLookup, error)
+	GetRolesLookup() ([]types.RoleLookup, error)
 }
 
 type lookupService struct {
@@ -22,6 +23,7 @@ type lookupService struct {
 	jobPositionRepo repository.JobPositionRepository
 	leaveTypeRepo   repository.LeaveTypeRepository
 	gradeRepo       repository.GradeRepository
+	roleRepo        repository.RoleRepository
 }
 
 func NewLookupService(
@@ -30,6 +32,7 @@ func NewLookupService(
 	jobPositionRepo repository.JobPositionRepository,
 	leaveTypeRepo repository.LeaveTypeRepository,
 	gradeRepo repository.GradeRepository,
+	roleRepo repository.RoleRepository,
 ) LookupService {
 	return &lookupService{
 		companyRepo:     companyRepo,
@@ -37,6 +40,7 @@ func NewLookupService(
 		jobPositionRepo: jobPositionRepo,
 		leaveTypeRepo:   leaveTypeRepo,
 		gradeRepo:       gradeRepo,
+		roleRepo:        roleRepo,
 	}
 }
 
@@ -147,6 +151,24 @@ func (s *lookupService) GetGradesLookup() ([]types.GradeLookup, error) {
 		lookupData[i] = types.GradeLookup{
 			ID:   grade.ID,
 			Name: grade.Name,
+		}
+	}
+
+	return lookupData, nil
+}
+
+// GetRolesLookup returns all roles as lookup data
+func (s *lookupService) GetRolesLookup() ([]types.RoleLookup, error) {
+	roles, err := s.roleRepo.List()
+	if err != nil {
+		return nil, err
+	}
+
+	lookupData := make([]types.RoleLookup, len(roles))
+	for i, role := range roles {
+		lookupData[i] = types.RoleLookup{
+			ID:   role.ID,
+			Name: role.Name,
 		}
 	}
 

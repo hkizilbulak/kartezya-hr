@@ -118,7 +118,7 @@ func main() {
 	companyService := service.NewCompanyService(companyRepo, departmentRepo, departmentService, auditService)
 	jobPositionService := service.NewJobPositionService(jobPositionRepo, auditService)
 	workInfoService := service.NewWorkInformationService(workInfoRepo, employeeRepo, companyRepo, departmentRepo, jobPositionRepo, auditService)
-	lookupService := service.NewLookupService(companyRepo, departmentRepo, jobPositionRepo, leaveTypeRepo, gradeRepo)
+	lookupService := service.NewLookupService(companyRepo, departmentRepo, jobPositionRepo, leaveTypeRepo, gradeRepo, roleRepo)
 	gradeService := service.NewGradeService(gradeRepo, auditService)
 	employeeGradeService := service.NewEmployeeGradeService(employeeGradeRepo, employeeRepo, gradeRepo, auditService)
 	employeeContractService := service.NewEmployeeContractService(employeeContractRepo, employeeRepo, auditService)
@@ -210,6 +210,13 @@ func main() {
 		lookup.GET("/job-positions", lookupHandler.GetJobPositionsLookup)
 		lookup.GET("/leave-types", lookupHandler.GetLeaveTypesLookup)
 		lookup.GET("/grades", lookupHandler.GetGradesLookup)
+	}
+
+	// Protected lookup routes (authentication required)
+	protectedLookup := v1.Group("/lookup")
+	protectedLookup.Use(authMiddleware.JWTAuth())
+	{
+		protectedLookup.GET("/roles", authMiddleware.RequireAdmin(), lookupHandler.GetRolesLookup)
 	}
 
 	// Protected routes (authentication required)

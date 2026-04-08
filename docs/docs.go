@@ -24,11 +24,6 @@ const docTemplate = `{
     "paths": {
         "/auth/change-password": {
             "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Change password for the authenticated user",
                 "consumes": [
                     "application/json"
@@ -70,7 +65,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
             }
         },
         "/auth/login": {
@@ -133,11 +133,6 @@ const docTemplate = `{
         },
         "/auth/logout": {
             "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Logout the authenticated user",
                 "consumes": [
                     "application/json"
@@ -156,7 +151,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
             }
         },
         "/auth/reset-password": {
@@ -207,11 +207,6 @@ const docTemplate = `{
         },
         "/auth/send-password-reset-email-batch": {
             "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Send password reset emails to a batch of users",
                 "consumes": [
                     "application/json"
@@ -265,7 +260,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
             }
         },
         "/auth/validate-reset-token": {
@@ -401,11 +401,6 @@ const docTemplate = `{
         },
         "/companies": {
             "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Get paginated list of companies with sorting (Admin only)",
                 "consumes": [
                     "application/json"
@@ -483,14 +478,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "post": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "post": {
                 "description": "Create a new company (Admin only)",
                 "consumes": [
                     "application/json"
@@ -550,16 +545,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/companies/{id}": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/companies/{id}": {
+            "get": {
                 "description": "Get a specific company by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -623,14 +618,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "put": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "put": {
                 "description": "Update a company by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -691,14 +686,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "delete": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "delete": {
                 "description": "Delete a company by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -750,16 +745,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/dashboard/data": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/dashboard/data": {
+            "get": {
                 "description": "Get all dashboard statistics in a single request",
                 "consumes": [
                     "application/json"
@@ -802,16 +797,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/dashboard/employees-by-company-department": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/dashboard/employees-by-company-department": {
+            "get": {
                 "description": "Get employee statistics grouped by company and department",
                 "consumes": [
                     "application/json"
@@ -857,16 +852,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/dashboard/employees-by-gender": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/dashboard/employees-by-gender": {
+            "get": {
                 "description": "Get employee statistics grouped by gender",
                 "consumes": [
                     "application/json"
@@ -912,16 +907,71 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/dashboard/employees-by-position": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
+                ]
+            }
+        },
+        "/dashboard/employees-by-grade": {
+            "get": {
+                "description": "Get employee statistics grouped by grade",
+                "consumes": [
+                    "application/json"
                 ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dashboard"
+                ],
+                "summary": "Get employees count by grade",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/handler.GradeChartData"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/dashboard/employees-by-position": {
+            "get": {
                 "description": "Get employee statistics grouped by job position",
                 "consumes": [
                     "application/json"
@@ -967,16 +1017,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/departments": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/departments": {
+            "get": {
                 "description": "Get all departments with pagination (Admin only)",
                 "produces": [
                     "application/json"
@@ -1048,14 +1098,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "post": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "post": {
                 "description": "Create a new department (Admin only)",
                 "consumes": [
                     "application/json"
@@ -1115,16 +1165,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/departments/{id}": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/departments/{id}": {
+            "get": {
                 "description": "Get a specific department by ID (Admin only)",
                 "produces": [
                     "application/json"
@@ -1185,14 +1235,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "put": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "put": {
                 "description": "Update a department by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -1253,14 +1303,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "delete": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "delete": {
                 "description": "Delete a department by ID (Admin only)",
                 "produces": [
                     "application/json"
@@ -1309,16 +1359,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/employee-contracts": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/employee-contracts": {
+            "get": {
                 "description": "Get paginated list of all employee contracts (Admin only)",
                 "consumes": [
                     "application/json"
@@ -1402,14 +1452,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "post": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "post": {
                 "description": "Create employee contract record (Admin only)",
                 "consumes": [
                     "application/json"
@@ -1469,16 +1519,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/employee-contracts/me": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/employee-contracts/me": {
+            "get": {
                 "description": "Get employee contracts for the authenticated employee",
                 "consumes": [
                     "application/json"
@@ -1515,16 +1565,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/employee-contracts/{id}": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/employee-contracts/{id}": {
+            "get": {
                 "description": "Get specific employee contract by ID",
                 "consumes": [
                     "application/json"
@@ -1582,14 +1632,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "put": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "put": {
                 "description": "Update employee contract by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -1656,14 +1706,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "delete": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "delete": {
                 "description": "Delete employee contract by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -1709,16 +1759,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/employee-grades": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/employee-grades": {
+            "get": {
                 "description": "Get paginated list of all employee grades (Admin only)",
                 "consumes": [
                     "application/json"
@@ -1802,14 +1852,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "post": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "post": {
                 "description": "Create employee grade record (Admin only)",
                 "consumes": [
                     "application/json"
@@ -1869,16 +1919,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/employee-grades/me": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/employee-grades/me": {
+            "get": {
                 "description": "Get employee grades for the authenticated employee",
                 "consumes": [
                     "application/json"
@@ -1915,16 +1965,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/employee-grades/{id}": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/employee-grades/{id}": {
+            "get": {
                 "description": "Get specific employee grade by ID",
                 "consumes": [
                     "application/json"
@@ -1982,14 +2032,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "put": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "put": {
                 "description": "Update employee grade by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -2056,14 +2106,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "delete": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "delete": {
                 "description": "Delete employee grade by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -2109,16 +2159,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/employees": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/employees": {
+            "get": {
                 "description": "Get paginated list of all employees with filtering (Admin only)",
                 "consumes": [
                     "application/json"
@@ -2156,12 +2206,6 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
-                        "type": "integer",
-                        "description": "Filter by employee ID",
-                        "name": "id",
-                        "in": "query"
-                    },
-                    {
                         "type": "string",
                         "description": "Filter by first name",
                         "name": "first_name",
@@ -2183,6 +2227,24 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "Filter by department ID",
                         "name": "department_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by company name (case-insensitive, LIKE)",
+                        "name": "company",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by department name (case-insensitive, LIKE)",
+                        "name": "department",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by job title (case-insensitive, LIKE)",
+                        "name": "jobTitle",
                         "in": "query"
                     },
                     {
@@ -2250,14 +2312,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "post": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "post": {
                 "description": "Create a new employee (Admin only)",
                 "consumes": [
                     "application/json"
@@ -2309,16 +2371,16 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     }
-                }
-            }
-        },
-        "/employees/me": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/employees/me": {
+            "get": {
                 "description": "Get the profile of the authenticated employee",
                 "consumes": [
                     "application/json"
@@ -2345,14 +2407,14 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     }
-                }
-            },
-            "put": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "put": {
                 "description": "Update the profile of the authenticated employee (own profile only)",
                 "consumes": [
                     "application/json"
@@ -2404,16 +2466,16 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     }
-                }
-            }
-        },
-        "/employees/{id}": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/employees/{id}": {
+            "get": {
                 "description": "Get employee details by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -2470,14 +2532,14 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     }
-                }
-            },
-            "put": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "put": {
                 "description": "Update employee details by ID (Admin or own profile)",
                 "consumes": [
                     "application/json"
@@ -2532,14 +2594,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "delete": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "delete": {
                 "description": "Delete employee by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -2585,16 +2647,1002 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/grades": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
+                ]
+            }
+        },
+        "/expense/documents/{id}": {
+            "delete": {
+                "description": "Delete a document from an expense request",
+                "produces": [
+                    "application/json"
                 ],
+                "tags": [
+                    "expense-documents"
+                ],
+                "summary": "Delete expense document",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Document ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/expense/documents/{id}/download": {
+            "get": {
+                "description": "Get download URL for an expense document",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "expense-documents"
+                ],
+                "summary": "Download expense document",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Document ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/expense/requests": {
+            "get": {
+                "description": "Get paginated list of all expense requests (Admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "expense-requests"
+                ],
+                "summary": "Get all expense requests",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default: 10)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by employee ID",
+                        "name": "employee_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by status (PENDING, APPROVED, REJECTED, PAID)",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort field (default: created_at)",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort direction (default: DESC)",
+                        "name": "direction",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "description": "Create a new expense request",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "expense-requests"
+                ],
+                "summary": "Create expense request",
+                "parameters": [
+                    {
+                        "description": "Expense request data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.CreateExpenseRequestDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/expense/requests/me": {
+            "get": {
+                "description": "Get paginated expense requests for the authenticated employee",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "expense-requests"
+                ],
+                "summary": "Get my expense requests",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default: 10)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by status (PENDING, APPROVED, REJECTED, PAID)",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort field (default: created_at)",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort direction (default: DESC)",
+                        "name": "direction",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/expense/requests/{id}": {
+            "get": {
+                "description": "Get expense request details by ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "expense-requests"
+                ],
+                "summary": "Get expense request by ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Expense Request ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "description": "Update an existing expense request (only pending requests)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "expense-requests"
+                ],
+                "summary": "Update expense request",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Expense Request ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Expense request data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/domain.ExpenseRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "description": "Delete an expense request (only pending requests)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "expense-requests"
+                ],
+                "summary": "Delete expense request",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Expense Request ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/expense/requests/{id}/approve": {
+            "post": {
+                "description": "Approve an expense request (Admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "expense-requests"
+                ],
+                "summary": "Approve expense request",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Expense Request ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/expense/requests/{id}/documents": {
+            "get": {
+                "description": "Get all documents for an expense request",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "expense-documents"
+                ],
+                "summary": "Get expense documents",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Expense Request ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "description": "Upload a receipt/invoice for an expense request",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "expense-documents"
+                ],
+                "summary": "Upload expense document",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Expense Request ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Document file",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/expense/requests/{id}/pay": {
+            "post": {
+                "description": "Mark an approved expense request as paid (Admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "expense-requests"
+                ],
+                "summary": "Mark expense as paid",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Expense Request ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Payment reference",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/expense/requests/{id}/reject": {
+            "post": {
+                "description": "Reject an expense request (Admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "expense-requests"
+                ],
+                "summary": "Reject expense request",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Expense Request ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Rejection reason",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/expense/types": {
+            "get": {
+                "description": "Get all expense types with pagination (Admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "expense-types"
+                ],
+                "summary": "Get expense types",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default: 10)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Role ID to filter by",
+                        "name": "role_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "description": "Create a new expense type (Admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "expense-types"
+                ],
+                "summary": "Create expense type",
+                "parameters": [
+                    {
+                        "description": "Expense type data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.CreateExpenseTypeRequestDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/expense/types/active": {
+            "get": {
+                "description": "Get all active expense types (for dropdown)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "expense-types"
+                ],
+                "summary": "Get active expense types",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/expense/types/{id}": {
+            "put": {
+                "description": "Update an existing expense type (Admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "expense-types"
+                ],
+                "summary": "Update expense type",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Expense Type ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Expense type update data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.UpdateExpenseTypeRequestDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "description": "Delete an expense type (Admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "expense-types"
+                ],
+                "summary": "Delete expense type",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Expense Type ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/grades": {
+            "get": {
                 "description": "Get paginated list of grades with sorting (Admin only)",
                 "consumes": [
                     "application/json"
@@ -2672,14 +3720,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "post": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "post": {
                 "description": "Create a new grade (Admin only)",
                 "consumes": [
                     "application/json"
@@ -2739,16 +3787,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/grades/{id}": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/grades/{id}": {
+            "get": {
                 "description": "Get a specific grade by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -2812,14 +3860,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "put": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "put": {
                 "description": "Update a grade by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -2880,14 +3928,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "delete": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "delete": {
                 "description": "Delete a grade by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -2939,16 +3987,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/job-positions": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/job-positions": {
+            "get": {
                 "description": "Get paginated list of job positions with sorting (Admin only)",
                 "produces": [
                     "application/json"
@@ -3023,14 +4071,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "post": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "post": {
                 "description": "Create a new job position (Admin only)",
                 "consumes": [
                     "application/json"
@@ -3090,16 +4138,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/job-positions/{id}": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/job-positions/{id}": {
+            "get": {
                 "description": "Get a specific job position by ID (Admin only)",
                 "produces": [
                     "application/json"
@@ -3160,14 +4208,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "put": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "put": {
                 "description": "Update a job position by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -3228,14 +4276,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "delete": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "delete": {
                 "description": "Delete a job position by ID (Admin only)",
                 "produces": [
                     "application/json"
@@ -3284,16 +4332,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/leave-types": {
-            "post": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/leave-types": {
+            "post": {
                 "description": "Create a new leave type (Admin only)",
                 "consumes": [
                     "application/json"
@@ -3353,16 +4401,110 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/leave/balances/me": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
+                ]
+            }
+        },
+        "/leave/balances": {
+            "get": {
+                "description": "Get paginated leave balances for a specific employee (Admin only)",
+                "consumes": [
+                    "application/json"
                 ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "leave-balances"
+                ],
+                "summary": "Get employee leave balances",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Employee ID",
+                        "name": "employee_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default: 10)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort field (default: leave_type_id)",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort direction (default: ASC)",
+                        "name": "direction",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.MyLeaveBalanceResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/leave/balances/me": {
+            "get": {
                 "description": "Get paginated leave balances for the authenticated employee",
                 "consumes": [
                     "application/json"
@@ -3426,16 +4568,16 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     }
-                }
-            }
-        },
-        "/leave/calculate-working-days": {
-            "post": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/leave/calculate-working-days": {
+            "post": {
                 "description": "Calculate the number of working days (excluding weekends and holidays) between two dates",
                 "consumes": [
                     "application/json"
@@ -3489,16 +4631,114 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/leave/requests": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
+                ]
+            }
+        },
+        "/leave/documents/{id}": {
+            "delete": {
+                "description": "Delete a document from a leave request",
+                "produces": [
+                    "application/json"
                 ],
+                "tags": [
+                    "leave-documents"
+                ],
+                "summary": "Delete leave document",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Document ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/leave/documents/{id}/download": {
+            "get": {
+                "description": "Get download URL for a leave document",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "leave-documents"
+                ],
+                "summary": "Download leave document",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Document ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/leave/requests": {
+            "get": {
                 "description": "Get paginated list of all leave requests (Admin only)",
                 "consumes": [
                     "application/json"
@@ -3521,6 +4761,12 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "Items per page (default: 10)",
                         "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by employee ID",
+                        "name": "employee_id",
                         "in": "query"
                     },
                     {
@@ -3576,14 +4822,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "post": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "post": {
                 "description": "Create a new leave request (Employee for own, Admin for any)",
                 "consumes": [
                     "application/json"
@@ -3631,16 +4877,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/leave/requests/me": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/leave/requests/me": {
+            "get": {
                 "description": "Get paginated leave requests for the authenticated employee",
                 "consumes": [
                     "application/json"
@@ -3712,16 +4958,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/leave/requests/{id}": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/leave/requests/{id}": {
+            "get": {
                 "description": "Get a specific leave request by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -3785,14 +5031,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "put": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "put": {
                 "description": "Update a leave request by ID (Employee for own, Admin for any)",
                 "consumes": [
                     "application/json"
@@ -3847,16 +5093,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/leave/requests/{id}/approve": {
-            "post": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/leave/requests/{id}/approve": {
+            "post": {
                 "description": "Approve a leave request by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -3902,16 +5148,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/leave/requests/{id}/cancel": {
-            "post": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/leave/requests/{id}/cancel": {
+            "post": {
                 "description": "Cancel a leave request by ID (Employee for own, Admin for any)",
                 "consumes": [
                     "application/json"
@@ -3966,16 +5212,122 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/leave/requests/{id}/reject": {
-            "post": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
+                ]
+            }
+        },
+        "/leave/requests/{id}/documents": {
+            "get": {
+                "description": "Get all documents for a leave request",
+                "produces": [
+                    "application/json"
                 ],
+                "tags": [
+                    "leave-documents"
+                ],
+                "summary": "Get leave documents",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Leave Request ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "description": "Upload a medical report or other document for a leave request",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "leave-documents"
+                ],
+                "summary": "Upload leave document",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Leave Request ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Document file",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/leave/requests/{id}/reject": {
+            "post": {
                 "description": "Reject a leave request by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -4030,16 +5382,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/leave/types": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/leave/types": {
+            "get": {
                 "description": "Get paginated list of leave types (Admin only)",
                 "consumes": [
                     "application/json"
@@ -4111,16 +5463,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/leave/types/{id}": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/leave/types/{id}": {
+            "get": {
                 "description": "Get a specific leave type by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -4184,14 +5536,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "put": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "put": {
                 "description": "Update a leave type by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -4258,14 +5610,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "delete": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "delete": {
                 "description": "Delete a leave type by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -4311,7 +5663,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
             }
         },
         "/lookup/companies": {
@@ -4535,11 +5892,6 @@ const docTemplate = `{
         },
         "/reports/grade": {
             "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Get employee count grouped by grade with optional company and department filters (Admin only)",
                 "consumes": [
                     "application/json"
@@ -4587,16 +5939,16 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     }
-                }
-            }
-        },
-        "/reports/work-day": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/reports/work-day": {
+            "get": {
                 "description": "Get work day report with filters",
                 "consumes": [
                     "application/json"
@@ -4630,8 +5982,18 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Department IDs (supports repeated param or comma separated), example: department_ids=1\u0026department_ids=2 or department_ids=1,2",
+                        "name": "department_ids",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
-                        "description": "Department ID",
+                        "description": "Legacy single department ID (backward compatibility)",
                         "name": "department_id",
                         "in": "query"
                     },
@@ -4668,16 +6030,73 @@ const docTemplate = `{
                             }
                         }
                     }
-                }
-            }
-        },
-        "/work-information": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
+                ]
+            }
+        },
+        "/reports/work-day/export": {
+            "post": {
+                "description": "Export work day report with dynamic export_columns and multiple department_ids",
+                "consumes": [
+                    "application/json"
                 ],
+                "produces": [
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ],
+                "tags": [
+                    "reports"
+                ],
+                "summary": "Export Work Day Report as Excel",
+                "parameters": [
+                    {
+                        "description": "Export request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.WorkDayReportExportRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/work-information": {
+            "get": {
                 "description": "Get paginated list of all work information (Admin only)",
                 "consumes": [
                     "application/json"
@@ -4761,14 +6180,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "post": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "post": {
                 "description": "Create work information for an employee (Admin only)",
                 "consumes": [
                     "application/json"
@@ -4828,16 +6247,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/work-information/me": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/work-information/me": {
+            "get": {
                 "description": "Get work information for the authenticated employee",
                 "consumes": [
                     "application/json"
@@ -4874,16 +6293,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            }
-        },
-        "/work-information/{id}": {
-            "get": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            }
+        },
+        "/work-information/{id}": {
+            "get": {
                 "description": "Get specific work information by ID",
                 "consumes": [
                     "application/json"
@@ -4941,14 +6360,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "put": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "put": {
                 "description": "Update work information by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -5015,14 +6434,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
-            },
-            "delete": {
+                },
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
+                ]
+            },
+            "delete": {
                 "description": "Delete work information by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -5068,7 +6487,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
             }
         }
     },
@@ -5403,6 +6827,150 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "work_email": {
+                    "type": "string"
+                }
+            }
+        },
+        "domain.ExpenseRequest": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "description": "Expense amount",
+                    "type": "number"
+                },
+                "approved_at": {
+                    "description": "Approval timestamp",
+                    "type": "string"
+                },
+                "approved_by": {
+                    "description": "Admin who approved",
+                    "type": "integer"
+                },
+                "approver": {
+                    "$ref": "#/definitions/domain.User"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "string"
+                },
+                "currency": {
+                    "description": "Currency code (TRY, USD, EUR)",
+                    "type": "string"
+                },
+                "deleted": {
+                    "type": "boolean"
+                },
+                "description": {
+                    "description": "Expense description/notes",
+                    "type": "string"
+                },
+                "document_count": {
+                    "description": "Computed fields (not stored in DB)",
+                    "type": "integer"
+                },
+                "employee": {
+                    "description": "Relationships",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/domain.Employee"
+                        }
+                    ]
+                },
+                "employee_id": {
+                    "type": "integer"
+                },
+                "expense_date": {
+                    "description": "Date of expense",
+                    "type": "string"
+                },
+                "expense_type": {
+                    "$ref": "#/definitions/domain.ExpenseType"
+                },
+                "expense_type_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "modified_by": {
+                    "type": "string"
+                },
+                "paid_at": {
+                    "description": "Payment timestamp",
+                    "type": "string"
+                },
+                "payment_reference": {
+                    "description": "Payment reference/transaction ID",
+                    "type": "string"
+                },
+                "rejected_at": {
+                    "description": "Rejection timestamp",
+                    "type": "string"
+                },
+                "rejection_reason": {
+                    "description": "Reason for rejection",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "PENDING, APPROVED, REJECTED, PAID",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "domain.ExpenseType": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "description": "Active/Inactive status",
+                    "type": "boolean"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "string"
+                },
+                "deleted": {
+                    "type": "boolean"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "max_amount": {
+                    "description": "Maximum allowed amount (null = no limit)",
+                    "type": "number"
+                },
+                "modified_by": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "requires_receipt": {
+                    "description": "Whether receipt/invoice is mandatory",
+                    "type": "boolean"
+                },
+                "role": {
+                    "description": "Relationships",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/domain.Role"
+                        }
+                    ]
+                },
+                "role_id": {
+                    "description": "Role required to see/use this expense type (null = all can see)",
+                    "type": "integer"
+                },
+                "updated_at": {
                     "type": "string"
                 }
             }
@@ -5869,7 +7437,6 @@ const docTemplate = `{
         "handler.CalculateWorkingDaysRequest": {
             "type": "object",
             "required": [
-                "end_date",
                 "start_date"
             ],
             "properties": {
@@ -5881,6 +7448,9 @@ const docTemplate = `{
                 },
                 "is_start_date_full_day": {
                     "type": "boolean"
+                },
+                "requested_days": {
+                    "type": "number"
                 },
                 "start_date": {
                     "type": "string"
@@ -6120,6 +7690,65 @@ const docTemplate = `{
                 }
             }
         },
+        "handler.CreateExpenseRequestDTO": {
+            "type": "object",
+            "required": [
+                "amount",
+                "currency",
+                "description",
+                "expense_date",
+                "expense_type_id"
+            ],
+            "properties": {
+                "amount": {
+                    "type": "number"
+                },
+                "currency": {
+                    "type": "string",
+                    "enum": [
+                        "TRY",
+                        "USD",
+                        "EUR"
+                    ]
+                },
+                "description": {
+                    "type": "string"
+                },
+                "expense_date": {
+                    "description": "Date string in YYYY-MM-DD format",
+                    "type": "string"
+                },
+                "expense_type_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.CreateExpenseTypeRequestDTO": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "active": {
+                    "type": "boolean"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "max_amount": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "requires_receipt": {
+                    "type": "boolean"
+                },
+                "role_id": {
+                    "type": "integer"
+                }
+            }
+        },
         "handler.CreateGradeRequest": {
             "type": "object",
             "required": [
@@ -6262,6 +7891,17 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "gender": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.GradeChartData": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "grade_name": {
                     "type": "string"
                 }
             }
@@ -6562,6 +8202,29 @@ const docTemplate = `{
                 }
             }
         },
+        "handler.UpdateExpenseTypeRequestDTO": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "boolean"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "max_amount": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "requires_receipt": {
+                    "type": "boolean"
+                },
+                "role_id": {
+                    "type": "integer"
+                }
+            }
+        },
         "handler.UpdateGradeRequest": {
             "type": "object",
             "required": [
@@ -6815,6 +8478,10 @@ const docTemplate = `{
                 "deleted": {
                     "type": "boolean"
                 },
+                "document_count": {
+                    "description": "Number of attached documents",
+                    "type": "integer"
+                },
                 "employee": {
                     "$ref": "#/definitions/types.EmployeeLookup"
                 },
@@ -6862,6 +8529,21 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.ColumnConfig": {
+            "type": "object",
+            "required": [
+                "key",
+                "label"
+            ],
+            "properties": {
+                "key": {
+                    "type": "string"
+                },
+                "label": {
                     "type": "string"
                 }
             }
@@ -7151,6 +8833,12 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "is_required_document": {
+                    "type": "boolean"
+                },
+                "limit_amount": {
+                    "type": "integer"
+                },
                 "name": {
                     "type": "string"
                 }
@@ -7197,6 +8885,26 @@ const docTemplate = `{
                 }
             }
         },
+        "types.MyLeaveBalanceResponse": {
+            "type": "object",
+            "properties": {
+                "leave_type_name": {
+                    "type": "string"
+                },
+                "remaining_days": {
+                    "type": "number"
+                },
+                "total_days": {
+                    "type": "number"
+                },
+                "used_days": {
+                    "type": "number"
+                },
+                "year": {
+                    "type": "integer"
+                }
+            }
+        },
         "types.MyLeaveRequestResponse": {
             "type": "object",
             "properties": {
@@ -7214,6 +8922,10 @@ const docTemplate = `{
                 },
                 "created_at": {
                     "type": "string"
+                },
+                "document_count": {
+                    "description": "Number of attached documents",
+                    "type": "integer"
                 },
                 "end_date": {
                     "type": "string"
@@ -7252,6 +8964,37 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.WorkDayReportExportRequest": {
+            "type": "object",
+            "required": [
+                "end_date",
+                "export_columns",
+                "start_date"
+            ],
+            "properties": {
+                "company_id": {
+                    "type": "integer"
+                },
+                "department_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "end_date": {
+                    "type": "string"
+                },
+                "export_columns": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.ColumnConfig"
+                    }
+                },
+                "start_date": {
                     "type": "string"
                 }
             }

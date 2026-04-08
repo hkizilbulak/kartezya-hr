@@ -174,3 +174,27 @@ func (h *LookupHandler) GetGradesLookup(c *gin.Context) {
 		Data:    grades,
 	})
 }
+
+// GetRolesLookup godoc
+// @Summary Get all roles for lookup
+// @Description Get all roles as lookup data (admin API)
+// @Tags Lookup
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} APIResponse{data=[]types.RoleLookup}
+// @Router /lookup/roles [get]
+func (h *LookupHandler) GetRolesLookup(c *gin.Context) {
+	roles, err := h.lookupService.GetRolesLookup()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, APIResponse{
+		Success: true,
+		Data:    roles,
+	})
+}

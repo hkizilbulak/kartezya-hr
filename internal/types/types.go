@@ -33,6 +33,11 @@ type GradeLookup struct {
 	Name string `json:"name"`
 }
 
+type RoleLookup struct {
+	ID   uint   `json:"id"`
+	Name string `json:"name"`
+}
+
 // Company response DTO without departments relationship
 type CompanyResponse struct {
 	ID         uint      `json:"id"`
