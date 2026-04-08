@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"mime/multipart"
-	"path/filepath"
 	"strconv"
 	"time"
 
@@ -1340,10 +1339,10 @@ func (s *leaveService) uploadLeaveAttachment(file *multipart.FileHeader, ownerID
 	}
 	defer src.Close()
 
-	// Generate unique filename
+	// Generate storage path using shared document service utility
 	timestamp := time.Now().Format("20060102150405")
-	filename := fmt.Sprintf("leave_%d_%s_%s", leaveRequestID, timestamp, filepath.Base(file.Filename))
-	storagePath := fmt.Sprintf("leaves/%d/%s", leaveRequestID, filename)
+	docID := fmt.Sprintf("%d_%s", leaveRequestID, timestamp)
+	storagePath := GenerateStoragePath(domain.AttachmentRelatedTypeLeave, file.Filename, docID)
 
 	// Upload to storage
 	if err := s.storage.Upload(src, storagePath); err != nil {

@@ -107,7 +107,7 @@ func (s *documentService) UploadDocument(fileHeader *multipart.FileHeader, owner
 
 	// Generate unique ID and storage path
 	docID := domain.GenerateUUID()
-	storagePath := s.generateStoragePath(relatedType, fileHeader.Filename, docID)
+	storagePath := GenerateStoragePath(relatedType, fileHeader.Filename, docID)
 
 	// Upload to storage
 	if err := s.storage.Upload(file, storagePath); err != nil {
@@ -322,8 +322,8 @@ func (s *documentService) calculateFileHash(file multipart.File) (string, error)
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
-// generateStoragePath creates a structured path for file storage
-func (s *documentService) generateStoragePath(relatedType domain.AttachmentRelatedType, filename string, docID string) string {
+// GenerateStoragePath creates a structured path for file storage
+func GenerateStoragePath(relatedType domain.AttachmentRelatedType, filename string, docID string) string {
 	now := time.Now()
 
 	// Determine folder based on related type
@@ -347,11 +347,12 @@ func (s *documentService) generateStoragePath(relatedType domain.AttachmentRelat
 		ext = ".bin"
 	}
 
-	// Format: folder/YYYY/MM/uuid_originalname.ext
-	return fmt.Sprintf("%s/%d/%02d/%s_%s%s",
-		folder,
+	// Formatting without duplicate 'documents' prefix since S3 already sets S3_BASE_PATH
+	// Format: YYYY/MM/folder/uuid_originalname.ext
+	return fmt.Sprintf("%d/%02d/%s/%s_%s%s",
 		now.Year(),
-		now.Month(),
+		int(now.Month()),
+		folder,
 		docID,
 		strings.ReplaceAll(filename, ext, ""),
 		ext,

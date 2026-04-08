@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"mime/multipart"
-	"path/filepath"
 	"time"
 
 	"kartezya-hr/internal/domain"
@@ -430,10 +429,10 @@ func (s *expenseService) uploadExpenseAttachment(file *multipart.FileHeader, own
 	}
 	defer src.Close()
 
-	// Generate unique filename
+	// Generate storage path using shared document service utility
 	timestamp := time.Now().Format("20060102150405")
-	filename := fmt.Sprintf("expense_%d_%s_%s", expenseRequestID, timestamp, filepath.Base(file.Filename))
-	storagePath := fmt.Sprintf("expenses/%d/%s", expenseRequestID, filename)
+	docID := fmt.Sprintf("%d_%s", expenseRequestID, timestamp)
+	storagePath := GenerateStoragePath(domain.AttachmentRelatedTypeExpense, file.Filename, docID)
 
 	// Upload to storage
 	if err := s.storage.Upload(src, storagePath); err != nil {
