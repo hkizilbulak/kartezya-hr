@@ -2,6 +2,7 @@ package service
 
 import (
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -170,7 +171,9 @@ func (s *emailService) SendCustomEmail(to []string, subject string, htmlBody str
 	return nil
 }
 
-// sendSMTPEmail sends an email using SMTP
+// sendSMTPEmail sends an email using SMTP.
+// Port 465 → direct SSL/TLS (implicit TLS)
+// Port 587/25 → STARTTLS (smtp.SendMail)
 func (s *emailService) sendSMTPEmail(to, subject, htmlBody string) error {
 	// Skip sending if SMTP not configured
 	if s.config.Email.SMTPUser == "" || s.config.Email.SMTPPassword == "" {
@@ -186,7 +189,7 @@ func (s *emailService) sendSMTPEmail(to, subject, htmlBody string) error {
 	// Encode subject with UTF-8
 	encodedSubject := mime.QEncoding.Encode("utf-8", subject)
 
-	// Create message with both plain text and HTML
+	// Build raw message
 	message := fmt.Sprintf(
 		"From: %s <%s>\r\n"+
 			"To: %s\r\n"+
@@ -200,20 +203,55 @@ func (s *emailService) sendSMTPEmail(to, subject, htmlBody string) error {
 		htmlBody,
 	)
 
-	// Setup SMTP auth
-	auth := smtp.PlainAuth(
-		"",
-		s.config.Email.SMTPUser,
-		s.config.Email.SMTPPassword,
-		s.config.Email.SMTPHost,
-	)
-
-	// Send email
 	addr := fmt.Sprintf("%s:%d", s.config.Email.SMTPHost, s.config.Email.SMTPPort)
-	if err := smtp.SendMail(addr, auth, s.config.Email.FromEmail, []string{to}, []byte(message)); err != nil {
-		return fmt.Errorf("failed to send SMTP email: %w", err)
+	auth := smtp.PlainAuth("", s.config.Email.SMTPUser, s.config.Email.SMTPPassword, s.config.Email.SMTPHost)
+
+	if s.config.Email.SMTPPort == 465 {
+		// Port 465: implicit TLS — open TLS connection directly
+		tlsConfig := &tls.Config{
+			InsecureSkipVerify: false,
+			ServerName:         s.config.Email.SMTPHost,
+		}
+
+		conn, err := tls.Dial("tcp", addr, tlsConfig)
+		if err != nil {
+			return fmt.Errorf("failed to connect via TLS: %w", err)
+		}
+		defer conn.Close()
+
+		client, err := smtp.NewClient(conn, s.config.Email.SMTPHost)
+		if err != nil {
+			return fmt.Errorf("failed to create SMTP client: %w", err)
+		}
+		defer client.Close()
+
+		if err = client.Auth(auth); err != nil {
+			return fmt.Errorf("SMTP auth failed: %w", err)
+		}
+		if err = client.Mail(s.config.Email.FromEmail); err != nil {
+			return fmt.Errorf("SMTP MAIL FROM failed: %w", err)
+		}
+		if err = client.Rcpt(to); err != nil {
+			return fmt.Errorf("SMTP RCPT TO failed: %w", err)
+		}
+		w, err := client.Data()
+		if err != nil {
+			return fmt.Errorf("SMTP DATA failed: %w", err)
+		}
+		if _, err = fmt.Fprint(w, message); err != nil {
+			return fmt.Errorf("failed to write email body: %w", err)
+		}
+		if err = w.Close(); err != nil {
+			return fmt.Errorf("failed to close email writer: %w", err)
+		}
+		client.Quit()
+	} else {
+		// Port 587/25: STARTTLS
+		if err := smtp.SendMail(addr, auth, s.config.Email.FromEmail, []string{to}, []byte(message)); err != nil {
+			return fmt.Errorf("failed to send SMTP email: %w", err)
+		}
 	}
 
-	log.Printf("Password reset email sent to: %s\n", to)
+	log.Printf("Email sent to: %s\n", to)
 	return nil
 }
