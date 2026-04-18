@@ -141,6 +141,7 @@ func main() {
 	reportHandler := handler.NewReportHandler(reportService)
 	documentHandler := handler.NewDocumentHandler(documentService)
 	expenseHandler := handler.NewExpenseHandler(expenseService)
+	emailHandler := handler.NewEmailHandler(emailService)
 
 	// Initialize and start scheduled jobs
 	scheduler := jobs.NewScheduler(db.DB, documentService)
@@ -459,6 +460,12 @@ func main() {
 			reportRoutes.GET("/work-day", authMiddleware.RequireAdmin(), reportHandler.GetWorkDayReport)
 			reportRoutes.POST("/work-day/export", authMiddleware.RequireAdmin(), reportHandler.ExportWorkDayReportExcel)
 			reportRoutes.GET("/grade", authMiddleware.RequireAdmin(), reportHandler.GetGradeReport)
+		}
+
+		// Email routes (Admin only)
+		emailRoutes := protected.Group("/email")
+		{
+			emailRoutes.POST("/send", authMiddleware.RequireAdmin(), emailHandler.SendEmail)
 		}
 	}
 

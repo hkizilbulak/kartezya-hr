@@ -24,6 +24,11 @@ const docTemplate = `{
     "paths": {
         "/auth/change-password": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Change password for the authenticated user",
                 "consumes": [
                     "application/json"
@@ -65,12 +70,7 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/auth/login": {
@@ -133,6 +133,11 @@ const docTemplate = `{
         },
         "/auth/logout": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Logout the authenticated user",
                 "consumes": [
                     "application/json"
@@ -151,12 +156,7 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/auth/reset-password": {
@@ -207,6 +207,11 @@ const docTemplate = `{
         },
         "/auth/send-password-reset-email-batch": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Send password reset emails to a batch of users",
                 "consumes": [
                     "application/json"
@@ -260,12 +265,7 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/auth/validate-reset-token": {
@@ -401,6 +401,11 @@ const docTemplate = `{
         },
         "/companies": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get paginated list of companies with sorting (Admin only)",
                 "consumes": [
                     "application/json"
@@ -478,14 +483,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "post": {
+                ],
                 "description": "Create a new company (Admin only)",
                 "consumes": [
                     "application/json"
@@ -545,16 +550,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/companies/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get a specific company by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -618,14 +623,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "put": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "put": {
+                ],
                 "description": "Update a company by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -686,14 +691,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "delete": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "delete": {
+                ],
                 "description": "Delete a company by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -745,16 +750,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/dashboard/data": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get all dashboard statistics in a single request",
                 "consumes": [
                     "application/json"
@@ -797,16 +802,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/dashboard/employees-by-company-department": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get employee statistics grouped by company and department",
                 "consumes": [
                     "application/json"
@@ -852,16 +857,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/dashboard/employees-by-gender": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get employee statistics grouped by gender",
                 "consumes": [
                     "application/json"
@@ -907,16 +912,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/dashboard/employees-by-grade": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get employee statistics grouped by grade",
                 "consumes": [
                     "application/json"
@@ -962,16 +967,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/dashboard/employees-by-position": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get employee statistics grouped by job position",
                 "consumes": [
                     "application/json"
@@ -1017,16 +1022,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/departments": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get all departments with pagination (Admin only)",
                 "produces": [
                     "application/json"
@@ -1098,14 +1103,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "post": {
+                ],
                 "description": "Create a new department (Admin only)",
                 "consumes": [
                     "application/json"
@@ -1165,16 +1170,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/departments/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get a specific department by ID (Admin only)",
                 "produces": [
                     "application/json"
@@ -1235,14 +1240,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "put": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "put": {
+                ],
                 "description": "Update a department by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -1303,14 +1308,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "delete": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "delete": {
+                ],
                 "description": "Delete a department by ID (Admin only)",
                 "produces": [
                     "application/json"
@@ -1359,16 +1364,91 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            }
+        },
+        "/email/send": {
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
+                ],
+                "description": "Send a custom HTML email to one or more recipients (Admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "email"
+                ],
+                "summary": "Send custom email",
+                "parameters": [
+                    {
+                        "description": "Email request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.SendEmailRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.SendEmailResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                }
             }
         },
         "/employee-contracts": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get paginated list of all employee contracts (Admin only)",
                 "consumes": [
                     "application/json"
@@ -1452,14 +1532,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "post": {
+                ],
                 "description": "Create employee contract record (Admin only)",
                 "consumes": [
                     "application/json"
@@ -1519,16 +1599,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/employee-contracts/me": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get employee contracts for the authenticated employee",
                 "consumes": [
                     "application/json"
@@ -1565,16 +1645,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/employee-contracts/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get specific employee contract by ID",
                 "consumes": [
                     "application/json"
@@ -1632,14 +1712,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "put": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "put": {
+                ],
                 "description": "Update employee contract by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -1706,14 +1786,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "delete": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "delete": {
+                ],
                 "description": "Delete employee contract by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -1759,16 +1839,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/employee-grades": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get paginated list of all employee grades (Admin only)",
                 "consumes": [
                     "application/json"
@@ -1852,14 +1932,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "post": {
+                ],
                 "description": "Create employee grade record (Admin only)",
                 "consumes": [
                     "application/json"
@@ -1919,16 +1999,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/employee-grades/me": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get employee grades for the authenticated employee",
                 "consumes": [
                     "application/json"
@@ -1965,16 +2045,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/employee-grades/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get specific employee grade by ID",
                 "consumes": [
                     "application/json"
@@ -2032,14 +2112,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "put": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "put": {
+                ],
                 "description": "Update employee grade by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -2106,14 +2186,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "delete": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "delete": {
+                ],
                 "description": "Delete employee grade by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -2159,16 +2239,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/employees": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get paginated list of all employees with filtering (Admin only)",
                 "consumes": [
                     "application/json"
@@ -2312,14 +2392,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "post": {
+                ],
                 "description": "Create a new employee (Admin only)",
                 "consumes": [
                     "application/json"
@@ -2371,16 +2451,16 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/employees/me": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get the profile of the authenticated employee",
                 "consumes": [
                     "application/json"
@@ -2407,14 +2487,14 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     }
-                },
+                }
+            },
+            "put": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "put": {
+                ],
                 "description": "Update the profile of the authenticated employee (own profile only)",
                 "consumes": [
                     "application/json"
@@ -2466,16 +2546,16 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/employees/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get employee details by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -2532,14 +2612,14 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     }
-                },
+                }
+            },
+            "put": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "put": {
+                ],
                 "description": "Update employee details by ID (Admin or own profile)",
                 "consumes": [
                     "application/json"
@@ -2594,14 +2674,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "delete": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "delete": {
+                ],
                 "description": "Delete employee by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -2647,16 +2727,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/expense/documents/{id}": {
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Delete a document from an expense request",
                 "produces": [
                     "application/json"
@@ -2696,16 +2776,16 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/expense/documents/{id}/download": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get download URL for an expense document",
                 "produces": [
                     "application/json"
@@ -2745,16 +2825,16 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/expense/requests": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get paginated list of all expense requests (Admin only)",
                 "consumes": [
                     "application/json"
@@ -2823,14 +2903,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "post": {
+                ],
                 "description": "Create a new expense request",
                 "consumes": [
                     "application/json"
@@ -2872,16 +2952,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/expense/requests/me": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get paginated expense requests for the authenticated employee",
                 "consumes": [
                     "application/json"
@@ -2938,16 +3018,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/expense/requests/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get expense request details by ID",
                 "consumes": [
                     "application/json"
@@ -2987,14 +3067,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "put": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "put": {
+                ],
                 "description": "Update an existing expense request (only pending requests)",
                 "consumes": [
                     "application/json"
@@ -3043,14 +3123,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "delete": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "delete": {
+                ],
                 "description": "Delete an expense request (only pending requests)",
                 "consumes": [
                     "application/json"
@@ -3090,16 +3170,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/expense/requests/{id}/approve": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Approve an expense request (Admin only)",
                 "consumes": [
                     "application/json"
@@ -3139,16 +3219,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/expense/requests/{id}/documents": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get all documents for an expense request",
                 "produces": [
                     "application/json"
@@ -3188,14 +3268,14 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     }
-                },
+                }
+            },
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "post": {
+                ],
                 "description": "Upload a receipt/invoice for an expense request",
                 "consumes": [
                     "multipart/form-data"
@@ -3245,16 +3325,16 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/expense/requests/{id}/pay": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Mark an approved expense request as paid (Admin only)",
                 "consumes": [
                     "application/json"
@@ -3306,16 +3386,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/expense/requests/{id}/reject": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Reject an expense request (Admin only)",
                 "consumes": [
                     "application/json"
@@ -3367,16 +3447,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/expense/types": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get all expense types with pagination (Admin only)",
                 "consumes": [
                     "application/json"
@@ -3427,14 +3507,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "post": {
+                ],
                 "description": "Create a new expense type (Admin only)",
                 "consumes": [
                     "application/json"
@@ -3482,16 +3562,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/expense/types/active": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get all active expense types (for dropdown)",
                 "consumes": [
                     "application/json"
@@ -3516,16 +3596,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/expense/types/{id}": {
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Update an existing expense type (Admin only)",
                 "consumes": [
                     "application/json"
@@ -3586,14 +3666,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "delete": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "delete": {
+                ],
                 "description": "Delete an expense type (Admin only)",
                 "consumes": [
                     "application/json"
@@ -3633,16 +3713,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/grades": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get paginated list of grades with sorting (Admin only)",
                 "consumes": [
                     "application/json"
@@ -3720,14 +3800,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "post": {
+                ],
                 "description": "Create a new grade (Admin only)",
                 "consumes": [
                     "application/json"
@@ -3787,16 +3867,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/grades/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get a specific grade by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -3860,14 +3940,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "put": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "put": {
+                ],
                 "description": "Update a grade by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -3928,14 +4008,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "delete": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "delete": {
+                ],
                 "description": "Delete a grade by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -3987,16 +4067,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/job-positions": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get paginated list of job positions with sorting (Admin only)",
                 "produces": [
                     "application/json"
@@ -4071,14 +4151,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "post": {
+                ],
                 "description": "Create a new job position (Admin only)",
                 "consumes": [
                     "application/json"
@@ -4138,16 +4218,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/job-positions/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get a specific job position by ID (Admin only)",
                 "produces": [
                     "application/json"
@@ -4208,14 +4288,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "put": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "put": {
+                ],
                 "description": "Update a job position by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -4276,14 +4356,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "delete": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "delete": {
+                ],
                 "description": "Delete a job position by ID (Admin only)",
                 "produces": [
                     "application/json"
@@ -4332,16 +4412,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/leave-types": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Create a new leave type (Admin only)",
                 "consumes": [
                     "application/json"
@@ -4401,16 +4481,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/leave/balances": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get paginated leave balances for a specific employee (Admin only)",
                 "consumes": [
                     "application/json"
@@ -4495,16 +4575,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/leave/balances/me": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get paginated leave balances for the authenticated employee",
                 "consumes": [
                     "application/json"
@@ -4568,16 +4648,16 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/leave/calculate-working-days": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Calculate the number of working days (excluding weekends and holidays) between two dates",
                 "consumes": [
                     "application/json"
@@ -4631,16 +4711,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/leave/documents/{id}": {
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Delete a document from a leave request",
                 "produces": [
                     "application/json"
@@ -4680,16 +4760,16 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/leave/documents/{id}/download": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get download URL for a leave document",
                 "produces": [
                     "application/json"
@@ -4729,16 +4809,16 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/leave/requests": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get paginated list of all leave requests (Admin only)",
                 "consumes": [
                     "application/json"
@@ -4822,14 +4902,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "post": {
+                ],
                 "description": "Create a new leave request (Employee for own, Admin for any)",
                 "consumes": [
                     "application/json"
@@ -4877,16 +4957,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/leave/requests/me": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get paginated leave requests for the authenticated employee",
                 "consumes": [
                     "application/json"
@@ -4958,16 +5038,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/leave/requests/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get a specific leave request by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -5031,14 +5111,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "put": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "put": {
+                ],
                 "description": "Update a leave request by ID (Employee for own, Admin for any)",
                 "consumes": [
                     "application/json"
@@ -5093,16 +5173,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/leave/requests/{id}/approve": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Approve a leave request by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -5148,16 +5228,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/leave/requests/{id}/cancel": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Cancel a leave request by ID (Employee for own, Admin for any)",
                 "consumes": [
                     "application/json"
@@ -5212,16 +5292,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/leave/requests/{id}/documents": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get all documents for a leave request",
                 "produces": [
                     "application/json"
@@ -5261,14 +5341,14 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     }
-                },
+                }
+            },
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "post": {
+                ],
                 "description": "Upload a medical report or other document for a leave request",
                 "consumes": [
                     "multipart/form-data"
@@ -5318,16 +5398,16 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/leave/requests/{id}/reject": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Reject a leave request by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -5382,16 +5462,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/leave/types": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get paginated list of leave types (Admin only)",
                 "consumes": [
                     "application/json"
@@ -5463,16 +5543,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/leave/types/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get a specific leave type by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -5536,14 +5616,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "put": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "put": {
+                ],
                 "description": "Update a leave type by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -5610,14 +5690,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "delete": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "delete": {
+                ],
                 "description": "Delete a leave type by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -5663,12 +5743,7 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/lookup/companies": {
@@ -5890,8 +5965,53 @@ const docTemplate = `{
                 }
             }
         },
+        "/lookup/roles": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all roles as lookup data (admin API)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Lookup"
+                ],
+                "summary": "Get all roles for lookup",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.RoleLookup"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/reports/grade": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get employee count grouped by grade with optional company and department filters (Admin only)",
                 "consumes": [
                     "application/json"
@@ -5939,16 +6059,16 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/reports/work-day": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get work day report with filters",
                 "consumes": [
                     "application/json"
@@ -6030,16 +6150,16 @@ const docTemplate = `{
                             }
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/reports/work-day/export": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Export work day report with dynamic export_columns and multiple department_ids",
                 "consumes": [
                     "application/json"
@@ -6087,16 +6207,16 @@ const docTemplate = `{
                             }
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/work-information": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get paginated list of all work information (Admin only)",
                 "consumes": [
                     "application/json"
@@ -6180,14 +6300,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "post": {
+                ],
                 "description": "Create work information for an employee (Admin only)",
                 "consumes": [
                     "application/json"
@@ -6247,16 +6367,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/work-information/me": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get work information for the authenticated employee",
                 "consumes": [
                     "application/json"
@@ -6293,16 +6413,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/work-information/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get specific work information by ID",
                 "consumes": [
                     "application/json"
@@ -6360,14 +6480,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "put": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "put": {
+                ],
                 "description": "Update work information by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -6434,14 +6554,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "delete": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ]
-            },
-            "delete": {
+                ],
                 "description": "Delete work information by ID (Admin only)",
                 "consumes": [
                     "application/json"
@@ -6487,12 +6607,7 @@ const docTemplate = `{
                             "$ref": "#/definitions/handler.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         }
     },
@@ -7951,6 +8066,48 @@ const docTemplate = `{
                 }
             }
         },
+        "handler.SendEmailRequest": {
+            "type": "object",
+            "required": [
+                "body",
+                "subject",
+                "to"
+            ],
+            "properties": {
+                "body": {
+                    "type": "string",
+                    "example": "\u003cp\u003eMerhaba,\u003c/p\u003e\u003cp\u003eBu bir test mailidir.\u003c/p\u003e"
+                },
+                "subject": {
+                    "type": "string",
+                    "example": "Bilgilendirme"
+                },
+                "to": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "[\"user@example.com\"]"
+                    ]
+                }
+            }
+        },
+        "handler.SendEmailResponse": {
+            "type": "object",
+            "properties": {
+                "sent_count": {
+                    "type": "integer"
+                },
+                "to": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "handler.SendPasswordResetEmailBatchRequest": {
             "type": "object",
             "required": [
@@ -8221,7 +8378,9 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "role_id": {
-                    "type": "integer"
+                    "description": "Use null to clear, omit to keep existing",
+                    "type": "integer",
+                    "example": 1
                 }
             }
         },
@@ -8964,6 +9123,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.RoleLookup": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
                     "type": "string"
                 }
             }

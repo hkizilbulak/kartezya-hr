@@ -23,6 +23,7 @@ type EmailService interface {
 	GeneratePasswordResetToken(userID uint) (string, error)
 	ResetPassword(token string, newPassword string, authService AuthService) error
 	ValidatePasswordResetToken(token string) (*domain.User, error)
+	SendCustomEmail(to []string, subject string, htmlBody string) error
 }
 
 type emailService struct {
@@ -147,6 +148,25 @@ func (s *emailService) SendPasswordResetEmailWithUserId(userId uint, email strin
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
+	return nil
+}
+
+// SendCustomEmail sends a custom HTML email to one or more recipients
+func (s *emailService) SendCustomEmail(to []string, subject string, htmlBody string) error {
+	if len(to) == 0 {
+		return fmt.Errorf("at least one recipient is required")
+	}
+
+	var errs []string
+	for _, recipient := range to {
+		if err := s.sendSMTPEmail(recipient, subject, htmlBody); err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", recipient, err))
+		}
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("failed to send to some recipients: %v", errs)
+	}
 	return nil
 }
 

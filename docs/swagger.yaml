@@ -959,6 +959,35 @@ definitions:
     - new_password
     - token
     type: object
+  handler.SendEmailRequest:
+    properties:
+      body:
+        example: <p>Merhaba,</p><p>Bu bir test mailidir.</p>
+        type: string
+      subject:
+        example: Bilgilendirme
+        type: string
+      to:
+        example:
+        - '["user@example.com"]'
+        items:
+          type: string
+        minItems: 1
+        type: array
+    required:
+    - body
+    - subject
+    - to
+    type: object
+  handler.SendEmailResponse:
+    properties:
+      sent_count:
+        type: integer
+      to:
+        items:
+          type: string
+        type: array
+    type: object
   handler.SendPasswordResetEmailBatchRequest:
     properties:
       users:
@@ -1139,6 +1168,8 @@ definitions:
       requires_receipt:
         type: boolean
       role_id:
+        description: Use null to clear, omit to keep existing
+        example: 1
         type: integer
     type: object
   handler.UpdateGradeRequest:
@@ -1629,6 +1660,13 @@ definitions:
       status:
         type: string
       updated_at:
+        type: string
+    type: object
+  types.RoleLookup:
+    properties:
+      id:
+        type: integer
+      name:
         type: string
     type: object
   types.WorkDayReportExportRequest:
@@ -2614,6 +2652,51 @@ paths:
       summary: Update department
       tags:
       - departments
+  /email/send:
+    post:
+      consumes:
+      - application/json
+      description: Send a custom HTML email to one or more recipients (Admin only)
+      parameters:
+      - description: Email request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.SendEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.SendEmailResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Send custom email
+      tags:
+      - email
   /employee-contracts:
     get:
       consumes:
@@ -5436,6 +5519,28 @@ paths:
                   type: array
               type: object
       summary: Get all leave types for lookup
+      tags:
+      - Lookup
+  /lookup/roles:
+    get:
+      description: Get all roles as lookup data (admin API)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.RoleLookup'
+                  type: array
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Get all roles for lookup
       tags:
       - Lookup
   /reports/grade:

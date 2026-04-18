@@ -52,7 +52,7 @@ type UpdateExpenseTypeRequestDTO struct {
 	RequiresReceipt *bool           `json:"requires_receipt"`
 	MaxAmount       *float64        `json:"max_amount"`
 	Active          *bool           `json:"active"`
-	RoleID          json.RawMessage `json:"role_id"`
+	RoleID          json.RawMessage `json:"role_id" swaggertype:"integer" example:"1"` // Use null to clear, omit to keep existing
 }
 
 func NewExpenseHandler(expenseService service.ExpenseService) *ExpenseHandler {
