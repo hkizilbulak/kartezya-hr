@@ -27,8 +27,8 @@ type EmployeeRepository interface {
 	GetEmployeeCountByPosition() ([]interface{}, error)
 	GetEmployeeCountByCompanyDepartment() ([]interface{}, error)
 	GetEmployeeCountByGrade() ([]interface{}, error)
-	GetWorkDayReportData(startDate, endDate string, companyID *uint, departmentIDs []uint) ([]types.WorkDayReportRow, error)
-	GetGradeReportData(companyID, departmentID *uint) ([]types.GradeReportRow, error)
+	GetWorkDayReportData(startDate, endDate string, companyID *uint, departmentIDs []uint, isActive *bool) ([]types.WorkDayReportRow, error)
+	GetGradeReportData(companyID, departmentID *uint, isActive *bool) ([]types.GradeReportRow, error)
 }
 
 type employeeRepository struct {
@@ -938,7 +938,7 @@ func (r *employeeRepository) GetEmployeeCountByGrade() ([]interface{}, error) {
 }
 
 // GetWorkDayReportData executes the work day report SQL query
-func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, companyID *uint, departmentIDs []uint) ([]types.WorkDayReportRow, error) {
+func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, companyID *uint, departmentIDs []uint, isActive *bool) ([]types.WorkDayReportRow, error) {
 	var rows []types.WorkDayReportRow
 
 	// Build base query with numbered parameters for PostgreSQL
@@ -1051,6 +1051,21 @@ func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, com
 		query += fmt.Sprintf("\n\t\t\tAND d.id IN (%s)", strings.Join(placeholders, ", "))
 	}
 
+	// Exclude interns (job_position_id = 21)
+	query += "\n\t\t\tAND NOT EXISTS (SELECT 1 FROM hr_employee_work_information wi2 WHERE wi2.employee_id = e.id AND wi2.job_position_id = 21 AND wi2.deleted = false AND wi2.start_date <= $1::date AND (wi2.end_date IS NULL OR wi2.end_date >= $1::date))"
+
+	// Add active/passive filter
+	if isActive != nil {
+		if *isActive {
+			query += "\n\t\t\tAND e.leave_date IS NULL"
+		} else {
+			query += "\n\t\t\tAND e.leave_date IS NOT NULL"
+		}
+	} else {
+		// Default: only active employees
+		query += "\n\t\t\tAND e.leave_date IS NULL"
+	}
+
 	// Add GROUP BY and ORDER BY
 	query += `
 		GROUP BY
@@ -1072,7 +1087,7 @@ func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, com
 }
 
 // GetGradeReportData executes the grade report SQL query
-func (r *employeeRepository) GetGradeReportData(companyID, departmentID *uint) ([]types.GradeReportRow, error) {
+func (r *employeeRepository) GetGradeReportData(companyID, departmentID *uint, isActive *bool) ([]types.GradeReportRow, error) {
 	var rows []types.GradeReportRow
 
 	// Build base query with user-provided SQL
@@ -1083,6 +1098,7 @@ WITH experience_calc AS (
         e.first_name,
         e.last_name,
         e.hire_date,
+        e.leave_date,
         e.profession_start_date,
         COALESCE(e.total_gap,0) AS total_gap,
 
@@ -1115,7 +1131,6 @@ WITH experience_calc AS (
 
     FROM hr_employees e
     WHERE e.deleted = false
-      AND e.leave_date IS NULL
 ),
 
 expected_grade_calc AS (
@@ -1203,6 +1218,29 @@ WHERE 1=1`
 		query += fmt.Sprintf("\n  AND t.department_id = $%d", paramCounter)
 		params = append(params, *departmentID)
 		paramCounter++
+	}
+
+	// Exclude interns (job_position_id = 21)
+	query += `
+  AND NOT EXISTS (
+    SELECT 1 FROM hr_employee_work_information wi2
+    WHERE wi2.employee_id = e.id
+      AND wi2.job_position_id = 21
+      AND wi2.deleted = false
+      AND wi2.start_date <= CURRENT_DATE
+      AND (wi2.end_date IS NULL OR wi2.end_date >= CURRENT_DATE)
+  )`
+
+	// Add active/passive filter
+	if isActive != nil {
+		if *isActive {
+			query += "\n  AND e.leave_date IS NULL"
+		} else {
+			query += "\n  AND e.leave_date IS NOT NULL"
+		}
+	} else {
+		// Default: only active employees
+		query += "\n  AND e.leave_date IS NULL"
 	}
 
 	// Complete the query

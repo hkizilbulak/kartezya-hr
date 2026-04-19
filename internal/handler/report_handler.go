@@ -114,6 +114,11 @@ func (h *ReportHandler) GetWorkDayReport(c *gin.Context) {
 		DepartmentIDs: departmentIDs,
 	}
 
+	if isActiveStr := c.Query("is_active"); isActiveStr != "" {
+		isActiveBool := isActiveStr == "true"
+		filter.IsActive = &isActiveBool
+	}
+
 	// Get report
 	report, err := h.reportService.GetWorkDayReport(filter)
 	if err != nil {
@@ -197,6 +202,11 @@ func (h *ReportHandler) GetGradeReport(c *gin.Context) {
 		DepartmentID: departmentID,
 	}
 
+	if isActiveStr := c.Query("is_active"); isActiveStr != "" {
+		isActiveBool := isActiveStr == "true"
+		filter.IsActive = &isActiveBool
+	}
+
 	report, err := h.reportService.GetGradeReportData(filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -204,4 +214,38 @@ func (h *ReportHandler) GetGradeReport(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, report)
+}
+
+// ExportGradeReportExcel godoc
+// @Summary Export Grade Report as Excel
+// @Description Export grade report data as an Excel file (Admin only)
+// @Tags reports
+// @Accept json
+// @Produce application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+// @Security BearerAuth
+// @Param request body types.GradeReportExportRequest true "Export request"
+// @Success 200 {file} binary
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /reports/grade/export [post]
+func (h *ReportHandler) ExportGradeReportExcel(c *gin.Context) {
+	var req types.GradeReportExportRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	filter := &types.GradeReportFilter{
+		CompanyID:    req.CompanyID,
+		DepartmentID: req.DepartmentID,
+	}
+
+	excelFile, err := h.reportService.ExportGradeReportExcel(filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Header("Content-Disposition", "attachment; filename=grade-report.xlsx")
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", excelFile)
 }

@@ -15,6 +15,7 @@ type ReportService interface {
 	GetWorkDayReport(filter *types.WorkDayReportFilter) (*types.WorkDayReportResponse, error)
 	ExportWorkDayReportExcel(request *types.WorkDayReportExportRequest) ([]byte, error)
 	GetGradeReportData(filter *types.GradeReportFilter) (*types.GradeReportResponse, error)
+	ExportGradeReportExcel(filter *types.GradeReportFilter) ([]byte, error)
 }
 
 type reportService struct {
@@ -52,6 +53,7 @@ func (s *reportService) GetWorkDayReport(filter *types.WorkDayReportFilter) (*ty
 		endDateStr,
 		filter.CompanyID,
 		filter.DepartmentIDs,
+		filter.IsActive,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get work day report data: %w", err)
@@ -193,6 +195,7 @@ func (s *reportService) GetGradeReportData(filter *types.GradeReportFilter) (*ty
 	rows, err := s.employeeRepo.GetGradeReportData(
 		filter.CompanyID,
 		filter.DepartmentID,
+		filter.IsActive,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get grade report data: %w", err)
@@ -203,4 +206,73 @@ func (s *reportService) GetGradeReportData(filter *types.GradeReportFilter) (*ty
 	}
 
 	return response, nil
+}
+
+// ExportGradeReportExcel exports grade report data as an Excel file
+func (s *reportService) ExportGradeReportExcel(filter *types.GradeReportFilter) ([]byte, error) {
+	report, err := s.GetGradeReportData(filter)
+	if err != nil {
+		return nil, err
+	}
+
+	f := excelize.NewFile()
+	sheetName := "Grade Report"
+	f.SetSheetName("Sheet1", sheetName)
+
+	headers := []string{
+		"Ad", "Soyad", "Şirket", "Departman", "Yönetici",
+		"İşe Giriş Tarihi", "Ekip Başlangıç Tarihi", "Meslek Başlangıç Tarihi",
+		"Toplam Boşluk (Yıl)", "Toplam Deneyim", "Mevcut Kademe", "Beklenen Kademe",
+	}
+
+	for colIndex, header := range headers {
+		cell, cellErr := excelize.CoordinatesToCellName(colIndex+1, 1)
+		if cellErr != nil {
+			return nil, fmt.Errorf("failed to create header cell: %w", cellErr)
+		}
+		if err = f.SetCellValue(sheetName, cell, header); err != nil {
+			return nil, fmt.Errorf("failed to write header: %w", err)
+		}
+	}
+
+	for rowIndex, row := range report.Rows {
+		rowNum := rowIndex + 2
+		values := []interface{}{
+			row.FirstName,
+			row.LastName,
+			row.CompanyName,
+			row.DepartmentName,
+			row.Manager,
+			nilableString(row.HireDate),
+			nilableString(row.TeamStartDate),
+			nilableString(row.ProfessionStartDate),
+			row.TotalGap,
+			row.TotalExperienceText,
+			row.CurrentGrade,
+			row.ExpectedGrade,
+		}
+		for colIndex, val := range values {
+			cell, cellErr := excelize.CoordinatesToCellName(colIndex+1, rowNum)
+			if cellErr != nil {
+				return nil, fmt.Errorf("failed to create data cell: %w", cellErr)
+			}
+			if err = f.SetCellValue(sheetName, cell, val); err != nil {
+				return nil, fmt.Errorf("failed to write data: %w", err)
+			}
+		}
+	}
+
+	buffer, err := f.WriteToBuffer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate excel: %w", err)
+	}
+
+	return buffer.Bytes(), nil
+}
+
+func nilableString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

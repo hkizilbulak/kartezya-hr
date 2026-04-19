@@ -54,6 +54,8 @@ type EmailConfig struct {
 	FromEmail    string
 	FromName     string
 	FrontendURL  string
+	Provider     string // "smtp" or "resend"
+	ResendAPIKey string
 }
 
 type OAuthConfig struct {
@@ -133,6 +135,8 @@ func Load() *Config {
 			FromEmail:    getEnv("FROM_EMAIL", "info@kartezya.com"),
 			FromName:     getEnv("FROM_NAME", "Kartezya Teknoloji"),
 			FrontendURL:  getEnv("FRONTEND_URL", "http://localhost:3000"),
+			Provider:     getEnv("EMAIL_PROVIDER", "smtp"), // "smtp" or "resend"
+			ResendAPIKey: getEnv("RESEND_API_KEY", ""),
 		},
 		OAuth: OAuthConfig{
 			YandexClientID:     getEnv("YANDEX_CLIENT_ID", ""),

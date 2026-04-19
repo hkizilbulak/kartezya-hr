@@ -1,12 +1,16 @@
 package service
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"mime"
+	"net/http"
 	"net/mail"
 	"net/smtp"
 	"time"
@@ -123,14 +127,14 @@ func (s *emailService) SendPasswordResetEmail(user *domain.User, firstName strin
 	emailContent := templates.PasswordResetEmailTemplate(firstName, lastName, resetURL)
 
 	// Send email
-	if err := s.sendSMTPEmail(user.Email, emailContent.Subject, emailContent.Body); err != nil {
+	if err := s.sendEmail(user.Email, emailContent.Subject, emailContent.Body); err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
 	return nil
 }
 
-// SendPasswordResetEmail sends a password reset email to the user
+// SendPasswordResetEmailWithUserId sends a password reset email using a user ID
 func (s *emailService) SendPasswordResetEmailWithUserId(userId uint, email string, firstName string, lastName string) error {
 	// Generate reset token
 	resetToken, err := s.GeneratePasswordResetToken(userId)
@@ -145,17 +149,30 @@ func (s *emailService) SendPasswordResetEmailWithUserId(userId uint, email strin
 	emailContent := templates.PasswordResetEmailTemplate(firstName, lastName, resetURL)
 
 	// Send email
-	if err := s.sendSMTPEmail(email, emailContent.Subject, emailContent.Body); err != nil {
+	if err := s.sendEmail(email, emailContent.Subject, emailContent.Body); err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
 	return nil
 }
 
-// SendCustomEmail sends a custom HTML email to one or more recipients
+// sendEmail routes to Resend or SMTP depending on EMAIL_PROVIDER config.
+func (s *emailService) sendEmail(to, subject, htmlBody string) error {
+	if s.config.Email.Provider == "resend" {
+		return s.sendViaResend([]string{to}, subject, htmlBody)
+	}
+	return s.sendSMTPEmail(to, subject, htmlBody)
+}
+
+// SendCustomEmail sends a custom HTML email to one or more recipients.
+// Routes to Resend HTTP API or SMTP depending on EMAIL_PROVIDER config.
 func (s *emailService) SendCustomEmail(to []string, subject string, htmlBody string) error {
 	if len(to) == 0 {
 		return fmt.Errorf("at least one recipient is required")
+	}
+
+	if s.config.Email.Provider == "resend" {
+		return s.sendViaResend(to, subject, htmlBody)
 	}
 
 	var errs []string
@@ -164,10 +181,51 @@ func (s *emailService) SendCustomEmail(to []string, subject string, htmlBody str
 			errs = append(errs, fmt.Sprintf("%s: %v", recipient, err))
 		}
 	}
-
 	if len(errs) > 0 {
 		return fmt.Errorf("failed to send to some recipients: %v", errs)
 	}
+	return nil
+}
+
+// sendViaResend sends email using Resend HTTP API (https://resend.com)
+// Works on Railway and other cloud platforms that block SMTP ports.
+func (s *emailService) sendViaResend(to []string, subject, htmlBody string) error {
+	if s.config.Email.ResendAPIKey == "" {
+		return fmt.Errorf("RESEND_API_KEY is not configured")
+	}
+
+	payload := map[string]interface{}{
+		"from":    fmt.Sprintf("%s <%s>", s.config.Email.FromName, s.config.Email.FromEmail),
+		"to":      to,
+		"subject": subject,
+		"html":    htmlBody,
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal resend payload: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", "https://api.resend.com/emails", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to create resend request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+s.config.Email.ResendAPIKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("resend HTTP request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("resend API error (status %d): %s", resp.StatusCode, string(respBody))
+	}
+
+	log.Printf("Email sent via Resend to: %v\n", to)
 	return nil
 }
 
@@ -212,29 +270,28 @@ func (s *emailService) sendSMTPEmail(to, subject, htmlBody string) error {
 			InsecureSkipVerify: false,
 			ServerName:         s.config.Email.SMTPHost,
 		}
-
 		conn, err := tls.Dial("tcp", addr, tlsConfig)
 		if err != nil {
 			return fmt.Errorf("failed to connect via TLS: %w", err)
 		}
 		defer conn.Close()
 
-		client, err := smtp.NewClient(conn, s.config.Email.SMTPHost)
+		smtpClient, err := smtp.NewClient(conn, s.config.Email.SMTPHost)
 		if err != nil {
 			return fmt.Errorf("failed to create SMTP client: %w", err)
 		}
-		defer client.Close()
+		defer smtpClient.Close()
 
-		if err = client.Auth(auth); err != nil {
+		if err = smtpClient.Auth(auth); err != nil {
 			return fmt.Errorf("SMTP auth failed: %w", err)
 		}
-		if err = client.Mail(s.config.Email.FromEmail); err != nil {
+		if err = smtpClient.Mail(s.config.Email.FromEmail); err != nil {
 			return fmt.Errorf("SMTP MAIL FROM failed: %w", err)
 		}
-		if err = client.Rcpt(to); err != nil {
+		if err = smtpClient.Rcpt(to); err != nil {
 			return fmt.Errorf("SMTP RCPT TO failed: %w", err)
 		}
-		w, err := client.Data()
+		w, err := smtpClient.Data()
 		if err != nil {
 			return fmt.Errorf("SMTP DATA failed: %w", err)
 		}
@@ -244,7 +301,7 @@ func (s *emailService) sendSMTPEmail(to, subject, htmlBody string) error {
 		if err = w.Close(); err != nil {
 			return fmt.Errorf("failed to close email writer: %w", err)
 		}
-		client.Quit()
+		smtpClient.Quit()
 	} else {
 		// Port 587/25: STARTTLS
 		if err := smtp.SendMail(addr, auth, s.config.Email.FromEmail, []string{to}, []byte(message)); err != nil {

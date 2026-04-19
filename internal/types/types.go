@@ -339,6 +339,7 @@ type WorkDayReportFilter struct {
 	EndDate       time.Time `json:"end_date"`
 	CompanyID     *uint     `json:"company_id"`
 	DepartmentIDs []uint    `json:"department_ids"`
+	IsActive      *bool     `json:"is_active"`
 }
 
 // ColumnConfig represents export column metadata from UI
@@ -459,6 +460,7 @@ type PaginatedResponse struct {
 type GradeReportFilter struct {
 	CompanyID    *uint `json:"company_id"`
 	DepartmentID *uint `json:"department_id"`
+	IsActive     *bool `json:"is_active"`
 }
 
 // GradeReportRow represents a single row in the grade report
@@ -481,4 +483,11 @@ type GradeReportRow struct {
 // GradeReportResponse represents the complete grade report response
 type GradeReportResponse struct {
 	Rows []GradeReportRow `json:"rows"`
+}
+
+// GradeReportExportRequest represents the export request body from the frontend
+type GradeReportExportRequest struct {
+	CompanyID     *uint  `json:"companyId"`
+	DepartmentID  *uint  `json:"departmentId"`
+	DepartmentIDs []uint `json:"departmentIds"`
 }

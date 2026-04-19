@@ -460,6 +460,7 @@ func main() {
 			reportRoutes.GET("/work-day", authMiddleware.RequireAdmin(), reportHandler.GetWorkDayReport)
 			reportRoutes.POST("/work-day/export", authMiddleware.RequireAdmin(), reportHandler.ExportWorkDayReportExcel)
 			reportRoutes.GET("/grade", authMiddleware.RequireAdmin(), reportHandler.GetGradeReport)
+			reportRoutes.POST("/grade/export", authMiddleware.RequireAdmin(), reportHandler.ExportGradeReportExcel)
 		}
 
 		// Email routes (Admin only)
