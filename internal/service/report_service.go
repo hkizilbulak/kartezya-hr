@@ -169,6 +169,7 @@ func (s *reportService) GetEforReport(filter *types.WorkDayReportFilter) (*types
 			DepartmentName: row.DepartmentName,
 			Manager:        row.Manager,
 			WorkedDays:     0, // Will recalculate total across the range based on new logic
+			CurrentGrade:   row.CurrentGrade,
 			Grade:          "",
 			Rate:           "",
 		}

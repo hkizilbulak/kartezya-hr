@@ -373,6 +373,7 @@ type WorkDayReportRow struct {
 	WorkDays       float64 `json:"work_days"`
 	UsedLeaveDays  float64 `json:"used_leave_days"`
 	WorkedDays     float64 `json:"worked_days"`
+	CurrentGrade   string  `json:"current_grade"`
 }
 
 // WorkDayReportResponse represents the complete work day report response
@@ -393,6 +394,7 @@ type EforReportRow struct {
 	CompanyName    string  `json:"company_name"`
 	DepartmentName string  `json:"department_name"`
 	Manager        string  `json:"manager"`
+	CurrentGrade   string  `json:"current_grade"`
 	Grade          string  `json:"grade"`
 	Rate           string  `json:"rate"`
 	January        float64 `json:"january"`

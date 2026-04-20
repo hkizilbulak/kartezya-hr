@@ -998,6 +998,7 @@ func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, com
 		SELECT
 			e.id,
 			e.identity_no,
+			cg.current_grade,
 			e.first_name,
 			e.last_name,
 			
@@ -1024,6 +1025,18 @@ func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, com
 		
 		LEFT JOIN hr_companies c ON c.id = ed.company_id
 		LEFT JOIN hr_departments d ON d.id = ed.department_id
+		
+		LEFT JOIN (
+			SELECT
+				eg.employee_id,
+				g.name AS current_grade
+			FROM hr_employee_grades eg
+			LEFT JOIN hr_grades g
+				ON g.id = eg.grade_id
+			WHERE eg.deleted = false
+			  AND eg.start_date <= CURRENT_DATE
+			  AND (eg.end_date IS NULL OR eg.end_date >= CURRENT_DATE)
+		) cg ON cg.employee_id = e.id
 		
 		WHERE 1=1`
 
@@ -1070,12 +1083,14 @@ func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, com
 		GROUP BY
 			e.id,
 			e.identity_no,
+			cg.current_grade,
 			e.first_name,
 			e.last_name,
 			c.id,
 			c.name,
 			d.id,
 			d.name,
+			d.manager,
 			e.hire_date,
 			e.leave_date
 		ORDER BY e.id
