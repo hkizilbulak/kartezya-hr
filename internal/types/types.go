@@ -384,6 +384,40 @@ type WorkDayReportResponse struct {
 	Rows             []WorkDayReportRow `json:"rows"`
 }
 
+// EforReportRow represents a single row in the efor report
+type EforReportRow struct {
+	ID             uint    `json:"id"`
+	FirstName      string  `json:"first_name"`
+	LastName       string  `json:"last_name"`
+	IdentityNo     string  `json:"identity_no"`
+	CompanyName    string  `json:"company_name"`
+	DepartmentName string  `json:"department_name"`
+	Manager        string  `json:"manager"`
+	Grade          string  `json:"grade"`
+	Rate           string  `json:"rate"`
+	January        float64 `json:"january"`
+	February       float64 `json:"february"`
+	March          float64 `json:"march"`
+	April          float64 `json:"april"`
+	May            float64 `json:"may"`
+	June           float64 `json:"june"`
+	July           float64 `json:"july"`
+	August         float64 `json:"august"`
+	September      float64 `json:"september"`
+	October        float64 `json:"october"`
+	November       float64 `json:"november"`
+	December       float64 `json:"december"`
+	WorkedDays     float64 `json:"worked_days"`
+}
+
+// EforReportResponse represents the complete efor report response
+type EforReportResponse struct {
+	StartDate     time.Time       `json:"start_date"`
+	EndDate       time.Time       `json:"end_date"`
+	TotalWorkDays float64         `json:"total_work_days"`
+	Rows          []EforReportRow `json:"rows"`
+}
+
 // EmployeeGradeLookup for lookup responses
 type EmployeeGradeLookup struct {
 	ID        uint   `json:"id"`

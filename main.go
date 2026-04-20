@@ -459,6 +459,7 @@ func main() {
 		{
 			reportRoutes.GET("/work-day", authMiddleware.RequireAdmin(), reportHandler.GetWorkDayReport)
 			reportRoutes.POST("/work-day/export", authMiddleware.RequireAdmin(), reportHandler.ExportWorkDayReportExcel)
+			reportRoutes.GET("/efor", authMiddleware.RequireAdmin(), reportHandler.GetEforReport)
 			reportRoutes.GET("/grade", authMiddleware.RequireAdmin(), reportHandler.GetGradeReport)
 			reportRoutes.POST("/grade/export", authMiddleware.RequireAdmin(), reportHandler.ExportGradeReportExcel)
 		}

@@ -14,6 +14,7 @@ import (
 type ReportService interface {
 	GetWorkDayReport(filter *types.WorkDayReportFilter) (*types.WorkDayReportResponse, error)
 	ExportWorkDayReportExcel(request *types.WorkDayReportExportRequest) ([]byte, error)
+	GetEforReport(filter *types.WorkDayReportFilter) (*types.EforReportResponse, error)
 	GetGradeReportData(filter *types.GradeReportFilter) (*types.GradeReportResponse, error)
 	ExportGradeReportExcel(filter *types.GradeReportFilter) ([]byte, error)
 }
@@ -146,51 +147,160 @@ func (s *reportService) ExportWorkDayReportExcel(request *types.WorkDayReportExp
 	return buffer.Bytes(), nil
 }
 
-func getFieldValueByJSONKey(row types.WorkDayReportRow, key string) (interface{}, error) {
-	v := reflect.ValueOf(row)
-	t := reflect.TypeOf(row)
-
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		jsonTag := field.Tag.Get("json")
-		if jsonTag != key {
-			continue
-		}
-
-		fieldValue := v.Field(i)
-		if fieldValue.Kind() == reflect.Ptr {
-			if fieldValue.IsNil() {
-				return "", nil
-			}
-			return fieldValue.Elem().Interface(), nil
-		}
-
-		return fieldValue.Interface(), nil
-	}
-
-	return nil, fmt.Errorf("unsupported export column key: %s", key)
-}
-
-// calculateHolidayDays calculates the number of public holiday days in a date range
-func (s *reportService) calculateHolidayDays(startDate, endDate time.Time) (float64, error) {
-	holidays, err := s.holidayRepo.GetByDateRange(startDate, endDate)
+func (s *reportService) GetEforReport(filter *types.WorkDayReportFilter) (*types.EforReportResponse, error) {
+	// Get total work day report first
+	baseReport, err := s.GetWorkDayReport(filter)
 	if err != nil {
-		return 0, err
+		return nil, fmt.Errorf("failed to get base work day report: %w", err)
 	}
 
-	holidayDays := 0.0
-	for _, holiday := range holidays {
-		if holiday.IsFullDay {
-			holidayDays += 1.0
+	// Initialize our mapping of employees to ID
+	eforMap := make(map[uint]*types.EforReportRow)
+	var orderedIDs []uint
+
+	// Map base rows to Efor rows
+	for _, row := range baseReport.Rows {
+		eforMap[row.ID] = &types.EforReportRow{
+			ID:             row.ID,
+			FirstName:      row.FirstName,
+			LastName:       row.LastName,
+			IdentityNo:     row.IdentityNo,
+			CompanyName:    row.CompanyName,
+			DepartmentName: row.DepartmentName,
+			Manager:        row.Manager,
+			WorkedDays:     0, // Will recalculate total across the range based on new logic
+			Grade:          "",
+			Rate:           "",
+		}
+		orderedIDs = append(orderedIDs, row.ID)
+	}
+
+	// Calculate current month start for the future month check
+	now := time.Now()
+	currentMonthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+
+	// For each month in the range, get the work day report data and merge
+	startMonth := time.Date(filter.StartDate.Year(), filter.StartDate.Month(), 1, 0, 0, 0, 0, time.UTC)
+	endMonth := time.Date(filter.EndDate.Year(), filter.EndDate.Month(), 1, 0, 0, 0, 0, time.UTC)
+
+	for m := startMonth; !m.After(endMonth); m = m.AddDate(0, 1, 0) {
+		// Calculate first and last day of this month
+		monthStart := m
+		monthEnd := m.AddDate(0, 1, -1)
+
+		// Clamp the month dates to the overall request dates
+		queryStart := monthStart
+		if queryStart.Before(filter.StartDate) {
+			queryStart = filter.StartDate
+		}
+		queryEnd := monthEnd
+		if queryEnd.After(filter.EndDate) {
+			queryEnd = filter.EndDate
+		}
+
+		monthVal := int(m.Month())
+
+		// If this is the current month or a future month, use system working days for everyone
+		if !m.Before(currentMonthStart) {
+			// Determine working days from system for this period
+			expectedWorkDays, _ := s.leaveService.CalculateWorkingDays(queryStart, queryEnd, true, true)
+			totalSystemWorkDays := expectedWorkDays
+			if totalSystemWorkDays < 0 {
+				totalSystemWorkDays = 0
+			}
+
+			for _, eforRow := range eforMap {
+				// Base update
+				switch monthVal {
+				case 1:
+					eforRow.January = totalSystemWorkDays
+				case 2:
+					eforRow.February = totalSystemWorkDays
+				case 3:
+					eforRow.March = totalSystemWorkDays
+				case 4:
+					eforRow.April = totalSystemWorkDays
+				case 5:
+					eforRow.May = totalSystemWorkDays
+				case 6:
+					eforRow.June = totalSystemWorkDays
+				case 7:
+					eforRow.July = totalSystemWorkDays
+				case 8:
+					eforRow.August = totalSystemWorkDays
+				case 9:
+					eforRow.September = totalSystemWorkDays
+				case 10:
+					eforRow.October = totalSystemWorkDays
+				case 11:
+					eforRow.November = totalSystemWorkDays
+				case 12:
+					eforRow.December = totalSystemWorkDays
+				}
+				eforRow.WorkedDays += totalSystemWorkDays
+			}
 		} else {
-			holidayDays += 0.5
+			// Fetch data for this specific month portion
+			monthRows, err := s.employeeRepo.GetWorkDayReportData(
+				queryStart.Format("2006-01-02"),
+				queryEnd.Format("2006-01-02"),
+				filter.CompanyID,
+				filter.DepartmentIDs,
+				filter.IsActive,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get monthly report data: %w", err)
+			}
+
+			// Update our employee mapping with this month's worked days
+			for _, row := range monthRows {
+				if eforRow, exists := eforMap[row.ID]; exists {
+					switch monthVal {
+					case 1:
+						eforRow.January += row.WorkedDays
+					case 2:
+						eforRow.February += row.WorkedDays
+					case 3:
+						eforRow.March += row.WorkedDays
+					case 4:
+						eforRow.April += row.WorkedDays
+					case 5:
+						eforRow.May += row.WorkedDays
+					case 6:
+						eforRow.June += row.WorkedDays
+					case 7:
+						eforRow.July += row.WorkedDays
+					case 8:
+						eforRow.August += row.WorkedDays
+					case 9:
+						eforRow.September += row.WorkedDays
+					case 10:
+						eforRow.October += row.WorkedDays
+					case 11:
+						eforRow.November += row.WorkedDays
+					case 12:
+						eforRow.December += row.WorkedDays
+					}
+					eforRow.WorkedDays += row.WorkedDays
+				}
+			}
 		}
 	}
 
-	return holidayDays, nil
+	// Assemble final row slice
+	finalRows := make([]types.EforReportRow, 0, len(orderedIDs))
+	for _, id := range orderedIDs {
+		finalRows = append(finalRows, *eforMap[id])
+	}
+
+	return &types.EforReportResponse{
+		StartDate:     baseReport.StartDate,
+		EndDate:       baseReport.EndDate,
+		TotalWorkDays: baseReport.TotalWorkDays,
+		Rows:          finalRows,
+	}, nil
 }
 
-// GetGradeReportData returns grade report data for a given company and department
 func (s *reportService) GetGradeReportData(filter *types.GradeReportFilter) (*types.GradeReportResponse, error) {
 	rows, err := s.employeeRepo.GetGradeReportData(
 		filter.CompanyID,
@@ -268,6 +378,50 @@ func (s *reportService) ExportGradeReportExcel(filter *types.GradeReportFilter) 
 	}
 
 	return buffer.Bytes(), nil
+}
+
+func getFieldValueByJSONKey(row types.WorkDayReportRow, key string) (interface{}, error) {
+	v := reflect.ValueOf(row)
+	t := reflect.TypeOf(row)
+
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		jsonTag := field.Tag.Get("json")
+		if jsonTag != key {
+			continue
+		}
+
+		fieldValue := v.Field(i)
+		if fieldValue.Kind() == reflect.Ptr {
+			if fieldValue.IsNil() {
+				return "", nil
+			}
+			return fieldValue.Elem().Interface(), nil
+		}
+
+		return fieldValue.Interface(), nil
+	}
+
+	return nil, fmt.Errorf("unsupported export column key: %s", key)
+}
+
+// calculateHolidayDays calculates the number of public holiday days in a date range
+func (s *reportService) calculateHolidayDays(startDate, endDate time.Time) (float64, error) {
+	holidays, err := s.holidayRepo.GetByDateRange(startDate, endDate)
+	if err != nil {
+		return 0, err
+	}
+
+	holidayDays := 0.0
+	for _, holiday := range holidays {
+		if holiday.IsFullDay {
+			holidayDays += 1.0
+		} else {
+			holidayDays += 0.5
+		}
+	}
+
+	return holidayDays, nil
 }
 
 func nilableString(s *string) string {

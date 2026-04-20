@@ -158,6 +158,118 @@ func (h *ReportHandler) ExportWorkDayReportExcel(c *gin.Context) {
 	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", excelFile)
 }
 
+// GetEforReport godoc
+// @Summary Get Efor Report
+// @Description Get efor report with filters
+// @Tags reports
+// @Accept json
+// @Produce json
+// @Param start_date query string true "Start Date (YYYY-MM-DD)"
+// @Param end_date query string true "End Date (YYYY-MM-DD)"
+// @Param company_id query uint false "Company ID"
+// @Param department_ids query []int false "Department IDs (supports repeated param or comma separated), example: department_ids=1&department_ids=2 or department_ids=1,2"
+// @Param department_id query int false "Legacy single department ID (backward compatibility)"
+// @Param is_active query bool false "Is Active" default(true)
+// @Success 200 {object} types.EforReportResponse
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /reports/efor [get]
+// @Security BearerAuth
+func (h *ReportHandler) GetEforReport(c *gin.Context) {
+	// Parse query parameters
+	startDateStr := c.Query("start_date")
+	endDateStr := c.Query("end_date")
+	companyIDStr := c.Query("company_id")
+	departmentIDsQuery := c.QueryArray("department_ids")
+	legacyDepartmentID := c.Query("department_id")
+
+	// Parse dates
+	startDate, err := time.Parse("2006-01-02", startDateStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid start_date format. Use YYYY-MM-DD"})
+		return
+	}
+
+	endDate, err := time.Parse("2006-01-02", endDateStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid end_date format. Use YYYY-MM-DD"})
+		return
+	}
+
+	// Parse optional parameters
+	var companyID *uint
+	if companyIDStr != "" {
+		id, err := strconv.ParseUint(companyIDStr, 10, 32)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid company_id"})
+			return
+		}
+		uid := uint(id)
+		companyID = &uid
+	}
+
+	// Handle department_ids parameter
+	var departmentIDs []uint
+
+	// Support comma-separated format
+	if len(departmentIDsQuery) == 1 && strings.Contains(departmentIDsQuery[0], ",") {
+		parts := strings.Split(departmentIDsQuery[0], ",")
+		departmentIDsQuery = parts
+	}
+
+	for _, deptIDStr := range departmentIDsQuery {
+		deptIDStr = strings.TrimSpace(deptIDStr)
+		if deptIDStr != "" {
+			id, err := strconv.ParseUint(deptIDStr, 10, 32)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid department_ids format"})
+				return
+			}
+			departmentIDs = append(departmentIDs, uint(id))
+		}
+	}
+
+	// Fallback to legacy single department_id if present and department_ids is empty
+	if len(departmentIDs) == 0 && legacyDepartmentID != "" {
+		id, err := strconv.ParseUint(legacyDepartmentID, 10, 32)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid department_id"})
+			return
+		}
+		departmentIDs = append(departmentIDs, uint(id))
+	}
+
+	var isActive *bool
+	isActiveStr := c.DefaultQuery("is_active", "true")
+	if isActiveStr != "" {
+		active, err := strconv.ParseBool(isActiveStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid is_active value"})
+			return
+		}
+		isActive = &active
+	} else {
+		defaultTrue := true
+		isActive = &defaultTrue
+	}
+
+	filter := &types.WorkDayReportFilter{
+		StartDate:     startDate,
+		EndDate:       endDate,
+		CompanyID:     companyID,
+		DepartmentIDs: departmentIDs,
+		IsActive:      isActive,
+	}
+
+	report, err := h.reportService.GetEforReport(filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, report)
+}
+
 // GetGradeReport godoc
 // @Summary Get grade distribution report
 // @Description Get employee count grouped by grade with optional company and department filters (Admin only)

@@ -952,21 +952,23 @@ func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, com
 		),
 		
 		working_days AS (
-			SELECT work_date
-			FROM date_range
-			WHERE EXTRACT(DOW FROM work_date) NOT IN (0,6)
-			  AND NOT EXISTS (
-					SELECT 1
-					FROM hr_holidays h
-					WHERE h.holiday_date = date_range.work_date
-			  )
+			SELECT date_range.work_date,
+                                CASE 
+                                        WHEN h.id IS NOT NULL AND h.is_full_day = false THEN 0.5
+                                        ELSE 1.0
+                                END AS day_value
+                        FROM date_range
+                        LEFT JOIN hr_holidays h ON h.holiday_date = date_range.work_date
+                        WHERE EXTRACT(DOW FROM date_range.work_date) NOT IN (0,6)
+                          AND (h.id IS NULL OR h.is_full_day = false)
 		),
 		
 		employee_days AS (
 			SELECT
 				e.id AS employee_id,
-				w.work_date,
-				wi.start_date AS team_start_date,
+                                w.work_date,
+                                w.day_value,
+                                wi.start_date AS team_start_date,
 				wi.end_date   AS team_end_date,
 				wi.company_id,
 				wi.department_id,
@@ -1012,12 +1014,9 @@ func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, com
 			e.hire_date,
 			e.leave_date,
 		
-			COUNT(CASE WHEN ed.day_type = 'WORK' THEN 1 END) AS worked_days,
-			COUNT(CASE WHEN ed.day_type = 'LEAVE' THEN 1 END) AS used_leave_days,
-
-			COUNT(CASE WHEN ed.day_type = 'WORK' THEN 1 END)
-				+
-			COUNT(CASE WHEN ed.day_type = 'LEAVE' THEN 1 END) AS work_days
+			COALESCE(SUM(CASE WHEN ed.day_type = 'WORK' THEN ed.day_value ELSE 0 END), 0) AS worked_days,
+                        COALESCE(SUM(CASE WHEN ed.day_type = 'LEAVE' THEN ed.day_value ELSE 0 END), 0) AS used_leave_days,
+                        COALESCE(SUM(ed.day_value), 0) AS work_days
 		
 		FROM employee_days ed
 		
