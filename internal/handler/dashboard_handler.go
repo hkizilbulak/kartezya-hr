@@ -6,6 +6,7 @@ import (
 
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/service"
+	"kartezya-hr/internal/types"
 
 	"github.com/gin-gonic/gin"
 )
@@ -15,6 +16,7 @@ type DashboardHandler struct {
 	departmentService service.DepartmentService
 	companyService    service.CompanyService
 	leaveService      service.LeaveService
+	expenseService    service.ExpenseService
 }
 
 func NewDashboardHandler(
@@ -22,20 +24,25 @@ func NewDashboardHandler(
 	departmentService service.DepartmentService,
 	companyService service.CompanyService,
 	leaveService service.LeaveService,
+	expenseService service.ExpenseService,
 ) *DashboardHandler {
 	return &DashboardHandler{
 		employeeService:   employeeService,
 		departmentService: departmentService,
 		companyService:    companyService,
 		leaveService:      leaveService,
+		expenseService:    expenseService,
 	}
 }
 
 type DashboardDataResponse struct {
-	TotalEmployees       int64 `json:"total_employees"`
-	TotalDepartments     int64 `json:"total_departments"`
-	TotalCompanies       int64 `json:"total_companies"`
-	PendingLeaveRequests int64 `json:"pending_leave_requests"`
+	TotalEmployees         int64 `json:"total_employees"`
+	TotalDepartments       int64 `json:"total_departments"`
+	TotalCompanies         int64 `json:"total_companies"`
+	PendingLeaveRequests   int64 `json:"pending_leave_requests"`
+	PendingExpenseRequests int64 `json:"pending_expense_requests"`
+	PendingPaymentExpenses int64 `json:"pending_payment_expenses"`
+	PaidExpenses           int64 `json:"paid_expenses"`
 }
 
 // Chart response types
@@ -112,11 +119,27 @@ func (h *DashboardHandler) GetDashboardData(c *gin.Context) {
 	}
 	pendingLeaveRequests := int64(len(pendingLeaves))
 
+	// Fetch expense requests stats
+	var pendingExpenseRequests, pendingPaymentExpenses, paidExpenses int64
+
+	if resp, err := h.expenseService.GetAllExpenseRequestsPaginated(nil, 1, 1, types.SortParams{}, "PENDING", nil, nil, nil); err == nil {
+		pendingExpenseRequests = resp.Page.Total
+	}
+	if resp, err := h.expenseService.GetAllExpenseRequestsPaginated(nil, 1, 1, types.SortParams{}, "APPROVED", nil, nil, nil); err == nil {
+		pendingPaymentExpenses = resp.Page.Total
+	}
+	if resp, err := h.expenseService.GetAllExpenseRequestsPaginated(nil, 1, 1, types.SortParams{}, "PAID", nil, nil, nil); err == nil {
+		paidExpenses = resp.Page.Total
+	}
+
 	dashboardData := DashboardDataResponse{
-		TotalEmployees:       totalEmployees,
-		TotalDepartments:     totalDepartments,
-		TotalCompanies:       totalCompanies,
-		PendingLeaveRequests: pendingLeaveRequests,
+		TotalEmployees:         totalEmployees,
+		TotalDepartments:       totalDepartments,
+		TotalCompanies:         totalCompanies,
+		PendingLeaveRequests:   pendingLeaveRequests,
+		PendingExpenseRequests: pendingExpenseRequests,
+		PendingPaymentExpenses: pendingPaymentExpenses,
+		PaidExpenses:           paidExpenses,
 	}
 
 	c.JSON(http.StatusOK, gin.H{
