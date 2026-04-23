@@ -23,17 +23,13 @@ func NewEmployeeContractHandler(employeeContractService service.EmployeeContract
 }
 
 type CreateEmployeeContractRequest struct {
-	EmployeeID uint   `json:"employee_id" binding:"required"`
-	ContractNo string `json:"contract_no"`
-	StartDate  string `json:"start_date" binding:"required"`
-	EndDate    string `json:"end_date"`
+	EmployeeID uint `json:"employee_id" binding:"required"`
+	ContractID uint `json:"contract_id" binding:"required"`
 }
 
 type UpdateEmployeeContractRequest struct {
-	EmployeeID uint   `json:"employee_id" binding:"required"`
-	ContractNo string `json:"contract_no"`
-	StartDate  string `json:"start_date" binding:"required"`
-	EndDate    string `json:"end_date"`
+	EmployeeID uint `json:"employee_id" binding:"required"`
+	ContractID uint `json:"contract_id" binding:"required"`
 }
 
 // CreateEmployeeContract godoc
@@ -77,7 +73,7 @@ func (h *EmployeeContractHandler) CreateEmployeeContract(c *gin.Context) {
 		return
 	}
 
-	employeeContract, err := h.employeeContractService.CreateContract(req.EmployeeID, req.ContractNo, req.StartDate, req.EndDate, email)
+	employeeContract, err := h.employeeContractService.CreateContract(req.EmployeeID, req.ContractID, email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -271,7 +267,7 @@ func (h *EmployeeContractHandler) UpdateEmployeeContract(c *gin.Context) {
 		return
 	}
 
-	if err := h.employeeContractService.UpdateContract(id, req.EmployeeID, req.ContractNo, req.StartDate, req.EndDate, email, requestingUserID, isAdmin(roles)); err != nil {
+	if err := h.employeeContractService.UpdateContract(id, req.EmployeeID, req.ContractID, email, requestingUserID, isAdmin(roles)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   err.Error(),

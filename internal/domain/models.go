@@ -302,13 +302,12 @@ type EmployeeGrade struct {
 // EmployeeContract represents employee contracts
 type EmployeeContract struct {
 	AuditableModel
-	EmployeeID uint       `json:"employee_id" gorm:"not null"`
-	ContractNo string     `json:"contract_no" gorm:"size:100"`
-	StartDate  time.Time  `json:"start_date" gorm:"not null"`
-	EndDate    *time.Time `json:"end_date"`
+	EmployeeID uint `json:"employee_id" gorm:"not null;uniqueIndex:idx_employee_contract"`
+	ContractID uint `json:"contract_id" gorm:"uniqueIndex:idx_employee_contract"`
 
 	// Relationships
 	Employee Employee `json:"employee,omitempty"`
+	Contract Contract `json:"contract,omitempty"`
 }
 
 // EmployeeContract table name
@@ -361,6 +360,36 @@ const (
 	AuditActionUpdate = "UPDATE"
 	AuditActionDelete = "DELETE"
 )
+
+// Contract status constants
+const (
+	ContractStatusPendingProposal  = "PENDING_PROPOSAL"  // teklif onay bekleniyor
+	ContractStatusProposalRevision = "PROPOSAL_REVISION" // teklif revize bekleniyor
+	ContractStatusPendingRevision  = "PENDING_REVISION"  // revize bekleniyor
+	ContractStatusPendingApproval  = "PENDING_APPROVAL"  // onay bekleniyor
+	ContractStatusApproved         = "APPROVED"          // onaylandı
+)
+
+// Contract represents an agreement/project with a customer
+type Contract struct {
+	AuditableModel
+	CustomerContactName  string     `json:"customer_contact_name" gorm:"size:255;not null"`
+	CustomerContactPhone string     `json:"customer_contact_phone" gorm:"size:50"`
+	CustomerContactEmail string     `json:"customer_contact_email" gorm:"size:255"`
+	ProjectName          string     `json:"project_name" gorm:"size:255;not null"`
+	ContractNo           string     `json:"contract_no" gorm:"size:100;uniqueIndex;not null"`
+	StartDate            time.Time  `json:"start_date" gorm:"not null"`
+	EndDate              *time.Time `json:"end_date"`
+	Status               string     `json:"status" gorm:"size:50;not null;default:'PENDING_PROPOSAL'"`
+
+	// Relationships
+	EmployeeContracts []EmployeeContract `json:"employee_contracts,omitempty"`
+}
+
+// Contract table name
+func (Contract) TableName() string {
+	return GetTableName("hr_contracts")
+}
 
 // TableName methods to add hr_ prefix to all tables
 

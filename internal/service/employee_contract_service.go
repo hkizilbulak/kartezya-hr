@@ -11,10 +11,10 @@ import (
 )
 
 type EmployeeContractService interface {
-	CreateContract(employeeID uint, contractNo, startDate, endDate, createdBy string) (*domain.EmployeeContract, error)
+	CreateContract(employeeID uint, contractID uint, createdBy string) (*domain.EmployeeContract, error)
 	GetContractByID(id uint) (*types.EmployeeContractResponse, error)
 	GetContractsByUserID(userID uint) ([]*types.EmployeeContractWithNames, error)
-	UpdateContract(id uint, employeeID uint, contractNo, startDate, endDate, modifiedBy string, requestingUserID uint, isAdmin bool) error
+	UpdateContract(id uint, employeeID uint, contractID uint, modifiedBy string, requestingUserID uint, isAdmin bool) error
 	DeleteContract(id uint, deletedBy string) error
 	GetAllContracts(page, limit int, sortParams types.SortParams, employeeID *uint) (*PaginatedResponse, error)
 }
@@ -33,31 +33,20 @@ func NewEmployeeContractService(contractRepo repository.EmployeeContractReposito
 	}
 }
 
-func (s *employeeContractService) CreateContract(employeeID uint, contractNo, startDate, endDate, createdBy string) (*domain.EmployeeContract, error) {
-	// Parse date fields
-	var startDatePtr time.Time
-	var endDatePtr *time.Time
-
-	if parsed, err := time.Parse("2006-01-02", startDate); err != nil {
-		return nil, fmt.Errorf("invalid start date format: %v", err)
-	} else {
-		startDatePtr = parsed
+func (s *employeeContractService) CreateContract(employeeID uint, contractID uint, createdBy string) (*domain.EmployeeContract, error) {
+	// Check if this employee already has this contract
+	exists, err := s.contractRepo.CheckExists(employeeID, contractID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check existing contract: %v", err)
 	}
-
-	if endDate != "" {
-		if parsed, err := time.Parse("2006-01-02", endDate); err != nil {
-			return nil, fmt.Errorf("invalid end date format: %v", err)
-		} else {
-			endDatePtr = &parsed
-		}
+	if exists {
+		return nil, fmt.Errorf("employee already has this contract assigned")
 	}
 
 	// Create employee contract
 	contract := &domain.EmployeeContract{
 		EmployeeID: employeeID,
-		ContractNo: contractNo,
-		StartDate:  startDatePtr,
-		EndDate:    endDatePtr,
+		ContractID: contractID,
 	}
 
 	// Create the contract
@@ -83,6 +72,31 @@ func (s *employeeContractService) GetContractByID(id uint) (*types.EmployeeContr
 		return nil, err
 	}
 
+	var contractResp *types.ContractResponse
+	if contract.Contract.ID != 0 {
+		var startDateStr string
+		var endDateStr *string
+		if !contract.Contract.StartDate.IsZero() {
+			startDateStr = contract.Contract.StartDate.Format(time.RFC3339)
+		}
+		if contract.Contract.EndDate != nil {
+			dateStr := contract.Contract.EndDate.Format(time.RFC3339)
+			endDateStr = &dateStr
+		}
+
+		contractResp = &types.ContractResponse{
+			ID:                   contract.Contract.ID,
+			ContractNo:           contract.Contract.ContractNo,
+			ProjectName:          contract.Contract.ProjectName,
+			CustomerContactName:  contract.Contract.CustomerContactName,
+			CustomerContactPhone: contract.Contract.CustomerContactPhone,
+			CustomerContactEmail: contract.Contract.CustomerContactEmail,
+			StartDate:            startDateStr,
+			EndDate:              endDateStr,
+			Status:               contract.Contract.Status,
+		}
+	}
+
 	return &types.EmployeeContractResponse{
 		ID:         contract.ID,
 		CreatedAt:  contract.CreatedAt,
@@ -90,14 +104,13 @@ func (s *employeeContractService) GetContractByID(id uint) (*types.EmployeeContr
 		Deleted:    contract.Deleted,
 		CreatedBy:  contract.CreatedBy,
 		ModifiedBy: contract.ModifiedBy,
-		StartDate:  contract.StartDate,
-		EndDate:    contract.EndDate,
 		Employee: types.EmployeeLookup{
 			ID:        contract.Employee.ID,
 			FirstName: contract.Employee.FirstName,
 			LastName:  contract.Employee.LastName,
 		},
-		ContractNo: contract.ContractNo,
+		ContractID: contract.ContractID,
+		Contract:   contractResp,
 	}, nil
 }
 
@@ -121,23 +134,23 @@ func (s *employeeContractService) GetContractsByUserID(userID uint) ([]*types.Em
 		var endDateStr *string
 
 		// Check if StartDate is not zero value
-		if !contract.StartDate.IsZero() {
-			startDateStr = contract.StartDate.Format(time.RFC3339)
+		if !contract.Contract.StartDate.IsZero() {
+			startDateStr = contract.Contract.StartDate.Format(time.RFC3339)
 		}
 
-		if contract.EndDate != nil {
-			dateStr := contract.EndDate.Format(time.RFC3339)
+		if contract.Contract.EndDate != nil {
+			dateStr := contract.Contract.EndDate.Format(time.RFC3339)
 			endDateStr = &dateStr
 		}
 
 		// Determine if contract is active
-		isActive := contract.EndDate == nil || time.Now().Before(*contract.EndDate)
+		isActive := contract.Contract.EndDate == nil || time.Now().Before(*contract.Contract.EndDate)
 
 		// Create DTO with related entity names
 		contractDTO := &types.EmployeeContractWithNames{
 			ID:           contract.ID,
 			EmployeeName: fmt.Sprintf("%s %s", contract.Employee.FirstName, contract.Employee.LastName),
-			ContractNo:   contract.ContractNo,
+			ContractNo:   contract.Contract.ContractNo,
 			StartDate:    startDateStr,
 			EndDate:      endDateStr,
 			IsActive:     isActive,
@@ -149,7 +162,7 @@ func (s *employeeContractService) GetContractsByUserID(userID uint) ([]*types.Em
 	return result, nil
 }
 
-func (s *employeeContractService) UpdateContract(id uint, employeeID uint, contractNo, startDate, endDate, modifiedBy string, requestingUserID uint, isAdmin bool) error {
+func (s *employeeContractService) UpdateContract(id uint, employeeID uint, contractID uint, modifiedBy string, requestingUserID uint, isAdmin bool) error {
 	// Get existing contract for audit trail
 	existingContract, err := s.contractRepo.GetByID(id)
 	if err != nil {
@@ -169,30 +182,10 @@ func (s *employeeContractService) UpdateContract(id uint, employeeID uint, contr
 		}
 	}
 
-	// Parse date fields
-	var startDatePtr time.Time
-	var endDatePtr *time.Time
-
-	if parsed, err := time.Parse("2006-01-02", startDate); err != nil {
-		return fmt.Errorf("invalid start date format: %v", err)
-	} else {
-		startDatePtr = parsed
-	}
-
-	if endDate != "" {
-		if parsed, err := time.Parse("2006-01-02", endDate); err != nil {
-			return fmt.Errorf("invalid end date format: %v", err)
-		} else {
-			endDatePtr = &parsed
-		}
-	}
-
 	// Create updated contract object
 	contract := &domain.EmployeeContract{
 		EmployeeID: employeeID,
-		ContractNo: contractNo,
-		StartDate:  startDatePtr,
-		EndDate:    endDatePtr,
+		ContractID: contractID,
 	}
 
 	// Set the ID after creating the struct
@@ -267,6 +260,31 @@ func (s *employeeContractService) GetAllContracts(page, limit int, sortParams ty
 
 	contractResponses := make([]types.EmployeeContractResponse, len(contracts))
 	for i, contract := range contracts {
+		var contractResp *types.ContractResponse
+		if contract.Contract.ID != 0 {
+			var startDateStr string
+			var endDateStr *string
+			if !contract.Contract.StartDate.IsZero() {
+				startDateStr = contract.Contract.StartDate.Format(time.RFC3339)
+			}
+			if contract.Contract.EndDate != nil {
+				dateStr := contract.Contract.EndDate.Format(time.RFC3339)
+				endDateStr = &dateStr
+			}
+
+			contractResp = &types.ContractResponse{
+				ID:                   contract.Contract.ID,
+				ContractNo:           contract.Contract.ContractNo,
+				ProjectName:          contract.Contract.ProjectName,
+				CustomerContactName:  contract.Contract.CustomerContactName,
+				CustomerContactPhone: contract.Contract.CustomerContactPhone,
+				CustomerContactEmail: contract.Contract.CustomerContactEmail,
+				StartDate:            startDateStr,
+				EndDate:              endDateStr,
+				Status:               contract.Contract.Status,
+			}
+		}
+
 		contractResponses[i] = types.EmployeeContractResponse{
 			ID:         contract.ID,
 			CreatedAt:  contract.CreatedAt,
@@ -274,14 +292,13 @@ func (s *employeeContractService) GetAllContracts(page, limit int, sortParams ty
 			Deleted:    contract.Deleted,
 			CreatedBy:  contract.CreatedBy,
 			ModifiedBy: contract.ModifiedBy,
-			StartDate:  contract.StartDate,
-			EndDate:    contract.EndDate,
 			Employee: types.EmployeeLookup{
 				ID:        contract.Employee.ID,
 				FirstName: contract.Employee.FirstName,
 				LastName:  contract.Employee.LastName,
 			},
-			ContractNo: contract.ContractNo,
+			ContractID: contract.ContractID,
+			Contract:   contractResp,
 		}
 	}
 

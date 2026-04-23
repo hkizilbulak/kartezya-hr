@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"log"
 	"net/http"
 	"time"
@@ -41,6 +42,16 @@ import (
 // @name Authorization
 // @description Type "Bearer" followed by a space and JWT token.
 
+type bodyLogWriter struct {
+	gin.ResponseWriter
+	body *bytes.Buffer
+}
+
+func (w bodyLogWriter) Write(b []byte) (int, error) {
+	w.body.Write(b)
+	return w.ResponseWriter.Write(b)
+}
+
 func main() {
 	// Load configuration
 	cfg := config.Load()
@@ -79,6 +90,7 @@ func main() {
 	gradeRepo := repository.NewGradeRepository(db.DB)
 	employeeGradeRepo := repository.NewEmployeeGradeRepository(db.DB)
 	employeeContractRepo := repository.NewEmployeeContractRepository(db.DB)
+	contractRepo := repository.NewContractRepository(db.DB)
 	attachmentRepo := repository.NewAttachmentRepository(db.DB)
 	expenseRepo := repository.NewExpenseRepository(db.DB)
 	expenseTypeRepo := repository.NewExpenseTypeRepository(db.DB)
@@ -122,6 +134,7 @@ func main() {
 	gradeService := service.NewGradeService(gradeRepo, auditService)
 	employeeGradeService := service.NewEmployeeGradeService(employeeGradeRepo, employeeRepo, gradeRepo, auditService)
 	employeeContractService := service.NewEmployeeContractService(employeeContractRepo, employeeRepo, auditService)
+	contractService := service.NewContractService(contractRepo, auditService)
 	expenseService := service.NewExpenseService(expenseRepo, expenseTypeRepo, attachmentRepo, employeeRepo, storageProvider, auditService)
 	reportService := service.NewReportService(employeeRepo, workInfoRepo, leaveRepo, holidayRepo, leaveService)
 
@@ -138,6 +151,7 @@ func main() {
 	gradeHandler := handler.NewGradeHandler(gradeService)
 	employeeGradeHandler := handler.NewEmployeeGradeHandler(employeeGradeService, employeeService)
 	employeeContractHandler := handler.NewEmployeeContractHandler(employeeContractService, employeeService)
+	contractHandler := handler.NewContractHandler(contractService)
 	reportHandler := handler.NewReportHandler(reportService)
 	documentHandler := handler.NewDocumentHandler(documentService)
 	expenseHandler := handler.NewExpenseHandler(expenseService)
@@ -156,6 +170,22 @@ func main() {
 
 	// Initialize router
 	router := gin.Default()
+
+	// Error logging middleware to capture response errors
+	router.Use(func(c *gin.Context) {
+		blw := &bodyLogWriter{body: bytes.NewBufferString(""), ResponseWriter: c.Writer}
+		c.Writer = blw
+
+		c.Next()
+
+		if c.Writer.Status() >= 400 {
+			log.Printf("[API ERROR] %s %s - Status: %d - Response: %s", c.Request.Method, c.Request.URL.Path, c.Writer.Status(), blw.body.String())
+
+			for _, e := range c.Errors {
+				log.Printf("[INTERNAL EXCEPTION] %v", e)
+			}
+		}
+	})
 
 	// Add CORS middleware with wildcard for development
 	router.Use(func(c *gin.Context) {
@@ -377,6 +407,17 @@ func main() {
 			employeeContractRoutes.POST("", authMiddleware.RequireAdmin(), employeeContractHandler.CreateEmployeeContract)
 			employeeContractRoutes.PUT("/:id", authMiddleware.RequireAdmin(), employeeContractHandler.UpdateEmployeeContract)
 			employeeContractRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), employeeContractHandler.DeleteEmployeeContract)
+		}
+
+		// Contract routes
+		contractRoutes := protected.Group("/contracts")
+		{
+			// Admin only routes
+			contractRoutes.GET("/:id", authMiddleware.RequireAdmin(), contractHandler.GetByID)
+			contractRoutes.GET("", authMiddleware.RequireAdmin(), contractHandler.GetAll)
+			contractRoutes.POST("", authMiddleware.RequireAdmin(), contractHandler.Create)
+			contractRoutes.PUT("/:id", authMiddleware.RequireAdmin(), contractHandler.Update)
+			contractRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), contractHandler.Delete)
 		}
 
 		// Dashboard routes

@@ -1,11 +1,11 @@
 package repository
 
 import (
-"fmt"
-"kartezya-hr/internal/domain"
-"kartezya-hr/internal/types"
+	"fmt"
+	"kartezya-hr/internal/domain"
+	"kartezya-hr/internal/types"
 
-"gorm.io/gorm"
+	"gorm.io/gorm"
 )
 
 type EmployeeContractRepository interface {
@@ -13,6 +13,7 @@ type EmployeeContractRepository interface {
 	GetByID(id uint) (*domain.EmployeeContract, error)
 	GetByEmployeeID(employeeID uint, page int, limit int) ([]*domain.EmployeeContract, int64, error)
 	GetAll(limit, offset int, sortParams types.SortParams) ([]*domain.EmployeeContract, int64, error)
+	CheckExists(employeeID uint, contractID uint) (bool, error)
 	Update(contract *domain.EmployeeContract, modifiedBy string) error
 	Delete(id uint, deletedBy string) error
 	GetTotalCount() (int64, error)
@@ -48,12 +49,29 @@ func (r *employeeContractRepository) GetByEmployeeID(employeeID uint, page int, 
 		Where("employee_id = ? AND deleted = ?", employeeID, false).
 		Count(&total).
 		Preload("Employee").
-		Order("start_date DESC").
+		Preload("Contract").
+		Order("id DESC").
 		Limit(limit).
 		Offset(offset).
 		Find(&contracts).Error
 
-	return contracts, total, err
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return contracts, total, nil
+}
+
+// CheckExists checks if an employee contract already exists
+func (r *employeeContractRepository) CheckExists(employeeID uint, contractID uint) (bool, error) {
+	var count int64
+	err := r.db.Model(&domain.EmployeeContract{}).
+		Where("employee_id = ? AND contract_id = ? AND deleted = ?", employeeID, contractID, false).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func (r *employeeContractRepository) GetAll(limit, offset int, sortParams types.SortParams) ([]*domain.EmployeeContract, int64, error) {
@@ -82,7 +100,7 @@ func (r *employeeContractRepository) GetAll(limit, offset int, sortParams types.
 
 	r.db.Model(&domain.EmployeeContract{}).Where("deleted = ?", false).Count(&total)
 
-	err := r.db.Preload("Employee").
+	err := r.db.Preload("Employee").Preload("Contract").
 		Where("deleted = ?", false).
 		Order(orderBy).
 		Limit(limit).
@@ -96,9 +114,7 @@ func (r *employeeContractRepository) Update(contract *domain.EmployeeContract, m
 	contract.ModifiedBy = modifiedBy
 
 	updates := map[string]interface{}{
-		"contract_no": contract.ContractNo,
-		"start_date":  contract.StartDate,
-		"end_date":    contract.EndDate,
+		"contract_id": contract.ContractID,
 		"modified_by": modifiedBy,
 	}
 
@@ -109,9 +125,9 @@ func (r *employeeContractRepository) Delete(id uint, deletedBy string) error {
 	return r.db.Model(&domain.EmployeeContract{}).
 		Where("id = ? AND deleted = ?", id, false).
 		Updates(map[string]interface{}{
-"deleted":     true,
-"modified_by": deletedBy,
-}).Error
+			"deleted":     true,
+			"modified_by": deletedBy,
+		}).Error
 }
 
 func (r *employeeContractRepository) GetTotalCount() (int64, error) {

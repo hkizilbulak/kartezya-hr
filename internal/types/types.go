@@ -460,16 +460,15 @@ type EmployeeContractLookup struct {
 
 // EmployeeContractResponse for detail responses
 type EmployeeContractResponse struct {
-	ID         uint           `json:"id"`
-	CreatedAt  time.Time      `json:"created_at"`
-	UpdatedAt  time.Time      `json:"updated_at"`
-	Deleted    bool           `json:"deleted"`
-	CreatedBy  string         `json:"created_by"`
-	ModifiedBy string         `json:"modified_by"`
-	Employee   EmployeeLookup `json:"employee"`
-	ContractNo string         `json:"contract_no"`
-	StartDate  time.Time      `json:"start_date"`
-	EndDate    *time.Time     `json:"end_date"`
+	ID         uint              `json:"id"`
+	CreatedAt  time.Time         `json:"created_at"`
+	UpdatedAt  time.Time         `json:"updated_at"`
+	Deleted    bool              `json:"deleted"`
+	CreatedBy  string            `json:"created_by"`
+	ModifiedBy string            `json:"modified_by"`
+	Employee   EmployeeLookup    `json:"employee"`
+	ContractID uint              `json:"contract_id"`
+	Contract   *ContractResponse `json:"contract"`
 }
 
 // EmployeeContractWithNames for API responses with names
@@ -526,4 +525,30 @@ type GradeReportExportRequest struct {
 	CompanyID     *uint  `json:"companyId"`
 	DepartmentID  *uint  `json:"departmentId"`
 	DepartmentIDs []uint `json:"departmentIds"`
+}
+
+// Contract definitions
+type ContractRequest struct {
+	CustomerContactName  string  `json:"customer_contact_name" binding:"required"`
+	CustomerContactPhone string  `json:"customer_contact_phone"`
+	CustomerContactEmail string  `json:"customer_contact_email"`
+	ProjectName          string  `json:"project_name" binding:"required"`
+	ContractNo           string  `json:"contract_no" binding:"required"`
+	StartDate            string  `json:"start_date" binding:"required"` // Format: YYYY-MM-DD
+	EndDate              *string `json:"end_date"`                      // Format: YYYY-MM-DD
+	Status               string  `json:"status"`                        // Defaults to PENDING_PROPOSAL
+}
+
+type ContractResponse struct {
+	ID                   uint    `json:"id"`
+	CreatedAt            string  `json:"created_at"`
+	UpdatedAt            string  `json:"updated_at"`
+	CustomerContactName  string  `json:"customer_contact_name"`
+	CustomerContactPhone string  `json:"customer_contact_phone"`
+	CustomerContactEmail string  `json:"customer_contact_email"`
+	ProjectName          string  `json:"project_name"`
+	ContractNo           string  `json:"contract_no"`
+	StartDate            string  `json:"start_date"`
+	EndDate              *string `json:"end_date"`
+	Status               string  `json:"status"`
 }
