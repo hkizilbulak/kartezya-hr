@@ -493,9 +493,9 @@ type PaginatedResponse struct {
 
 // GradeReportFilter represents the filter criteria for grade report
 type GradeReportFilter struct {
-	CompanyID    *uint `json:"company_id"`
-	DepartmentID *uint `json:"department_id"`
-	IsActive     *bool `json:"is_active"`
+	CompanyID     *uint  `json:"company_id"`
+	DepartmentIDs []uint `json:"department_ids"`
+	IsActive      *bool  `json:"is_active"`
 }
 
 // GradeReportRow represents a single row in the grade report

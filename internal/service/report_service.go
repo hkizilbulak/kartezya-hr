@@ -307,7 +307,7 @@ func (s *reportService) GetEforReport(filter *types.WorkDayReportFilter) (*types
 func (s *reportService) GetGradeReportData(filter *types.GradeReportFilter) (*types.GradeReportResponse, error) {
 	rows, err := s.employeeRepo.GetGradeReportData(
 		filter.CompanyID,
-		filter.DepartmentID,
+		filter.DepartmentIDs,
 		filter.IsActive,
 	)
 	if err != nil {

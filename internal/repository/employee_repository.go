@@ -28,7 +28,7 @@ type EmployeeRepository interface {
 	GetEmployeeCountByCompanyDepartment() ([]interface{}, error)
 	GetEmployeeCountByGrade() ([]interface{}, error)
 	GetWorkDayReportData(startDate, endDate string, companyID *uint, departmentIDs []uint, isActive *bool) ([]types.WorkDayReportRow, error)
-	GetGradeReportData(companyID, departmentID *uint, isActive *bool) ([]types.GradeReportRow, error)
+	GetGradeReportData(companyID *uint, departmentIDs []uint, isActive *bool) ([]types.GradeReportRow, error)
 	GetContractReportData(startDate, endDate string, companyID *uint, departmentIDs []uint, isActive *bool) ([]types.ContractReportRow, error)
 }
 
@@ -1102,7 +1102,7 @@ func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, com
 }
 
 // GetGradeReportData executes the grade report SQL query
-func (r *employeeRepository) GetGradeReportData(companyID, departmentID *uint, isActive *bool) ([]types.GradeReportRow, error) {
+func (r *employeeRepository) GetGradeReportData(companyID *uint, departmentIDs []uint, isActive *bool) ([]types.GradeReportRow, error) {
 	var rows []types.GradeReportRow
 
 	// Build base query with user-provided SQL
@@ -1229,10 +1229,14 @@ WHERE 1=1`
 	}
 
 	// Add department filter if provided
-	if departmentID != nil {
-		query += fmt.Sprintf("\n  AND t.department_id = $%d", paramCounter)
-		params = append(params, *departmentID)
-		paramCounter++
+	if len(departmentIDs) > 0 {
+		placeholders := make([]string, 0, len(departmentIDs))
+		for _, depID := range departmentIDs {
+			placeholders = append(placeholders, fmt.Sprintf("$%d", paramCounter))
+			params = append(params, depID)
+			paramCounter++
+		}
+		query += fmt.Sprintf("\n  AND t.department_id IN (%s)", strings.Join(placeholders, ", "))
 	}
 
 	// Exclude interns (job_position_id = 21)

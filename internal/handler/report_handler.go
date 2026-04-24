@@ -279,11 +279,13 @@ func (h *ReportHandler) GetEforReport(c *gin.Context) {
 // @Security BearerAuth
 // @Param company_id query int false "Filter by company ID"
 // @Param department_id query int false "Filter by department ID"
+// @Param department_ids query []int false "Department IDs (supports repeated param or comma separated)"
 // @Success 200 {object} types.GradeReportResponse
 // @Router /api/reports/grade [get]
 func (h *ReportHandler) GetGradeReport(c *gin.Context) {
 	companyIDStr := c.Query("company_id")
-	departmentIDStr := c.Query("department_id")
+	departmentIDsQuery := c.QueryArray("department_ids")
+	legacyDepartmentID := c.Query("department_id")
 
 	var companyID *uint
 	if companyIDStr != "" {
@@ -296,20 +298,36 @@ func (h *ReportHandler) GetGradeReport(c *gin.Context) {
 		companyID = &uid
 	}
 
-	var departmentID *uint
-	if departmentIDStr != "" {
-		id, err := strconv.ParseUint(departmentIDStr, 10, 32)
+	var departmentIDs []uint
+	if len(departmentIDsQuery) == 1 && strings.Contains(departmentIDsQuery[0], ",") {
+		parts := strings.Split(departmentIDsQuery[0], ",")
+		departmentIDsQuery = parts
+	}
+
+	for _, deptIDStr := range departmentIDsQuery {
+		deptIDStr = strings.TrimSpace(deptIDStr)
+		if deptIDStr != "" {
+			id, err := strconv.ParseUint(deptIDStr, 10, 32)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid department_ids format"})
+				return
+			}
+			departmentIDs = append(departmentIDs, uint(id))
+		}
+	}
+
+	if len(departmentIDs) == 0 && legacyDepartmentID != "" {
+		id, err := strconv.ParseUint(legacyDepartmentID, 10, 32)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid department_id"})
 			return
 		}
-		uid := uint(id)
-		departmentID = &uid
+		departmentIDs = append(departmentIDs, uint(id))
 	}
 
 	filter := &types.GradeReportFilter{
-		CompanyID:    companyID,
-		DepartmentID: departmentID,
+		CompanyID:     companyID,
+		DepartmentIDs: departmentIDs,
 	}
 
 	if isActiveStr := c.Query("is_active"); isActiveStr != "" {
@@ -345,9 +363,16 @@ func (h *ReportHandler) ExportGradeReportExcel(c *gin.Context) {
 		return
 	}
 
+	var departmentIDs []uint
+	if len(req.DepartmentIDs) > 0 {
+		departmentIDs = req.DepartmentIDs
+	} else if req.DepartmentID != nil {
+		departmentIDs = append(departmentIDs, *req.DepartmentID)
+	}
+
 	filter := &types.GradeReportFilter{
-		CompanyID:    req.CompanyID,
-		DepartmentID: req.DepartmentID,
+		CompanyID:     req.CompanyID,
+		DepartmentIDs: departmentIDs,
 	}
 
 	excelFile, err := h.reportService.ExportGradeReportExcel(filter)
