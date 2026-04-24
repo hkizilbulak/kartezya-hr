@@ -502,7 +502,9 @@ func main() {
 			reportRoutes.POST("/work-day/export", authMiddleware.RequireAdmin(), reportHandler.ExportWorkDayReportExcel)
 			reportRoutes.GET("/efor", authMiddleware.RequireAdmin(), reportHandler.GetEforReport)
 			reportRoutes.GET("/grade", authMiddleware.RequireAdmin(), reportHandler.GetGradeReport)
-			reportRoutes.POST("/grade/export", authMiddleware.RequireAdmin(), reportHandler.ExportGradeReportExcel)
+			reportRoutes.POST("/grade/export/excel", authMiddleware.RequireAdmin(), reportHandler.ExportGradeReportExcel)
+			reportRoutes.GET("/contract", authMiddleware.RequireAdmin(), reportHandler.GetContractReport)
+			reportRoutes.POST("/contract/export/excel", authMiddleware.RequireAdmin(), reportHandler.ExportContractReportExcel)
 		}
 
 		// Email routes (Admin only)

@@ -29,6 +29,7 @@ type EmployeeRepository interface {
 	GetEmployeeCountByGrade() ([]interface{}, error)
 	GetWorkDayReportData(startDate, endDate string, companyID *uint, departmentIDs []uint, isActive *bool) ([]types.WorkDayReportRow, error)
 	GetGradeReportData(companyID, departmentID *uint, isActive *bool) ([]types.GradeReportRow, error)
+	GetContractReportData(startDate, endDate string, companyID *uint, departmentIDs []uint, isActive *bool) ([]types.ContractReportRow, error)
 }
 
 type employeeRepository struct {
@@ -1260,6 +1261,68 @@ WHERE 1=1`
 	// Complete the query
 	query += `
 ORDER BY e.id`
+
+	err := r.db.Raw(query, params...).Scan(&rows).Error
+	return rows, err
+}
+
+// GetContractReportData executes the contract report SQL query
+func (r *employeeRepository) GetContractReportData(startDate, endDate string, companyID *uint, departmentIDs []uint, isActive *bool) ([]types.ContractReportRow, error) {
+	var rows []types.ContractReportRow
+
+	query := `
+		SELECT
+			e.id,
+			e.first_name,
+			e.last_name,
+			c.name AS company_name,
+			d.name AS department_name,
+			d.manager AS manager,
+			COALESCE(string_agg(ctr.project_name || ' (' || ctr.contract_no || ')', ', '), '') AS contract_names
+		FROM hr_employees e
+		JOIN hr_employee_work_information wi ON wi.employee_id = e.id AND wi.deleted = false
+			AND wi.id = (
+				SELECT id FROM hr_employee_work_information
+				WHERE employee_id = e.id AND deleted = false
+				ORDER BY start_date DESC LIMIT 1
+			)
+		LEFT JOIN hr_companies c ON c.id = wi.company_id AND c.deleted = false
+		LEFT JOIN hr_departments d ON d.id = wi.department_id AND d.deleted = false
+		LEFT JOIN hr_employee_contracts ec ON ec.employee_id = e.id AND ec.deleted = false
+		LEFT JOIN hr_contracts ctr ON ctr.id = ec.contract_id AND ctr.deleted = false`
+
+	var params []interface{}
+
+	if startDate != "" && endDate != "" {
+		query += " AND ctr.start_date <= ?::date AND (ctr.end_date IS NULL OR ctr.end_date >= ?::date)"
+		params = append(params, endDate, startDate)
+	}
+
+	query += `
+		WHERE e.deleted = false`
+
+	if companyID != nil {
+		query += " AND wi.company_id = ?"
+		params = append(params, *companyID)
+	}
+
+	if len(departmentIDs) > 0 {
+		query += " AND wi.department_id IN ?"
+		params = append(params, departmentIDs)
+	}
+
+	if isActive != nil {
+		if *isActive {
+			query += " AND e.leave_date IS NULL"
+		} else {
+			query += " AND e.leave_date IS NOT NULL"
+		}
+	} else {
+		// Default to active
+		query += " AND e.leave_date IS NULL"
+	}
+
+	query += " GROUP BY e.id, c.name, d.name, d.manager ORDER BY e.id"
 
 	err := r.db.Raw(query, params...).Scan(&rows).Error
 	return rows, err

@@ -17,6 +17,8 @@ type ReportService interface {
 	GetEforReport(filter *types.WorkDayReportFilter) (*types.EforReportResponse, error)
 	GetGradeReportData(filter *types.GradeReportFilter) (*types.GradeReportResponse, error)
 	ExportGradeReportExcel(filter *types.GradeReportFilter) ([]byte, error)
+	GetContractReportData(filter *types.ContractReportFilter) (*types.ContractReportResponse, error)
+	ExportContractReportExcel(request *types.ContractReportExportRequest) ([]byte, error)
 }
 
 type reportService struct {
@@ -379,6 +381,101 @@ func (s *reportService) ExportGradeReportExcel(filter *types.GradeReportFilter) 
 	}
 
 	return buffer.Bytes(), nil
+}
+
+func (s *reportService) GetContractReportData(filter *types.ContractReportFilter) (*types.ContractReportResponse, error) {
+	rows, err := s.employeeRepo.GetContractReportData(filter.StartDate, filter.EndDate, filter.CompanyID, filter.DepartmentIDs, filter.IsActive)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.ContractReportResponse{
+		Rows: rows,
+	}, nil
+}
+
+func (s *reportService) ExportContractReportExcel(request *types.ContractReportExportRequest) ([]byte, error) {
+	// 1. Veriyi çek
+	filter := &types.ContractReportFilter{
+		StartDate:     request.StartDate,
+		EndDate:       request.EndDate,
+		CompanyID:     request.CompanyID,
+		DepartmentIDs: request.DepartmentIDs,
+	}
+
+	resp, err := s.GetContractReportData(filter)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Excel dosyası oluştur
+	f := excelize.NewFile()
+	defer func() {
+		if err := f.Close(); err != nil {
+			fmt.Println(err)
+		}
+	}()
+
+	sheetName := "Sözleşme Raporu"
+	f.SetSheetName("Sheet1", sheetName)
+	f.DeleteSheet("Sheet1") // Silinmeyebilir eğer adı değiştiyse, ama genel uygulama böyle
+
+	// Başlıkları ayarla
+	headerStyle, _ := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{Bold: true, Color: "FFFFFF"},
+		Fill: excelize.Fill{
+			Type:    "pattern",
+			Color:   []string{"4F81BD"},
+			Pattern: 1,
+		},
+	})
+
+	for i, col := range request.ExportColumns {
+		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
+		f.SetCellValue(sheetName, cell, col.Label)
+		f.SetCellStyle(sheetName, cell, cell, headerStyle)
+	}
+
+	for rowIndex, rowData := range resp.Rows {
+		v := reflect.ValueOf(rowData)
+
+		for colIndex, colConfig := range request.ExportColumns {
+			cell, _ := excelize.CoordinatesToCellName(colIndex+1, rowIndex+2)
+
+			// get Field by exact key mapping (need standard json mapping matching)
+			val := ""
+			switch colConfig.Key {
+			case "firstName":
+				val = rowData.FirstName
+			case "lastName":
+				val = rowData.LastName
+			case "companyName":
+				val = rowData.CompanyName
+			case "departmentName":
+				val = rowData.DepartmentName
+			case "manager":
+				val = rowData.Manager
+			case "contractNames":
+				val = rowData.ContractNames
+			default:
+				// Reflection kullanarak key eşitleme denenebilir,
+				// Fakat struct JSON taglari farklı ve Go field isimleri büyük harf.
+				field := v.FieldByName(colConfig.Key)
+				if field.IsValid() {
+					val = fmt.Sprintf("%v", field.Interface())
+				}
+			}
+
+			f.SetCellValue(sheetName, cell, val)
+		}
+	}
+
+	buf, err := f.WriteToBuffer()
+	if err != nil {
+		return nil, fmt.Errorf("could not write excel to buffer: %v", err)
+	}
+
+	return buf.Bytes(), nil
 }
 
 func getFieldValueByJSONKey(row types.WorkDayReportRow, key string) (interface{}, error) {

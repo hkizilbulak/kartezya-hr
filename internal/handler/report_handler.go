@@ -279,10 +279,8 @@ func (h *ReportHandler) GetEforReport(c *gin.Context) {
 // @Security BearerAuth
 // @Param company_id query int false "Filter by company ID"
 // @Param department_id query int false "Filter by department ID"
-// @Success 200 {object} map[string]interface{} "success: true, data: []GradeReportRow"
-// @Failure 401 {object} map[string]interface{}
-// @Failure 403 {object} map[string]interface{}
-// @Router /reports/grade [get]
+// @Success 200 {object} types.GradeReportResponse
+// @Router /api/reports/grade [get]
 func (h *ReportHandler) GetGradeReport(c *gin.Context) {
 	companyIDStr := c.Query("company_id")
 	departmentIDStr := c.Query("department_id")
@@ -360,4 +358,89 @@ func (h *ReportHandler) ExportGradeReportExcel(c *gin.Context) {
 
 	c.Header("Content-Disposition", "attachment; filename=grade-report.xlsx")
 	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", excelFile)
+}
+
+// GetContractReport godoc
+// @Summary Get Contract Report
+// @Description Get contract report with filters
+// @Tags reports
+// @Accept json
+// @Produce json
+// @Param company_id query uint false "Company ID"
+// @Param department_ids query []int false "Department IDs (supports repeated param or comma separated)"
+// @Param is_active query bool false "Is Active (true or false)"
+// @Success 200 {object} types.ContractReportResponse
+// @Router /api/reports/contract [get]
+func (h *ReportHandler) GetContractReport(c *gin.Context) {
+	var filter types.ContractReportFilter
+
+	filter.StartDate = c.Query("start_date")
+	filter.EndDate = c.Query("end_date")
+
+	if companyIDStr := c.Query("company_id"); companyIDStr != "" {
+		if companyID, err := strconv.ParseUint(companyIDStr, 10, 32); err == nil {
+			id := uint(companyID)
+			filter.CompanyID = &id
+		}
+	}
+
+	// Aynı department_ids ayrıştırma mantığı (WorkDayReport'taki gibi)
+	var departmentIDs []uint
+	if depsStr := c.QueryArray("department_ids"); len(depsStr) > 0 {
+		for _, dep := range depsStr {
+			parts := strings.Split(dep, ",")
+			for _, part := range parts {
+				part = strings.TrimSpace(part)
+				if part != "" {
+					if id, err := strconv.ParseUint(part, 10, 32); err == nil {
+						departmentIDs = append(departmentIDs, uint(id))
+					}
+				}
+			}
+		}
+	}
+
+	if len(departmentIDs) > 0 {
+		filter.DepartmentIDs = departmentIDs
+	}
+
+	if isActiveStr := c.Query("is_active"); isActiveStr != "" {
+		isActive := isActiveStr == "true"
+		filter.IsActive = &isActive
+	}
+
+	report, err := h.reportService.GetContractReportData(&filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, report)
+}
+
+// ExportContractReportExcel godoc
+// @Summary Export Contract Report to Excel
+// @Description Creates an Excel file and downloads it
+// @Tags reports
+// @Accept json
+// @Produce application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+// @Param request body types.ContractReportExportRequest true "Export Configuration"
+// @Success 200 {file} file "sozlesme_raporu.xlsx"
+// @Router /api/reports/contract/export/excel [post]
+func (h *ReportHandler) ExportContractReportExcel(c *gin.Context) {
+	var request types.ContractReportExportRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
+		return
+	}
+
+	excelData, err := h.reportService.ExportContractReportExcel(&request)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate Excel file: " + err.Error()})
+		return
+	}
+
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", "attachment; filename=sozlesme_raporu.xlsx")
+	c.Data(http.StatusOK, "application/octet-stream", excelData)
 }

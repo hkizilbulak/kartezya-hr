@@ -552,3 +552,36 @@ type ContractResponse struct {
 	EndDate              *string `json:"end_date"`
 	Status               string  `json:"status"`
 }
+
+// ContractReportFilter represents filters for contract report
+type ContractReportFilter struct {
+	StartDate     string `json:"start_date"`
+	EndDate       string `json:"end_date"`
+	CompanyID     *uint  `json:"company_id"`
+	DepartmentIDs []uint `json:"department_ids"`
+	IsActive      *bool  `json:"is_active"`
+}
+
+// ContractReportRow represents a row in the contract report
+type ContractReportRow struct {
+	ID             uint   `json:"id"`
+	FirstName      string `json:"first_name"`
+	LastName       string `json:"last_name"`
+	CompanyName    string `json:"company_name"`
+	DepartmentName string `json:"department_name"`
+	Manager        string `json:"manager"`
+	ContractNames  string `json:"contract_names"`
+}
+
+type ContractReportResponse struct {
+	Rows []ContractReportRow `json:"rows"`
+}
+
+// ContractReportExportRequest represents export requirements for contract report
+type ContractReportExportRequest struct {
+	StartDate     string         `json:"start_date"`
+	EndDate       string         `json:"end_date"`
+	CompanyID     *uint          `json:"company_id"`
+	DepartmentIDs []uint         `json:"department_ids"`
+	ExportColumns []ColumnConfig `json:"export_columns" binding:"required"`
+}
