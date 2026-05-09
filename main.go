@@ -94,6 +94,7 @@ func main() {
 	attachmentRepo := repository.NewAttachmentRepository(db.DB)
 	expenseRepo := repository.NewExpenseRepository(db.DB)
 	expenseTypeRepo := repository.NewExpenseTypeRepository(db.DB)
+	jobRepo := repository.NewJobRepository(db.DB)
 
 	// Initialize storage provider
 	var storageProvider service.StorageProvider
@@ -137,6 +138,12 @@ func main() {
 	contractService := service.NewContractService(contractRepo, auditService)
 	expenseService := service.NewExpenseService(expenseRepo, expenseTypeRepo, attachmentRepo, employeeRepo, storageProvider, auditService)
 	reportService := service.NewReportService(employeeRepo, workInfoRepo, leaveRepo, holidayRepo, leaveService)
+	jobService := service.NewJobService(jobRepo, auditService)
+
+	// Initialize and start scheduled jobs
+	scheduler := jobs.NewScheduler(db.DB, documentService, jobService)
+	scheduler.Start()
+	defer scheduler.Stop()
 
 	// Initialize handlers
 	authHandler := handler.NewAuthHandler(authService, emailService, userRepo)
@@ -156,11 +163,7 @@ func main() {
 	documentHandler := handler.NewDocumentHandler(documentService)
 	expenseHandler := handler.NewExpenseHandler(expenseService)
 	emailHandler := handler.NewEmailHandler(emailService)
-
-	// Initialize and start scheduled jobs
-	scheduler := jobs.NewScheduler(db.DB, documentService)
-	scheduler.Start()
-	defer scheduler.Stop()
+	jobHandler := handler.NewJobHandler(jobService, scheduler)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -512,6 +515,17 @@ func main() {
 		{
 			emailRoutes.POST("/send", authMiddleware.RequireAdmin(), emailHandler.SendEmail)
 			emailRoutes.POST("/template/send", authMiddleware.RequireAdmin(), emailHandler.SendTemplateEmail)
+		}
+
+		// Job Management routes (Admin only)
+		jobRoutes := protected.Group("/jobs")
+		jobRoutes.Use(authMiddleware.RequireAdmin())
+		{
+			jobRoutes.GET("", jobHandler.GetJobs)
+			jobRoutes.GET("/:id", jobHandler.GetJobByID)
+			jobRoutes.PUT("/:id", jobHandler.UpdateJob)
+			jobRoutes.POST("/:id/run", jobHandler.RunJob)
+			jobRoutes.GET("/:id/history", jobHandler.GetJobHistory)
 		}
 	}
 

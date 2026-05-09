@@ -105,6 +105,8 @@ func (d *Database) Migrate() error {
 		&domain.ExpenseType{},    // Expense Management
 		&domain.ExpenseRequest{}, // Expense Management
 		&domain.Attachment{},     // Document Management System (for all modules)
+		&domain.Job{},            // Job Scheduler
+		&domain.JobHistory{},     // Job Scheduler
 		// Note: AuditLog is excluded - it's created by schema.sql
 	)
 

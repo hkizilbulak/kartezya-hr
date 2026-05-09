@@ -1,0 +1,97 @@
+package repository
+
+import (
+	"errors"
+	"kartezya-hr/internal/domain"
+
+	"gorm.io/gorm"
+)
+
+type JobRepository interface {
+	// Job methods
+	Create(job *domain.Job) error
+	Update(job *domain.Job) error
+	GetByID(id uint) (*domain.Job, error)
+	GetByKey(key string) (*domain.Job, error)
+	GetAll() ([]domain.Job, error)
+	GetActiveJobs() ([]domain.Job, error)
+
+	// JobHistory methods
+	CreateHistory(history *domain.JobHistory) error
+	UpdateHistory(history *domain.JobHistory) error
+	GetHistoryByJobID(jobID uint, limit int) ([]domain.JobHistory, error)
+}
+
+type jobRepository struct {
+	db *gorm.DB
+}
+
+func NewJobRepository(db *gorm.DB) JobRepository {
+	return &jobRepository{db: db}
+}
+
+func (r *jobRepository) Create(job *domain.Job) error {
+	return r.db.Create(job).Error
+}
+
+func (r *jobRepository) Update(job *domain.Job) error {
+	return r.db.Save(job).Error
+}
+
+func (r *jobRepository) GetByID(id uint) (*domain.Job, error) {
+	var job domain.Job
+	if err := r.db.First(&job, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &job, nil
+}
+
+func (r *jobRepository) GetByKey(key string) (*domain.Job, error) {
+	var job domain.Job
+	if err := r.db.Where("job_key = ?", key).First(&job).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &job, nil
+}
+
+func (r *jobRepository) GetAll() ([]domain.Job, error) {
+	var jobs []domain.Job
+	if err := r.db.Order("id asc").Find(&jobs).Error; err != nil {
+		return nil, err
+	}
+	return jobs, nil
+}
+
+func (r *jobRepository) GetActiveJobs() ([]domain.Job, error) {
+	var jobs []domain.Job
+	if err := r.db.Where("is_active = ?", true).Find(&jobs).Error; err != nil {
+		return nil, err
+	}
+	return jobs, nil
+}
+
+func (r *jobRepository) CreateHistory(history *domain.JobHistory) error {
+	return r.db.Create(history).Error
+}
+
+func (r *jobRepository) UpdateHistory(history *domain.JobHistory) error {
+	return r.db.Save(history).Error
+}
+
+func (r *jobRepository) GetHistoryByJobID(jobID uint, limit int) ([]domain.JobHistory, error) {
+	var history []domain.JobHistory
+	query := r.db.Where("job_id = ?", jobID).Order("start_time desc")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if err := query.Find(&history).Error; err != nil {
+		return nil, err
+	}
+	return history, nil
+}

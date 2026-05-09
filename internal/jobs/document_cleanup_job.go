@@ -25,14 +25,15 @@ func NewDocumentCleanupJob(documentService service.DocumentService, hoursOld int
 }
 
 // Run executes the cleanup job
-func (j *DocumentCleanupJob) Run() {
+func (j *DocumentCleanupJob) Run() (int, error) {
 	log.Printf("[DocumentCleanupJob] Starting cleanup of temporary files older than %d hours...", j.hoursOld)
 
 	count, err := j.documentService.CleanupTemporaryFiles(j.hoursOld)
 	if err != nil {
 		log.Printf("[DocumentCleanupJob] Error during cleanup: %v", err)
-		return
+		return 0, err
 	}
 
 	log.Printf("[DocumentCleanupJob] Cleanup completed. %d files removed.", count)
+	return count, nil
 }

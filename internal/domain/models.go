@@ -583,3 +583,41 @@ type ExpenseType struct {
 func (ExpenseType) TableName() string {
 	return GetTableName("hr_expense_types")
 }
+
+// ==================== Job Scheduler ====================
+
+// Job represents a scheduled background task
+type Job struct {
+	AuditableModel
+	JobKey         string `json:"job_key" gorm:"size:100;uniqueIndex;not null"`
+	Name           string `json:"name" gorm:"size:255;not null"`
+	CronExpression string `json:"cron_expression" gorm:"size:100;not null"`
+	IsActive       bool   `json:"is_active" gorm:"default:true"`
+	TimeoutSecond  int    `json:"timeout_second" gorm:"default:3600"`
+
+	// Relationships
+	Histories []JobHistory `json:"histories,omitempty" gorm:"foreignKey:JobID"`
+}
+
+func (Job) TableName() string {
+	return GetTableName("hr_jobs")
+}
+
+// JobHistory logs the execution of a scheduled job
+type JobHistory struct {
+	ID             uint       `json:"id" gorm:"primaryKey"`
+	JobID          uint       `json:"job_id" gorm:"not null;index"`
+	StartTime      time.Time  `json:"start_time" gorm:"not null;index"`
+	EndTime        *time.Time `json:"end_time"`
+	ProcessedCount int        `json:"processed_count" gorm:"default:0"`
+	Status         string     `json:"status" gorm:"size:20;not null;index"` // SUCCESS, FAILED, RUNNING, TIMEOUT
+	ErrorSummary   string     `json:"error_summary" gorm:"type:text"`
+	ExecutionNode  string     `json:"execution_node" gorm:"size:255"`
+
+	// Relationships
+	Job Job `json:"job,omitempty" gorm:"foreignKey:JobID"`
+}
+
+func (JobHistory) TableName() string {
+	return GetTableName("hr_job_history")
+}

@@ -17,7 +17,7 @@ func NewLeaveBalanceJob(db *gorm.DB) *LeaveBalanceJob {
 }
 
 // Run executes the leave balance update job
-func (j *LeaveBalanceJob) Run() {
+func (j *LeaveBalanceJob) Run() (int, error) {
 	log.Println("[LeaveBalanceJob] Starting annual leave balance update...")
 
 	query := `
@@ -98,8 +98,9 @@ WHERE u.employee_id IS NULL;
 	result := j.db.Exec(query)
 	if result.Error != nil {
 		log.Printf("[LeaveBalanceJob] Error: %v", result.Error)
-		return
+		return 0, result.Error
 	}
 
 	log.Printf("[LeaveBalanceJob] Completed successfully. Rows affected: %d", result.RowsAffected)
+	return int(result.RowsAffected), nil
 }
