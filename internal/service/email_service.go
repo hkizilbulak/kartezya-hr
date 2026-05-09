@@ -29,6 +29,7 @@ type EmailService interface {
 	ResetPassword(token string, newPassword string, authService AuthService) error
 	ValidatePasswordResetToken(token string) (*domain.User, error)
 	SendCustomEmail(to []string, subject string, htmlBody string) error
+	SendTemplateEmail(to []string, subject string, templateId string, variables map[string]interface{}) error
 }
 
 type emailService struct {
@@ -187,6 +188,23 @@ func (s *emailService) SendCustomEmail(to []string, subject string, htmlBody str
 	return nil
 }
 
+// SendTemplateEmail sends an email using a predefined template.
+// Currently only supported by the Resend provider.
+func (s *emailService) SendTemplateEmail(to []string, subject string, templateId string, variables map[string]interface{}) error {
+	if len(to) == 0 {
+		return fmt.Errorf("at least one recipient is required")
+	}
+	if templateId == "" {
+		return fmt.Errorf("template_id is required")
+	}
+
+	if s.config.Email.Provider == "resend" {
+		return s.sendViaResendTemplate(to, subject, templateId, variables)
+	}
+
+	return fmt.Errorf("template emails are currently only supported with the resend provider")
+}
+
 // sendViaResend sends email using Resend HTTP API (https://resend.com)
 // Works on Railway and other cloud platforms that block SMTP ports.
 func (s *emailService) sendViaResend(to []string, subject, htmlBody string) error {
@@ -226,6 +244,57 @@ func (s *emailService) sendViaResend(to []string, subject, htmlBody string) erro
 	}
 
 	log.Printf("Email sent via Resend to: %v\n", to)
+	return nil
+}
+
+// sendViaResendTemplate sends email using Resend HTTP API with a template
+func (s *emailService) sendViaResendTemplate(to []string, subject string, templateId string, variables map[string]interface{}) error {
+	if s.config.Email.ResendAPIKey == "" {
+		return fmt.Errorf("RESEND_API_KEY is not configured")
+	}
+
+	if variables == nil {
+		variables = make(map[string]interface{})
+	}
+
+	payload := map[string]interface{}{
+		"from":    fmt.Sprintf("%s <%s>", s.config.Email.FromName, s.config.Email.FromEmail),
+		"to":      to,
+		"template": map[string]interface{}{
+			"id":        templateId,
+			"variables": variables,
+		},
+	}
+
+	if subject != "" {
+		payload["subject"] = subject
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal resend payload: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", "https://api.resend.com/emails", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to create resend request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+s.config.Email.ResendAPIKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("resend HTTP request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("resend API error (status %d): %s", resp.StatusCode, string(respBody))
+	}
+
+	log.Printf("Template email sent via Resend to: %v (template: %s)\n", to, templateId)
 	return nil
 }
 

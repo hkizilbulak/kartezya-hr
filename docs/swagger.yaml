@@ -695,17 +695,13 @@ definitions:
     type: object
   handler.CreateEmployeeContractRequest:
     properties:
-      contract_no:
-        type: string
+      contract_id:
+        type: integer
       employee_id:
         type: integer
-      end_date:
-        type: string
-      start_date:
-        type: string
     required:
+    - contract_id
     - employee_id
-    - start_date
     type: object
   handler.CreateEmployeeGradeRequest:
     properties:
@@ -906,7 +902,13 @@ definitions:
     type: object
   handler.DashboardDataResponse:
     properties:
+      paid_expenses:
+        type: integer
+      pending_expense_requests:
+        type: integer
       pending_leave_requests:
+        type: integer
+      pending_payment_expenses:
         type: integer
       total_companies:
         type: integer
@@ -1037,6 +1039,27 @@ definitions:
     - last_name
     - user_id
     type: object
+  handler.SendTemplateEmailRequest:
+    properties:
+      subject:
+        example: Bilgilendirme
+        type: string
+      template_id:
+        example: b36f6d63-5477-4c7b-b5d1-67ec5d69ba2a
+        type: string
+      to:
+        example:
+        - '["user@example.com"]'
+        items:
+          type: string
+        minItems: 1
+        type: array
+      variables:
+        type: object
+    required:
+    - template_id
+    - to
+    type: object
   handler.UpdateCompanyRequest:
     properties:
       address:
@@ -1066,17 +1089,13 @@ definitions:
     type: object
   handler.UpdateEmployeeContractRequest:
     properties:
-      contract_no:
-        type: string
+      contract_id:
+        type: integer
       employee_id:
         type: integer
-      end_date:
-        type: string
-      start_date:
-        type: string
     required:
+    - contract_id
     - employee_id
-    - start_date
     type: object
   handler.UpdateEmployeeGradeRequest:
     properties:
@@ -1419,6 +1438,74 @@ definitions:
       website:
         type: string
     type: object
+  types.ContractReportExportRequest:
+    properties:
+      company_id:
+        type: integer
+      department_ids:
+        items:
+          type: integer
+        type: array
+      end_date:
+        type: string
+      export_columns:
+        items:
+          $ref: '#/definitions/types.ColumnConfig'
+        type: array
+      start_date:
+        type: string
+    required:
+    - export_columns
+    type: object
+  types.ContractReportResponse:
+    properties:
+      rows:
+        items:
+          $ref: '#/definitions/types.ContractReportRow'
+        type: array
+    type: object
+  types.ContractReportRow:
+    properties:
+      company_name:
+        type: string
+      contract_names:
+        type: string
+      department_name:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: integer
+      last_name:
+        type: string
+      manager:
+        type: string
+    type: object
+  types.ContractResponse:
+    properties:
+      contract_no:
+        type: string
+      created_at:
+        type: string
+      customer_contact_email:
+        type: string
+      customer_contact_name:
+        type: string
+      customer_contact_phone:
+        type: string
+      end_date:
+        type: string
+      id:
+        type: integer
+      project_name:
+        type: string
+      start_date:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+    type: object
   types.DepartmentLookup:
     properties:
       id:
@@ -1449,10 +1536,74 @@ definitions:
       updated_at:
         type: string
     type: object
+  types.EforReportResponse:
+    properties:
+      end_date:
+        type: string
+      rows:
+        items:
+          $ref: '#/definitions/types.EforReportRow'
+        type: array
+      start_date:
+        type: string
+      total_work_days:
+        type: number
+    type: object
+  types.EforReportRow:
+    properties:
+      april:
+        type: number
+      august:
+        type: number
+      company_name:
+        type: string
+      current_grade:
+        type: string
+      december:
+        type: number
+      department_name:
+        type: string
+      february:
+        type: number
+      first_name:
+        type: string
+      grade:
+        type: string
+      id:
+        type: integer
+      identity_no:
+        type: string
+      january:
+        type: number
+      july:
+        type: number
+      june:
+        type: number
+      last_name:
+        type: string
+      manager:
+        type: string
+      march:
+        type: number
+      may:
+        type: number
+      november:
+        type: number
+      october:
+        type: number
+      rate:
+        type: string
+      september:
+        type: number
+      worked_days:
+        type: number
+    type: object
   types.EmployeeContractResponse:
     properties:
-      contract_no:
-        type: string
+      contract:
+        $ref: '#/definitions/types.ContractResponse'
+      contract_id:
+        type: integer
       created_at:
         type: string
       created_by:
@@ -1461,13 +1612,9 @@ definitions:
         type: boolean
       employee:
         $ref: '#/definitions/types.EmployeeLookup'
-      end_date:
-        type: string
       id:
         type: integer
       modified_by:
-        type: string
-      start_date:
         type: string
       updated_at:
         type: string
@@ -1540,6 +1687,53 @@ definitions:
         type: integer
       name:
         type: string
+    type: object
+  types.GradeReportExportRequest:
+    properties:
+      companyId:
+        type: integer
+      departmentId:
+        type: integer
+      departmentIds:
+        items:
+          type: integer
+        type: array
+    type: object
+  types.GradeReportResponse:
+    properties:
+      rows:
+        items:
+          $ref: '#/definitions/types.GradeReportRow'
+        type: array
+    type: object
+  types.GradeReportRow:
+    properties:
+      company_name:
+        type: string
+      current_grade:
+        type: string
+      department_name:
+        type: string
+      expected_grade:
+        type: string
+      first_name:
+        type: string
+      hire_date:
+        type: string
+      id:
+        type: integer
+      last_name:
+        type: string
+      manager:
+        type: string
+      profession_start_date:
+        type: string
+      team_start_date:
+        type: string
+      total_experience_text:
+        type: string
+      total_gap:
+        type: number
     type: object
   types.GradeResponse:
     properties:
@@ -1709,6 +1903,8 @@ definitions:
     properties:
       company_name:
         type: string
+      current_grade:
+        type: string
       department_name:
         type: string
       first_name:
@@ -1830,6 +2026,93 @@ info:
   title: Kartezya HR Management System API
   version: "1.0"
 paths:
+  /api/reports/contract:
+    get:
+      consumes:
+      - application/json
+      description: Get contract report with filters
+      parameters:
+      - description: Company ID
+        in: query
+        name: company_id
+        type: integer
+      - collectionFormat: csv
+        description: Department IDs (supports repeated param or comma separated)
+        in: query
+        items:
+          type: integer
+        name: department_ids
+        type: array
+      - description: Is Active (true or false)
+        in: query
+        name: is_active
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.ContractReportResponse'
+      summary: Get Contract Report
+      tags:
+      - reports
+  /api/reports/contract/export/excel:
+    post:
+      consumes:
+      - application/json
+      description: Creates an Excel file and downloads it
+      parameters:
+      - description: Export Configuration
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/types.ContractReportExportRequest'
+      produces:
+      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      responses:
+        "200":
+          description: sozlesme_raporu.xlsx
+          schema:
+            type: file
+      summary: Export Contract Report to Excel
+      tags:
+      - reports
+  /api/reports/grade:
+    get:
+      consumes:
+      - application/json
+      description: Get employee count grouped by grade with optional company and department
+        filters (Admin only)
+      parameters:
+      - description: Filter by company ID
+        in: query
+        name: company_id
+        type: integer
+      - description: Filter by department ID
+        in: query
+        name: department_id
+        type: integer
+      - collectionFormat: csv
+        description: Department IDs (supports repeated param or comma separated)
+        in: query
+        items:
+          type: integer
+        name: department_ids
+        type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.GradeReportResponse'
+      security:
+      - BearerAuth: []
+      summary: Get grade distribution report
+      tags:
+      - reports
   /auth/change-password:
     post:
       consumes:
@@ -2695,6 +2978,51 @@ paths:
       security:
       - BearerAuth: []
       summary: Send custom email
+      tags:
+      - email
+  /email/template/send:
+    post:
+      consumes:
+      - application/json
+      description: Send an email using a predefined template (Admin only)
+      parameters:
+      - description: Template email request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.SendTemplateEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.SendEmailResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Send template email
       tags:
       - email
   /employee-contracts:
@@ -5543,42 +5871,101 @@ paths:
       summary: Get all roles for lookup
       tags:
       - Lookup
-  /reports/grade:
+  /reports/efor:
     get:
       consumes:
       - application/json
-      description: Get employee count grouped by grade with optional company and department
-        filters (Admin only)
+      description: Get efor report with filters
       parameters:
-      - description: Filter by company ID
+      - description: Start Date (YYYY-MM-DD)
+        in: query
+        name: start_date
+        required: true
+        type: string
+      - description: End Date (YYYY-MM-DD)
+        in: query
+        name: end_date
+        required: true
+        type: string
+      - description: Company ID
         in: query
         name: company_id
         type: integer
-      - description: Filter by department ID
+      - collectionFormat: csv
+        description: 'Department IDs (supports repeated param or comma separated),
+          example: department_ids=1&department_ids=2 or department_ids=1,2'
+        in: query
+        items:
+          type: integer
+        name: department_ids
+        type: array
+      - description: Legacy single department ID (backward compatibility)
         in: query
         name: department_id
         type: integer
+      - default: true
+        description: Is Active
+        in: query
+        name: is_active
+        type: boolean
       produces:
       - application/json
       responses:
         "200":
-          description: 'success: true, data: []GradeReportRow'
+          description: OK
           schema:
-            additionalProperties: true
+            $ref: '#/definitions/types.EforReportResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
             type: object
-        "401":
-          description: Unauthorized
+        "500":
+          description: Internal Server Error
           schema:
-            additionalProperties: true
-            type: object
-        "403":
-          description: Forbidden
-          schema:
-            additionalProperties: true
+            additionalProperties:
+              type: string
             type: object
       security:
       - BearerAuth: []
-      summary: Get grade distribution report
+      summary: Get Efor Report
+      tags:
+      - reports
+  /reports/grade/export:
+    post:
+      consumes:
+      - application/json
+      description: Export grade report data as an Excel file (Admin only)
+      parameters:
+      - description: Export request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/types.GradeReportExportRequest'
+      produces:
+      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Export Grade Report as Excel
       tags:
       - reports
   /reports/work-day:

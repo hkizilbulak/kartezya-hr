@@ -22,6 +22,139 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/reports/contract": {
+            "get": {
+                "description": "Get contract report with filters",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "reports"
+                ],
+                "summary": "Get Contract Report",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Company ID",
+                        "name": "company_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Department IDs (supports repeated param or comma separated)",
+                        "name": "department_ids",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Is Active (true or false)",
+                        "name": "is_active",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.ContractReportResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/reports/contract/export/excel": {
+            "post": {
+                "description": "Creates an Excel file and downloads it",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ],
+                "tags": [
+                    "reports"
+                ],
+                "summary": "Export Contract Report to Excel",
+                "parameters": [
+                    {
+                        "description": "Export Configuration",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.ContractReportExportRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "sozlesme_raporu.xlsx",
+                        "schema": {
+                            "type": "file"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/reports/grade": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get employee count grouped by grade with optional company and department filters (Admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "reports"
+                ],
+                "summary": "Get grade distribution report",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Filter by company ID",
+                        "name": "company_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by department ID",
+                        "name": "department_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Department IDs (supports repeated param or comma separated)",
+                        "name": "department_ids",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.GradeReportResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/change-password": {
             "post": {
                 "security": [
@@ -1393,6 +1526,81 @@ const docTemplate = `{
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/handler.SendEmailRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.SendEmailResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/email/template/send": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Send an email using a predefined template (Admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "email"
+                ],
+                "summary": "Send template email",
+                "parameters": [
+                    {
+                        "description": "Template email request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.SendTemplateEmailRequest"
                         }
                     }
                 ],
@@ -6005,14 +6213,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/reports/grade": {
+        "/reports/efor": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get employee count grouped by grade with optional company and department filters (Admin only)",
+                "description": "Get efor report with filters",
                 "consumes": [
                     "application/json"
                 ],
@@ -6022,41 +6230,132 @@ const docTemplate = `{
                 "tags": [
                     "reports"
                 ],
-                "summary": "Get grade distribution report",
+                "summary": "Get Efor Report",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "Start Date (YYYY-MM-DD)",
+                        "name": "start_date",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "End Date (YYYY-MM-DD)",
+                        "name": "end_date",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
                         "type": "integer",
-                        "description": "Filter by company ID",
+                        "description": "Company ID",
                         "name": "company_id",
                         "in": "query"
                     },
                     {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Department IDs (supports repeated param or comma separated), example: department_ids=1\u0026department_ids=2 or department_ids=1,2",
+                        "name": "department_ids",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
-                        "description": "Filter by department ID",
+                        "description": "Legacy single department ID (backward compatibility)",
                         "name": "department_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Is Active",
+                        "name": "is_active",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "success: true, data: []GradeReportRow",
+                        "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/types.EforReportResponse"
                         }
                     },
-                    "401": {
-                        "description": "Unauthorized",
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "additionalProperties": true
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
-                    "403": {
-                        "description": "Forbidden",
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "additionalProperties": true
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/reports/grade/export": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Export grade report data as an Excel file (Admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ],
+                "tags": [
+                    "reports"
+                ],
+                "summary": "Export Grade Report as Excel",
+                "parameters": [
+                    {
+                        "description": "Export request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.GradeReportExportRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     }
                 }
@@ -7673,21 +7972,15 @@ const docTemplate = `{
         "handler.CreateEmployeeContractRequest": {
             "type": "object",
             "required": [
-                "employee_id",
-                "start_date"
+                "contract_id",
+                "employee_id"
             ],
             "properties": {
-                "contract_no": {
-                    "type": "string"
+                "contract_id": {
+                    "type": "integer"
                 },
                 "employee_id": {
                     "type": "integer"
-                },
-                "end_date": {
-                    "type": "string"
-                },
-                "start_date": {
-                    "type": "string"
                 }
             }
         },
@@ -7985,7 +8278,16 @@ const docTemplate = `{
         "handler.DashboardDataResponse": {
             "type": "object",
             "properties": {
+                "paid_expenses": {
+                    "type": "integer"
+                },
+                "pending_expense_requests": {
+                    "type": "integer"
+                },
                 "pending_leave_requests": {
+                    "type": "integer"
+                },
+                "pending_payment_expenses": {
                     "type": "integer"
                 },
                 "total_companies": {
@@ -8182,6 +8484,36 @@ const docTemplate = `{
                 }
             }
         },
+        "handler.SendTemplateEmailRequest": {
+            "type": "object",
+            "required": [
+                "template_id",
+                "to"
+            ],
+            "properties": {
+                "subject": {
+                    "type": "string",
+                    "example": "Bilgilendirme"
+                },
+                "template_id": {
+                    "type": "string",
+                    "example": "b36f6d63-5477-4c7b-b5d1-67ec5d69ba2a"
+                },
+                "to": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "[\"user@example.com\"]"
+                    ]
+                },
+                "variables": {
+                    "type": "object"
+                }
+            }
+        },
         "handler.UpdateCompanyRequest": {
             "type": "object",
             "required": [
@@ -8226,21 +8558,15 @@ const docTemplate = `{
         "handler.UpdateEmployeeContractRequest": {
             "type": "object",
             "required": [
-                "employee_id",
-                "start_date"
+                "contract_id",
+                "employee_id"
             ],
             "properties": {
-                "contract_no": {
-                    "type": "string"
+                "contract_id": {
+                    "type": "integer"
                 },
                 "employee_id": {
                     "type": "integer"
-                },
-                "end_date": {
-                    "type": "string"
-                },
-                "start_date": {
-                    "type": "string"
                 }
             }
         },
@@ -8756,6 +9082,110 @@ const docTemplate = `{
                 }
             }
         },
+        "types.ContractReportExportRequest": {
+            "type": "object",
+            "required": [
+                "export_columns"
+            ],
+            "properties": {
+                "company_id": {
+                    "type": "integer"
+                },
+                "department_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "end_date": {
+                    "type": "string"
+                },
+                "export_columns": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.ColumnConfig"
+                    }
+                },
+                "start_date": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.ContractReportResponse": {
+            "type": "object",
+            "properties": {
+                "rows": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.ContractReportRow"
+                    }
+                }
+            }
+        },
+        "types.ContractReportRow": {
+            "type": "object",
+            "properties": {
+                "company_name": {
+                    "type": "string"
+                },
+                "contract_names": {
+                    "type": "string"
+                },
+                "department_name": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "manager": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.ContractResponse": {
+            "type": "object",
+            "properties": {
+                "contract_no": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "customer_contact_email": {
+                    "type": "string"
+                },
+                "customer_contact_name": {
+                    "type": "string"
+                },
+                "customer_contact_phone": {
+                    "type": "string"
+                },
+                "end_date": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "project_name": {
+                    "type": "string"
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "types.DepartmentLookup": {
             "type": "object",
             "properties": {
@@ -8802,11 +9232,108 @@ const docTemplate = `{
                 }
             }
         },
+        "types.EforReportResponse": {
+            "type": "object",
+            "properties": {
+                "end_date": {
+                    "type": "string"
+                },
+                "rows": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.EforReportRow"
+                    }
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "total_work_days": {
+                    "type": "number"
+                }
+            }
+        },
+        "types.EforReportRow": {
+            "type": "object",
+            "properties": {
+                "april": {
+                    "type": "number"
+                },
+                "august": {
+                    "type": "number"
+                },
+                "company_name": {
+                    "type": "string"
+                },
+                "current_grade": {
+                    "type": "string"
+                },
+                "december": {
+                    "type": "number"
+                },
+                "department_name": {
+                    "type": "string"
+                },
+                "february": {
+                    "type": "number"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "grade": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "identity_no": {
+                    "type": "string"
+                },
+                "january": {
+                    "type": "number"
+                },
+                "july": {
+                    "type": "number"
+                },
+                "june": {
+                    "type": "number"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "manager": {
+                    "type": "string"
+                },
+                "march": {
+                    "type": "number"
+                },
+                "may": {
+                    "type": "number"
+                },
+                "november": {
+                    "type": "number"
+                },
+                "october": {
+                    "type": "number"
+                },
+                "rate": {
+                    "type": "string"
+                },
+                "september": {
+                    "type": "number"
+                },
+                "worked_days": {
+                    "type": "number"
+                }
+            }
+        },
         "types.EmployeeContractResponse": {
             "type": "object",
             "properties": {
-                "contract_no": {
-                    "type": "string"
+                "contract": {
+                    "$ref": "#/definitions/types.ContractResponse"
+                },
+                "contract_id": {
+                    "type": "integer"
                 },
                 "created_at": {
                     "type": "string"
@@ -8820,16 +9347,10 @@ const docTemplate = `{
                 "employee": {
                     "$ref": "#/definitions/types.EmployeeLookup"
                 },
-                "end_date": {
-                    "type": "string"
-                },
                 "id": {
                     "type": "integer"
                 },
                 "modified_by": {
-                    "type": "string"
-                },
-                "start_date": {
                     "type": "string"
                 },
                 "updated_at": {
@@ -8940,6 +9461,78 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                }
+            }
+        },
+        "types.GradeReportExportRequest": {
+            "type": "object",
+            "properties": {
+                "companyId": {
+                    "type": "integer"
+                },
+                "departmentId": {
+                    "type": "integer"
+                },
+                "departmentIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "types.GradeReportResponse": {
+            "type": "object",
+            "properties": {
+                "rows": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.GradeReportRow"
+                    }
+                }
+            }
+        },
+        "types.GradeReportRow": {
+            "type": "object",
+            "properties": {
+                "company_name": {
+                    "type": "string"
+                },
+                "current_grade": {
+                    "type": "string"
+                },
+                "department_name": {
+                    "type": "string"
+                },
+                "expected_grade": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "hire_date": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "manager": {
+                    "type": "string"
+                },
+                "profession_start_date": {
+                    "type": "string"
+                },
+                "team_start_date": {
+                    "type": "string"
+                },
+                "total_experience_text": {
+                    "type": "string"
+                },
+                "total_gap": {
+                    "type": "number"
                 }
             }
         },
@@ -9196,6 +9789,9 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "company_name": {
+                    "type": "string"
+                },
+                "current_grade": {
                     "type": "string"
                 },
                 "department_name": {

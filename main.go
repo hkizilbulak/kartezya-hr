@@ -511,6 +511,7 @@ func main() {
 		emailRoutes := protected.Group("/email")
 		{
 			emailRoutes.POST("/send", authMiddleware.RequireAdmin(), emailHandler.SendEmail)
+			emailRoutes.POST("/template/send", authMiddleware.RequireAdmin(), emailHandler.SendTemplateEmail)
 		}
 	}
 
