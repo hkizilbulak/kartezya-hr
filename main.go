@@ -95,6 +95,8 @@ func main() {
 	expenseRepo := repository.NewExpenseRepository(db.DB)
 	expenseTypeRepo := repository.NewExpenseTypeRepository(db.DB)
 	jobRepo := repository.NewJobRepository(db.DB)
+	eventRepo := repository.NewEventRepository(db.DB)
+	eventParticipantRepo := repository.NewEventParticipantRepository(db.DB)
 
 	// Initialize storage provider
 	var storageProvider service.StorageProvider
@@ -139,6 +141,7 @@ func main() {
 	expenseService := service.NewExpenseService(expenseRepo, expenseTypeRepo, attachmentRepo, employeeRepo, storageProvider, auditService)
 	reportService := service.NewReportService(employeeRepo, workInfoRepo, leaveRepo, holidayRepo, leaveService)
 	jobService := service.NewJobService(jobRepo, auditService)
+	eventService := service.NewEventService(eventRepo, eventParticipantRepo, userRepo, employeeRepo, emailService)
 
 	// Initialize and start scheduled jobs
 	scheduler := jobs.NewScheduler(db.DB, documentService, jobService)
@@ -164,6 +167,7 @@ func main() {
 	expenseHandler := handler.NewExpenseHandler(expenseService)
 	emailHandler := handler.NewEmailHandler(emailService)
 	jobHandler := handler.NewJobHandler(jobService, scheduler)
+	eventHandler := handler.NewEventHandler(eventService)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -515,6 +519,22 @@ func main() {
 		{
 			emailRoutes.POST("/send", authMiddleware.RequireAdmin(), emailHandler.SendEmail)
 			emailRoutes.POST("/template/send", authMiddleware.RequireAdmin(), emailHandler.SendTemplateEmail)
+		}
+
+		// Event Management routes
+		eventRoutes := protected.Group("/events")
+		{
+			// Portal routes
+			eventRoutes.GET("/dashboard", eventHandler.GetDashboardEvents)
+			eventRoutes.POST("/:id/participate", eventHandler.ParticipateInEvent)
+
+			// Admin only routes
+			eventRoutes.GET("", authMiddleware.RequireAdmin(), eventHandler.GetEvents)
+			eventRoutes.POST("", authMiddleware.RequireAdmin(), eventHandler.CreateEvent)
+			eventRoutes.PUT("/:id", authMiddleware.RequireAdmin(), eventHandler.UpdateEvent)
+			eventRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), eventHandler.DeleteEvent)
+			eventRoutes.POST("/:id/publish", authMiddleware.RequireAdmin(), eventHandler.PublishEvent)
+			eventRoutes.GET("/:id/participants/export", authMiddleware.RequireAdmin(), eventHandler.ExportParticipants)
 		}
 
 		// Job Management routes (Admin only)
