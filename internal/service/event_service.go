@@ -14,15 +14,15 @@ import (
 )
 
 type EventService interface {
-	CreateEvent(event *domain.Event, createdBy string) error
-	UpdateEvent(event *domain.Event, modifiedBy string) error
+	CreateEvent(event *domain.Event, targetEmployeeIDs []uint, createdBy string) error
+	UpdateEvent(event *domain.Event, targetEmployeeIDs []uint, modifiedBy string) error
 	GetEvent(id uint) (*domain.Event, error)
 	GetAllEvents(limit, offset int, sortParams types.SortParams) ([]*domain.Event, int64, error)
 	DeleteEvent(id uint, deletedBy string) error
 
 	PublishEvent(id uint, modifiedBy string) error
 	
-	GetActiveEventsForDashboard(userID uint, audience string) ([]*domain.Event, error)
+	GetActiveEventsForDashboard(userID uint) ([]*domain.Event, error)
 	ParticipateInEvent(eventId uint, userId uint, status domain.ParticipantStatus, companionCount int) error
 
 	ExportEventParticipants(eventId uint) ([]byte, error)
@@ -52,12 +52,20 @@ func NewEventService(
 	}
 }
 
-func (s *eventService) CreateEvent(event *domain.Event, createdBy string) error {
-	return s.eventRepo.Create(event, createdBy)
+func (s *eventService) CreateEvent(event *domain.Event, targetEmployeeIDs []uint, createdBy string) error {
+	err := s.eventRepo.Create(event, createdBy)
+	if err != nil {
+		return err
+	}
+	return s.syncTargetEmployees(event.ID, targetEmployeeIDs, createdBy)
 }
 
-func (s *eventService) UpdateEvent(event *domain.Event, modifiedBy string) error {
-	return s.eventRepo.Update(event, modifiedBy)
+func (s *eventService) UpdateEvent(event *domain.Event, targetEmployeeIDs []uint, modifiedBy string) error {
+	err := s.eventRepo.Update(event, modifiedBy)
+	if err != nil {
+		return err
+	}
+	return s.syncTargetEmployees(event.ID, targetEmployeeIDs, modifiedBy)
 }
 
 func (s *eventService) GetEvent(id uint) (*domain.Event, error) {
@@ -86,32 +94,54 @@ func (s *eventService) PublishEvent(id uint, modifiedBy string) error {
 	// Send Email using Resend template if configured
 	if event.ResendTemplateId != "" {
 		// Get target audience emails. For simplicity, we get all active employees' emails.
-		// If AudienceFilter is specific, you would filter here.
-		filters := map[string]interface{}{
-			"status": "ACTIVE",
-		}
-		
-		employees, _, err := s.employeeRepo.GetAllWithFilters(10000, 0, types.SortParams{Sort: "id", Direction: "ASC"}, filters)
-		if err == nil && len(employees) > 0 {
-			var emails []string
-			for _, emp := range employees {
-				if emp.CompanyEmail != "" {
-					emails = append(emails, emp.CompanyEmail)
-				} else if emp.Email != "" {
-					emails = append(emails, emp.Email)
+		if event.AudienceFilter == domain.EventAudienceAllCompany {
+			filters := map[string]interface{}{
+				"status": "ACTIVE",
+			}
+			employees, _, err := s.employeeRepo.GetAllWithFilters(10000, 0, types.SortParams{Sort: "id", Direction: "ASC"}, filters)
+			if err == nil && len(employees) > 0 {
+				var emails []string
+				for _, emp := range employees {
+					if emp.CompanyEmail != "" {
+						emails = append(emails, emp.CompanyEmail)
+					} else if emp.Email != "" {
+						emails = append(emails, emp.Email)
+					}
+				}
+
+				if len(emails) > 0 {
+					variables := map[string]interface{}{
+						"event_name":  event.Name,
+						"date":        event.StartDate.Format("02.01.2006 15:04"),
+						"location":    event.Location,
+					}
+					_ = s.emailService.SendTemplateEmail(emails, "Yeni Etkinlik: "+event.Name, event.ResendTemplateId, variables)
 				}
 			}
-
-			if len(emails) > 0 {
-				variables := map[string]interface{}{
-					"event_name":  event.Name,
-					"date":        event.StartDate.Format("02.01.2006 15:04"),
-					"location":    event.Location,
-					// "portal_link": "https://portal.domain.com/events", // Configurable
+		} else {
+			// Targeted audience, fetch participants
+			participants, err := s.eventParticipantRepo.GetByEventID(event.ID)
+			if err == nil && len(participants) > 0 {
+				var emails []string
+				for _, p := range participants {
+					if p.User != nil && p.User.Employee != nil {
+						emp := p.User.Employee
+						if emp.CompanyEmail != "" {
+							emails = append(emails, emp.CompanyEmail)
+						} else if emp.Email != "" {
+							emails = append(emails, emp.Email)
+						}
+					}
 				}
-				
-				// Send to all emails. Note: In production, batching is better.
-				_ = s.emailService.SendTemplateEmail(emails, "Yeni Etkinlik: "+event.Name, event.ResendTemplateId, variables)
+
+				if len(emails) > 0 {
+					variables := map[string]interface{}{
+						"event_name":  event.Name,
+						"date":        event.StartDate.Format("02.01.2006 15:04"),
+						"location":    event.Location,
+					}
+					_ = s.emailService.SendTemplateEmail(emails, "Yeni Etkinlik: "+event.Name, event.ResendTemplateId, variables)
+				}
 			}
 		}
 	} else {
@@ -121,9 +151,9 @@ func (s *eventService) PublishEvent(id uint, modifiedBy string) error {
 	return nil
 }
 
-func (s *eventService) GetActiveEventsForDashboard(userID uint, audience string) ([]*domain.Event, error) {
+func (s *eventService) GetActiveEventsForDashboard(userID uint) ([]*domain.Event, error) {
 	// Active published events
-	events, err := s.eventRepo.GetActiveEventsForDashboard(audience)
+	events, err := s.eventRepo.GetActiveEventsForDashboard(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -269,4 +299,65 @@ func (s *eventService) ExportEventParticipants(eventId uint) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+func (s *eventService) syncTargetEmployees(eventID uint, targetEmployeeIDs []uint, modifiedBy string) error {
+	if targetEmployeeIDs == nil {
+		targetEmployeeIDs = []uint{}
+	}
+
+	// Fetch existing participants
+	existingParticipants, err := s.eventParticipantRepo.GetByEventID(eventID)
+	if err != nil {
+		return err
+	}
+
+	existingUserIDs := make(map[uint]*domain.EventParticipant)
+	for i, p := range existingParticipants {
+		existingUserIDs[p.UserID] = existingParticipants[i]
+	}
+
+	// Fetch target employees to get their UserIDs
+	var targetUserIDs []uint
+	if len(targetEmployeeIDs) > 0 {
+		employees, err := s.employeeRepo.GetByIDs(targetEmployeeIDs)
+		if err != nil {
+			return err
+		}
+		for _, emp := range employees {
+			if emp.UserID != 0 {
+				targetUserIDs = append(targetUserIDs, emp.UserID)
+			}
+		}
+	}
+
+	targetUserIDsMap := make(map[uint]bool)
+	for _, uid := range targetUserIDs {
+		targetUserIDsMap[uid] = true
+
+		if _, exists := existingUserIDs[uid]; !exists {
+			// Add new PENDING participant
+			newParticipant := &domain.EventParticipant{
+				EventID: eventID,
+				UserID:  uid,
+				Status:  domain.ParticipantStatusPending,
+			}
+			err := s.eventParticipantRepo.Create(newParticipant, modifiedBy)
+			if err != nil {
+				log.Printf("Failed to create participant for event %d, user %d: %v", eventID, uid, err)
+			}
+		}
+	}
+
+	// Remove PENDING participants that are not in targetUserIDs
+	for uid, p := range existingUserIDs {
+		if !targetUserIDsMap[uid] && p.Status == domain.ParticipantStatusPending {
+			err := s.eventParticipantRepo.Delete(p.ID, modifiedBy)
+			if err != nil {
+				log.Printf("Failed to delete participant for event %d, user %d: %v", eventID, uid, err)
+			}
+		}
+	}
+
+	return nil
 }

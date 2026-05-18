@@ -11,6 +11,7 @@ type EventParticipantRepository interface {
 	GetByEventAndUser(eventId uint, userId uint) (*domain.EventParticipant, error)
 	GetByEventID(eventId uint) ([]*domain.EventParticipant, error)
 	Update(participant *domain.EventParticipant, modifiedBy string) error
+	Delete(id uint, deletedBy string) error
 }
 
 type eventParticipantRepository struct {
@@ -48,4 +49,11 @@ func (r *eventParticipantRepository) GetByEventID(eventId uint) ([]*domain.Event
 func (r *eventParticipantRepository) Update(participant *domain.EventParticipant, modifiedBy string) error {
 	participant.ModifiedBy = modifiedBy
 	return r.db.Where("deleted = ?", false).Save(participant).Error
+}
+
+func (r *eventParticipantRepository) Delete(id uint, deletedBy string) error {
+	return r.db.Model(&domain.EventParticipant{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"deleted":     true,
+		"modified_by": deletedBy,
+	}).Error
 }

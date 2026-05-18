@@ -37,6 +37,7 @@ type CreateEventRequest struct {
 	MaxCompanion     int                  `json:"max_companion"`
 	LastChangeDate   *time.Time           `json:"last_change_date"`
 	ResendTemplateId string               `json:"resend_template_id"`
+	TargetEmployeeIDs []uint               `json:"target_employee_ids"`
 }
 
 type ParticipateRequest struct {
@@ -54,7 +55,9 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 
 	userID, _ := c.Get("userID")
 
-	if req.AudienceFilter == "" {
+	if len(req.TargetEmployeeIDs) > 0 {
+		req.AudienceFilter = "TARGETED" // Custom value to indicate it is targeted
+	} else if req.AudienceFilter == "" {
 		req.AudienceFilter = domain.EventAudienceAllCompany
 	}
 
@@ -74,7 +77,7 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 		Status:           domain.EventStatusDraft,
 	}
 
-	if err := h.eventService.CreateEvent(event, fmt.Sprintf("%v", userID)); err != nil {
+	if err := h.eventService.CreateEvent(event, req.TargetEmployeeIDs, fmt.Sprintf("%v", userID)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		return
 	}
@@ -110,14 +113,20 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 	event.StartDate = req.StartDate
 	event.EndDate = req.EndDate
 	event.Location = req.Location
-	event.AudienceFilter = req.AudienceFilter
+	if len(req.TargetEmployeeIDs) > 0 {
+		event.AudienceFilter = "TARGETED"
+	} else if req.AudienceFilter == "" {
+		event.AudienceFilter = domain.EventAudienceAllCompany
+	} else {
+		event.AudienceFilter = req.AudienceFilter
+	}
 	event.Quota = req.Quota
 	event.AllowCompanion = req.AllowCompanion
 	event.MaxCompanion = req.MaxCompanion
 	event.LastChangeDate = req.LastChangeDate
 	event.ResendTemplateId = req.ResendTemplateId
 
-	if err := h.eventService.UpdateEvent(event, fmt.Sprintf("%v", userID)); err != nil {
+	if err := h.eventService.UpdateEvent(event, req.TargetEmployeeIDs, fmt.Sprintf("%v", userID)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		return
 	}
@@ -196,9 +205,7 @@ func (h *EventHandler) GetDashboardEvents(c *gin.Context) {
 		return
 	}
 
-	audience := c.Query("audience")
-
-	events, err := h.eventService.GetActiveEventsForDashboard(userID.(uint), audience)
+	events, err := h.eventService.GetActiveEventsForDashboard(userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return

@@ -12,6 +12,7 @@ import (
 type EmployeeRepository interface {
 	Create(employee *domain.Employee, createdBy string) error
 	GetByID(id uint) (*domain.Employee, error)
+	GetByIDs(ids []uint) ([]*domain.Employee, error)
 	GetByUserID(userID uint) (*domain.Employee, error)
 	GetByEmail(email string) (*domain.Employee, error)
 	GetByIdentityNo(identityNo string) (*domain.Employee, error)
@@ -60,6 +61,12 @@ func (r *employeeRepository) Create(employee *domain.Employee, createdBy string)
 	employee.CreatedBy = createdBy
 	employee.ModifiedBy = createdBy
 	return r.db.Create(employee).Error
+}
+
+func (r *employeeRepository) GetByIDs(ids []uint) ([]*domain.Employee, error) {
+	var employees []*domain.Employee
+	err := r.db.Where("id IN ?", ids).Find(&employees).Error
+	return employees, err
 }
 
 func (r *employeeRepository) GetByID(id uint) (*domain.Employee, error) {

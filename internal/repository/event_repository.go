@@ -16,8 +16,8 @@ type EventRepository interface {
 	Update(event *domain.Event, modifiedBy string) error
 	Delete(id uint, deletedBy string) error
 	
-	// Dashboard: Get active events for a specific audience (or ALL)
-	GetActiveEventsForDashboard(audience string) ([]*domain.Event, error)
+	// Dashboard: Get active events for a specific user
+	GetActiveEventsForDashboard(userID uint) ([]*domain.Event, error)
 }
 
 type eventRepository struct {
@@ -100,16 +100,20 @@ func (r *eventRepository) Delete(id uint, deletedBy string) error {
 		}).Error
 }
 
-func (r *eventRepository) GetActiveEventsForDashboard(audience string) ([]*domain.Event, error) {
+func (r *eventRepository) GetActiveEventsForDashboard(userID uint) ([]*domain.Event, error) {
 	var events []*domain.Event
 	now := time.Now()
 
-	query := r.db.Where("deleted = ? AND status = ? AND end_date >= ?", false, domain.EventStatusPublished, now)
+	eventsTable := domain.GetTableName("events")
+	participantsTable := domain.GetTableName("event_participants")
+
+	query := r.db.Model(&domain.Event{}).Where(eventsTable+".deleted = ? AND "+eventsTable+".status = ? AND "+eventsTable+".end_date >= ?", false, domain.EventStatusPublished, now)
 	
-	if audience != "" && audience != string(domain.EventAudienceAllCompany) {
-		// Example: If an event is ALL_COMPANY or matches the specific audience
-		query = query.Where("audience_filter = ? OR audience_filter = ?", string(domain.EventAudienceAllCompany), audience)
-	}
+	query = query.Where(`
+		`+eventsTable+`.audience_filter = ? 
+		OR 
+		EXISTS (SELECT 1 FROM `+participantsTable+` p WHERE p.event_id = `+eventsTable+`.id AND p.user_id = ? AND p.deleted = false)
+	`, string(domain.EventAudienceAllCompany), userID)
 
 	err := query.Order("start_date ASC").Find(&events).Error
 	return events, err
