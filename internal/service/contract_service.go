@@ -18,14 +18,16 @@ type ContractService interface {
 }
 
 type contractService struct {
-	contractRepo repository.ContractRepository
-	auditService AuditService
+	contractRepo         repository.ContractRepository
+	employeeContractRepo repository.EmployeeContractRepository
+	auditService         AuditService
 }
 
-func NewContractService(contractRepo repository.ContractRepository, auditService AuditService) ContractService {
+func NewContractService(contractRepo repository.ContractRepository, employeeContractRepo repository.EmployeeContractRepository, auditService AuditService) ContractService {
 	return &contractService{
-		contractRepo: contractRepo,
-		auditService: auditService,
+		contractRepo:         contractRepo,
+		employeeContractRepo: employeeContractRepo,
+		auditService:         auditService,
 	}
 }
 
@@ -64,6 +66,13 @@ func (s *contractService) CreateContract(req types.ContractRequest, createdBy st
 		return nil, err
 	}
 
+	if len(req.TargetEmployeeIDs) > 0 {
+		if err := s.syncTargetEmployees(contract.ID, req.TargetEmployeeIDs, createdBy); err != nil {
+			// Log error but don't fail contract creation
+			fmt.Printf("Error syncing target employees for contract %d: %v\n", contract.ID, err)
+		}
+	}
+
 	s.auditService.CreateAuditLog("Contract", contract.ID, domain.AuditActionCreate, nil, contract, createdBy)
 
 	return contract, nil
@@ -95,6 +104,22 @@ func (s *contractService) GetAllContracts(page, limit int, sortParams types.Sort
 			endDateStr = &str
 		}
 
+		var employeeContracts []types.EmployeeContractResponse
+		if len(c.EmployeeContracts) > 0 {
+			employeeContracts = make([]types.EmployeeContractResponse, len(c.EmployeeContracts))
+			for j, ec := range c.EmployeeContracts {
+				employeeContracts[j] = types.EmployeeContractResponse{
+					ID: ec.ID,
+					Employee: types.EmployeeLookup{
+						ID:        ec.Employee.ID,
+						FirstName: ec.Employee.FirstName,
+						LastName:  ec.Employee.LastName,
+					},
+					ContractID: ec.ContractID,
+				}
+			}
+		}
+
 		responses[i] = types.ContractResponse{
 			ID:                   c.ID,
 			CreatedAt:            c.CreatedAt.Format(time.RFC3339),
@@ -107,6 +132,7 @@ func (s *contractService) GetAllContracts(page, limit int, sortParams types.Sort
 			StartDate:            c.StartDate.Format("2006-01-02"),
 			EndDate:              endDateStr,
 			Status:               c.Status,
+			EmployeeContracts:    employeeContracts,
 		}
 	}
 
@@ -158,6 +184,10 @@ func (s *contractService) UpdateContract(id uint, req types.ContractRequest, mod
 		return err
 	}
 
+	if err := s.syncTargetEmployees(id, req.TargetEmployeeIDs, modifiedBy); err != nil {
+		fmt.Printf("Error syncing target employees for contract %d: %v\n", id, err)
+	}
+
 	s.auditService.CreateAuditLog("Contract", id, domain.AuditActionUpdate, existing, updated, modifiedBy)
 	return nil
 }
@@ -173,5 +203,46 @@ func (s *contractService) DeleteContract(id uint, deletedBy string) error {
 	}
 
 	s.auditService.CreateAuditLog("Contract", id, domain.AuditActionDelete, existing, nil, deletedBy)
+	return nil
+}
+
+func (s *contractService) syncTargetEmployees(contractID uint, targetEmployeeIDs []uint, modifiedBy string) error {
+	existingContract, err := s.contractRepo.GetByID(contractID)
+	if err != nil {
+		return err
+	}
+
+	existingMap := make(map[uint]bool)
+	for _, ec := range existingContract.EmployeeContracts {
+		existingMap[ec.EmployeeID] = true
+	}
+
+	targetMap := make(map[uint]bool)
+	for _, id := range targetEmployeeIDs {
+		targetMap[id] = true
+	}
+
+	// Add new assignments
+	for id := range targetMap {
+		if !existingMap[id] {
+			ec := &domain.EmployeeContract{
+				ContractID: contractID,
+				EmployeeID: id,
+			}
+			if err := s.employeeContractRepo.Create(ec, modifiedBy); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Remove deleted assignments
+	for id := range existingMap {
+		if !targetMap[id] {
+			if err := s.employeeContractRepo.DeleteByContractAndEmployee(contractID, id, modifiedBy); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }

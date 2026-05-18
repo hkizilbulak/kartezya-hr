@@ -537,6 +537,7 @@ type ContractRequest struct {
 	StartDate            string  `json:"start_date" binding:"required"` // Format: YYYY-MM-DD
 	EndDate              *string `json:"end_date"`                      // Format: YYYY-MM-DD
 	Status               string  `json:"status"`                        // Defaults to PENDING_PROPOSAL
+	TargetEmployeeIDs    []uint  `json:"target_employee_ids"`
 }
 
 type ContractResponse struct {
@@ -551,6 +552,7 @@ type ContractResponse struct {
 	StartDate            string  `json:"start_date"`
 	EndDate              *string `json:"end_date"`
 	Status               string  `json:"status"`
+	EmployeeContracts    []EmployeeContractResponse `json:"employee_contracts,omitempty"`
 }
 
 // ContractReportFilter represents filters for contract report

@@ -34,7 +34,10 @@ func (r *contractRepository) Create(contract *domain.Contract, createdBy string)
 
 func (r *contractRepository) GetByID(id uint) (*domain.Contract, error) {
 	var contract domain.Contract
-	if err := r.db.Where("id = ? AND deleted = ?", id, false).First(&contract).Error; err != nil {
+	if err := r.db.Where("id = ? AND deleted = ?", id, false).
+		Preload("EmployeeContracts", "deleted = ?", false).
+		Preload("EmployeeContracts.Employee").
+		First(&contract).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, fmt.Errorf("contract not found")
 		}
@@ -62,6 +65,9 @@ func (r *contractRepository) GetAll(limit, offset int, sortParams types.SortPara
 	} else {
 		query = query.Order("created_at DESC")
 	}
+
+	query = query.Preload("EmployeeContracts", "deleted = ?", false).
+		Preload("EmployeeContracts.Employee")
 
 	if err := query.Limit(limit).Offset(offset).Find(&contracts).Error; err != nil {
 		return nil, 0, err

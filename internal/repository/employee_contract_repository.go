@@ -16,6 +16,7 @@ type EmployeeContractRepository interface {
 	CheckExists(employeeID uint, contractID uint) (bool, error)
 	Update(contract *domain.EmployeeContract, modifiedBy string) error
 	Delete(id uint, deletedBy string) error
+	DeleteByContractAndEmployee(contractID uint, employeeID uint, deletedBy string) error
 	GetTotalCount() (int64, error)
 }
 
@@ -124,6 +125,15 @@ func (r *employeeContractRepository) Update(contract *domain.EmployeeContract, m
 func (r *employeeContractRepository) Delete(id uint, deletedBy string) error {
 	return r.db.Model(&domain.EmployeeContract{}).
 		Where("id = ? AND deleted = ?", id, false).
+		Updates(map[string]interface{}{
+			"deleted":     true,
+			"modified_by": deletedBy,
+		}).Error
+}
+
+func (r *employeeContractRepository) DeleteByContractAndEmployee(contractID uint, employeeID uint, deletedBy string) error {
+	return r.db.Model(&domain.EmployeeContract{}).
+		Where("contract_id = ? AND employee_id = ? AND deleted = ?", contractID, employeeID, false).
 		Updates(map[string]interface{}{
 			"deleted":     true,
 			"modified_by": deletedBy,
