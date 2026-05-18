@@ -15,7 +15,7 @@ type EventRepository interface {
 	GetAll(limit, offset int, sortParams types.SortParams) ([]*domain.Event, int64, error)
 	Update(event *domain.Event, modifiedBy string) error
 	Delete(id uint, deletedBy string) error
-	
+
 	// Dashboard: Get active events for a specific user
 	GetActiveEventsForDashboard(userID uint) ([]*domain.Event, error)
 }
@@ -38,6 +38,7 @@ func (r *eventRepository) GetByID(id uint) (*domain.Event, error) {
 	var event domain.Event
 	err := r.db.Where(fmt.Sprintf("%s.id = ? AND %s.deleted = ?", domain.GetTableName("events"), domain.GetTableName("events")), id, false).
 		Preload("Participants", "deleted = ?", false).
+		Preload("Participants.User").
 		Preload("Participants.User.Employee").
 		First(&event).Error
 	if err != nil {
@@ -76,7 +77,7 @@ func (r *eventRepository) GetAll(limit, offset int, sortParams types.SortParams)
 	}
 
 	query := r.db.Model(&domain.Event{}).Where("deleted = ?", false)
-	
+
 	// Count total records
 	query.Count(&total)
 
@@ -112,7 +113,7 @@ func (r *eventRepository) GetActiveEventsForDashboard(userID uint) ([]*domain.Ev
 	participantsTable := domain.GetTableName("event_participants")
 
 	query := r.db.Model(&domain.Event{}).Where(eventsTable+".deleted = ? AND "+eventsTable+".status = ? AND "+eventsTable+".end_date >= ?", false, domain.EventStatusPublished, now)
-	
+
 	query = query.Where(`
 		`+eventsTable+`.audience_filter = ? 
 		OR 
