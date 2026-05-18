@@ -37,6 +37,8 @@ func (r *eventRepository) Create(event *domain.Event, createdBy string) error {
 func (r *eventRepository) GetByID(id uint) (*domain.Event, error) {
 	var event domain.Event
 	err := r.db.Where(fmt.Sprintf("%s.id = ? AND %s.deleted = ?", domain.GetTableName("events"), domain.GetTableName("events")), id, false).
+		Preload("Participants", "deleted = ?", false).
+		Preload("Participants.User.Employee").
 		First(&event).Error
 	if err != nil {
 		return nil, err
@@ -80,6 +82,8 @@ func (r *eventRepository) GetAll(limit, offset int, sortParams types.SortParams)
 
 	// Execute query
 	err := query.Order(fmt.Sprintf("%s %s", sortField, direction)).
+		Preload("Participants", "deleted = ?", false).
+		Preload("Participants.User.Employee").
 		Limit(limit).Offset(offset).
 		Find(&events).Error
 
