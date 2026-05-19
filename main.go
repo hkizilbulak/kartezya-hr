@@ -149,7 +149,7 @@ func main() {
 	defer scheduler.Stop()
 
 	// Initialize handlers
-	authHandler := handler.NewAuthHandler(authService, emailService, userRepo)
+	authHandler := handler.NewAuthHandler(authService, emailService, userRepo, employeeRepo)
 	employeeHandler := handler.NewEmployeeHandler(employeeService)
 	leaveHandler := handler.NewLeaveHandler(leaveService, employeeService)
 	companyHandler := handler.NewCompanyHandler(companyService)
@@ -162,10 +162,9 @@ func main() {
 	employeeGradeHandler := handler.NewEmployeeGradeHandler(employeeGradeService, employeeService)
 	employeeContractHandler := handler.NewEmployeeContractHandler(employeeContractService, employeeService)
 	contractHandler := handler.NewContractHandler(contractService)
-	reportHandler := handler.NewReportHandler(reportService)
+	reportHandler := handler.NewReportHandler(reportService, emailService, cfg)
 	documentHandler := handler.NewDocumentHandler(documentService)
 	expenseHandler := handler.NewExpenseHandler(expenseService)
-	emailHandler := handler.NewEmailHandler(emailService)
 	jobHandler := handler.NewJobHandler(jobService, scheduler)
 	eventHandler := handler.NewEventHandler(eventService)
 
@@ -266,7 +265,7 @@ func main() {
 		{
 			authRoutes.POST("/logout", authHandler.Logout)
 			authRoutes.POST("/change-password", authHandler.ChangePassword)
-			authRoutes.POST("/send-password-reset-email-batch", authHandler.SendPasswordResetEmailBatch)
+			authRoutes.POST("/send-password-reset-email", authMiddleware.RequireAdmin(), authHandler.SendPasswordResetEmail)
 		}
 
 		// Employee routes
@@ -512,13 +511,7 @@ func main() {
 			reportRoutes.POST("/grade/export/excel", authMiddleware.RequireAdmin(), reportHandler.ExportGradeReportExcel)
 			reportRoutes.GET("/contract", authMiddleware.RequireAdmin(), reportHandler.GetContractReport)
 			reportRoutes.POST("/contract/export/excel", authMiddleware.RequireAdmin(), reportHandler.ExportContractReportExcel)
-		}
-
-		// Email routes (Admin only)
-		emailRoutes := protected.Group("/email")
-		{
-			emailRoutes.POST("/send", authMiddleware.RequireAdmin(), emailHandler.SendEmail)
-			emailRoutes.POST("/template/send", authMiddleware.RequireAdmin(), emailHandler.SendTemplateEmail)
+			reportRoutes.POST("/email", authMiddleware.RequireAdmin(), reportHandler.SendReportEmail)
 		}
 
 		// Event Management routes

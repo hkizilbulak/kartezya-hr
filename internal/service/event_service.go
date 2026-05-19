@@ -21,7 +21,7 @@ type EventService interface {
 	DeleteEvent(id uint, deletedBy string) error
 
 	PublishEvent(id uint, modifiedBy string) error
-	
+
 	GetActiveEventsForDashboard(userID uint) ([]*domain.Event, error)
 	ParticipateInEvent(eventId uint, userId uint, status domain.ParticipantStatus, companionCount int) error
 
@@ -91,9 +91,18 @@ func (s *eventService) PublishEvent(id uint, modifiedBy string) error {
 		return err
 	}
 
+	log.Printf("[EVENT] Event published: ID=%d, Name=%s", event.ID, event.Name)
+
 	// Send Email using Resend template if configured
 	if event.ResendTemplateId != "" {
-		// Get target audience emails. For simplicity, we get all active employees' emails.
+		eventDate := event.StartDate.Format("02/01/2006 15:04") + " - " + event.EndDate.Format("02/01/2006 15:04")
+		importantNote := "Katılım durumunu en kısa sürede bildirmeni rica ederiz."
+		if event.AllowCompanion && event.MaxCompanion > 0 {
+			importantNote = fmt.Sprintf("Bu etkinliğe +%d kişiyle katılabilirsin. Katılım durumunu en kısa sürede bildirmeni rica ederiz.", event.MaxCompanion)
+		}
+		eventUrl := "https://personel.kartezya.com"
+
+		// Get target audience emails
 		if event.AudienceFilter == domain.EventAudienceAllCompany {
 			filters := map[string]interface{}{
 				"status": "ACTIVE",
@@ -111,11 +120,19 @@ func (s *eventService) PublishEvent(id uint, modifiedBy string) error {
 
 				if len(emails) > 0 {
 					variables := map[string]interface{}{
-						"event_name":  event.Name,
-						"date":        event.StartDate.Format("02.01.2006 15:04"),
-						"location":    event.Location,
+						"eventTitle":       event.Name,
+						"eventDate":        eventDate,
+						"eventLocation":    event.Location,
+						"eventDescription": event.Description,
+						"eventUrl":         eventUrl,
+						"importantNote":    importantNote,
 					}
-					_ = s.emailService.SendTemplateEmail(emails, "Yeni Etkinlik: "+event.Name, event.ResendTemplateId, variables)
+					err := s.emailService.SendTemplateEmail(emails, "", event.ResendTemplateId, variables)
+					if err != nil {
+						log.Printf("[EVENT] ERROR: Failed to send event email: %v", err)
+					} else {
+						log.Printf("[EVENT] Successfully sent event email to %d recipients: %v", len(emails), emails)
+					}
 				}
 			}
 		} else {
@@ -136,11 +153,19 @@ func (s *eventService) PublishEvent(id uint, modifiedBy string) error {
 
 				if len(emails) > 0 {
 					variables := map[string]interface{}{
-						"event_name":  event.Name,
-						"date":        event.StartDate.Format("02.01.2006 15:04"),
-						"location":    event.Location,
+						"eventTitle":       event.Name,
+						"eventDate":        eventDate,
+						"eventLocation":    event.Location,
+						"eventDescription": event.Description,
+						"eventUrl":         eventUrl,
+						"importantNote":    importantNote,
 					}
-					_ = s.emailService.SendTemplateEmail(emails, "Yeni Etkinlik: "+event.Name, event.ResendTemplateId, variables)
+					err := s.emailService.SendTemplateEmail(emails, "", event.ResendTemplateId, variables)
+					if err != nil {
+						log.Printf("[EVENT] ERROR: Failed to send event email: %v", err)
+					} else {
+						log.Printf("[EVENT] Successfully sent event email to %d recipients: %v", len(emails), emails)
+					}
 				}
 			}
 		}
@@ -246,10 +271,10 @@ func (s *eventService) ExportEventParticipants(eventId uint) ([]byte, error) {
 	// Data rows
 	for rowIdx, p := range participants {
 		rowNum := rowIdx + 2
-		
+
 		fullName := ""
 		department := ""
-		
+
 		if p.User != nil && p.User.Employee != nil {
 			fullName = p.User.Employee.FirstName + " " + p.User.Employee.LastName
 			if len(p.User.Employee.EmployeeWorkInformation) > 0 {

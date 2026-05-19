@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
@@ -15,13 +16,15 @@ type AuthHandler struct {
 	authService  service.AuthService
 	emailService service.EmailService
 	userRepo     repository.UserRepository
+	employeeRepo repository.EmployeeRepository
 }
 
-func NewAuthHandler(authService service.AuthService, emailService service.EmailService, userRepo repository.UserRepository) *AuthHandler {
+func NewAuthHandler(authService service.AuthService, emailService service.EmailService, userRepo repository.UserRepository, employeeRepo repository.EmployeeRepository) *AuthHandler {
 	return &AuthHandler{
 		authService:  authService,
 		emailService: emailService,
 		userRepo:     userRepo,
+		employeeRepo: employeeRepo,
 	}
 }
 
@@ -47,28 +50,7 @@ type ValidateResetTokenRequest struct {
 }
 
 type SendPasswordResetEmailRequest struct {
-	UserID    uint   `json:"user_id" binding:"required"`
-	Email     string `json:"email" binding:"required,email"`
-	FirstName string `json:"first_name" binding:"required"`
-	LastName  string `json:"last_name" binding:"required"`
-}
-
-type SendPasswordResetEmailBatchRequest struct {
-	Users []SendPasswordResetEmailRequest `json:"users" binding:"required"`
-}
-
-type SendPasswordResetEmailBatchResponse struct {
-	TotalCount   int                                     `json:"total_count"`
-	SuccessCount int                                     `json:"success_count"`
-	FailureCount int                                     `json:"failure_count"`
-	Results      []SendPasswordResetEmailBatchResultItem `json:"results"`
-}
-
-type SendPasswordResetEmailBatchResultItem struct {
-	UserID  uint   `json:"user_id"`
-	Email   string `json:"email"`
-	Success bool   `json:"success"`
-	Error   string `json:"error,omitempty"`
+	UserID uint `json:"user_id" binding:"required"`
 }
 
 type APIResponse struct {
@@ -328,20 +310,19 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	})
 }
 
-// SendPasswordResetEmailBatch godoc
-// @Summary Send password reset emails to multiple users
-// @Description Send password reset emails to a batch of users
+// SendPasswordResetEmail godoc
+// @Summary Send password reset email to a single user
+// @Description Send password reset email to a user by user ID
 // @Tags auth
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param batchRequest body SendPasswordResetEmailBatchRequest true "Batch password reset email request"
-// @Success 200 {object} APIResponse{data=SendPasswordResetEmailBatchResponse}
+// @Param request body SendPasswordResetEmailRequest true "Single password reset email request"
+// @Success 200 {object} APIResponse
 // @Failure 400 {object} APIResponse
 // @Failure 401 {object} APIResponse
-// @Router /auth/send-password-reset-email-batch [post]
-func (h *AuthHandler) SendPasswordResetEmailBatch(c *gin.Context) {
-	// Check if user is authenticated
+// @Router /auth/send-password-reset-email [post]
+func (h *AuthHandler) SendPasswordResetEmail(c *gin.Context) {
 	_, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -351,7 +332,7 @@ func (h *AuthHandler) SendPasswordResetEmailBatch(c *gin.Context) {
 		return
 	}
 
-	var req SendPasswordResetEmailBatchRequest
+	var req SendPasswordResetEmailRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -361,42 +342,43 @@ func (h *AuthHandler) SendPasswordResetEmailBatch(c *gin.Context) {
 		return
 	}
 
-	// Process each user in the batch
-	response := SendPasswordResetEmailBatchResponse{
-		TotalCount: len(req.Users),
-		Results:    make([]SendPasswordResetEmailBatchResultItem, 0),
+	// Get user from database
+	user, err := h.userRepo.GetByID(req.UserID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "User not found",
+		})
+		return
 	}
 
-	for _, user := range req.Users {
-		result := SendPasswordResetEmailBatchResultItem{
-			UserID: user.UserID,
-			Email:  user.Email,
-		}
+	// Get employee info for first/last name
+	firstName := ""
+	lastName := ""
+	employee, empErr := h.employeeRepo.GetByUserID(user.ID)
+	if empErr != nil {
+		log.Printf("[AUTH] SendPasswordResetEmail - Employee not found for UserID: %d, error: %v", user.ID, empErr)
+	} else {
+		firstName = employee.FirstName
+		lastName = employee.LastName
+	}
 
-		// Send password reset email
-		err := h.emailService.SendPasswordResetEmailWithUserId(
-			user.UserID,
-			user.Email,
-			user.FirstName,
-			user.LastName,
-		)
-
-		if err != nil {
-			result.Success = false
-			result.Error = err.Error()
-			response.FailureCount++
-		} else {
-			result.Success = true
-			response.SuccessCount++
-		}
-
-		response.Results = append(response.Results, result)
+	// Send password reset email
+	if err := h.emailService.SendPasswordResetEmail(user.ID, user.Email, firstName, lastName); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Failed to send password reset email: " + err.Error(),
+		})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data":    response,
-		"message": "Batch password reset emails processed",
+		"message": "Password reset email sent successfully",
+		"data": gin.H{
+			"user_id": user.ID,
+			"email":   user.Email,
+		},
 	})
 }
 

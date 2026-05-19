@@ -3,33 +3,30 @@ package service
 import (
 	"bytes"
 	"crypto/rand"
-	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"encoding/base64"
 	"io"
+	"io/ioutil"
 	"log"
-	"mime"
 	"net/http"
-	"net/mail"
-	"net/smtp"
 	"time"
 
 	"kartezya-hr/internal/config"
 	"kartezya-hr/internal/domain"
-	templates "kartezya-hr/internal/email_templates"
 	"kartezya-hr/internal/repository"
 )
 
 // EmailService interface for sending emails
 type EmailService interface {
-	SendPasswordResetEmail(user *domain.User, firstName string, lastName string) error
-	SendPasswordResetEmailWithUserId(userId uint, email string, firstName string, lastName string) error
+	SendWelcomeEmail(userId uint, email string, firstName string, lastName string) error
+	SendPasswordResetEmail(userId uint, email string, firstName string, lastName string) error
 	GeneratePasswordResetToken(userID uint) (string, error)
 	ResetPassword(token string, newPassword string, authService AuthService) error
 	ValidatePasswordResetToken(token string) (*domain.User, error)
-	SendCustomEmail(to []string, subject string, htmlBody string) error
 	SendTemplateEmail(to []string, subject string, templateId string, variables map[string]interface{}) error
+	SendReportEmail(to []string, subject string, variables map[string]interface{}, attachment io.Reader, filename string) error
 }
 
 type emailService struct {
@@ -113,30 +110,7 @@ func (s *emailService) ResetPassword(token string, newPassword string, authServi
 	return nil
 }
 
-// SendPasswordResetEmail sends a password reset email to the user
-func (s *emailService) SendPasswordResetEmail(user *domain.User, firstName string, lastName string) error {
-	// Generate reset token
-	resetToken, err := s.GeneratePasswordResetToken(user.ID)
-	if err != nil {
-		return fmt.Errorf("failed to generate reset token: %w", err)
-	}
-
-	// Build reset URL
-	resetURL := fmt.Sprintf("%s/reset-password?token=%s&email=%s", s.config.Email.FrontendURL, resetToken, user.Email)
-
-	// Build email content using template
-	emailContent := templates.PasswordResetEmailTemplate(firstName, lastName, resetURL)
-
-	// Send email
-	if err := s.sendEmail(user.Email, emailContent.Subject, emailContent.Body); err != nil {
-		return fmt.Errorf("failed to send email: %w", err)
-	}
-
-	return nil
-}
-
-// SendPasswordResetEmailWithUserId sends a password reset email using a user ID
-func (s *emailService) SendPasswordResetEmailWithUserId(userId uint, email string, firstName string, lastName string) error {
+func (s *emailService) SendWelcomeEmail(userId uint, email string, firstName string, lastName string) error {
 	// Generate reset token
 	resetToken, err := s.GeneratePasswordResetToken(userId)
 	if err != nil {
@@ -146,45 +120,40 @@ func (s *emailService) SendPasswordResetEmailWithUserId(userId uint, email strin
 	// Build reset URL
 	resetURL := fmt.Sprintf("%s/reset-password?token=%s&email=%s", s.config.Email.FrontendURL, resetToken, email)
 
-	// Build email content using template
-	emailContent := templates.PasswordResetEmailTemplate(firstName, lastName, resetURL)
+	// Send email using template
+	variables := map[string]interface{}{
+		"fullname": fmt.Sprintf("%s %s", firstName, lastName),
+		"resetUrl": resetURL,
+	}
 
-	// Send email
-	if err := s.sendEmail(email, emailContent.Subject, emailContent.Body); err != nil {
+	if err := s.SendTemplateEmail([]string{email}, "", "welcome-email", variables); err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
 	return nil
 }
 
-// sendEmail routes to Resend or SMTP depending on EMAIL_PROVIDER config.
-func (s *emailService) sendEmail(to, subject, htmlBody string) error {
-	if s.config.Email.Provider == "resend" {
-		return s.sendViaResend([]string{to}, subject, htmlBody)
-	}
-	return s.sendSMTPEmail(to, subject, htmlBody)
-}
-
-// SendCustomEmail sends a custom HTML email to one or more recipients.
-// Routes to Resend HTTP API or SMTP depending on EMAIL_PROVIDER config.
-func (s *emailService) SendCustomEmail(to []string, subject string, htmlBody string) error {
-	if len(to) == 0 {
-		return fmt.Errorf("at least one recipient is required")
+// SendPasswordResetEmailWithUserId sends a password reset email using a user ID
+func (s *emailService) SendPasswordResetEmail(userId uint, email string, firstName string, lastName string) error {
+	// Generate reset token
+	resetToken, err := s.GeneratePasswordResetToken(userId)
+	if err != nil {
+		return fmt.Errorf("failed to generate reset token: %w", err)
 	}
 
-	if s.config.Email.Provider == "resend" {
-		return s.sendViaResend(to, subject, htmlBody)
+	// Build reset URL
+	resetURL := fmt.Sprintf("%s/reset-password?token=%s&email=%s", s.config.Email.FrontendURL, resetToken, email)
+
+	// Send email using template
+	variables := map[string]interface{}{
+		"fullname": fmt.Sprintf("%s %s", firstName, lastName),
+		"resetUrl": resetURL,
 	}
 
-	var errs []string
-	for _, recipient := range to {
-		if err := s.sendSMTPEmail(recipient, subject, htmlBody); err != nil {
-			errs = append(errs, fmt.Sprintf("%s: %v", recipient, err))
-		}
+	if err := s.SendTemplateEmail([]string{email}, "", "reset-password", variables); err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
 	}
-	if len(errs) > 0 {
-		return fmt.Errorf("failed to send to some recipients: %v", errs)
-	}
+
 	return nil
 }
 
@@ -199,56 +168,15 @@ func (s *emailService) SendTemplateEmail(to []string, subject string, templateId
 	}
 
 	if s.config.Email.Provider == "resend" {
-		return s.sendViaResendTemplate(to, subject, templateId, variables)
+		return s.sendViaResendTemplate(to, subject, templateId, variables, nil, "")
 	}
 
 	return fmt.Errorf("template emails are currently only supported with the resend provider")
 }
 
-// sendViaResend sends email using Resend HTTP API (https://resend.com)
-// Works on Railway and other cloud platforms that block SMTP ports.
-func (s *emailService) sendViaResend(to []string, subject, htmlBody string) error {
-	if s.config.Email.ResendAPIKey == "" {
-		return fmt.Errorf("RESEND_API_KEY is not configured")
-	}
-
-	payload := map[string]interface{}{
-		"from":    fmt.Sprintf("%s <%s>", s.config.Email.FromName, s.config.Email.FromEmail),
-		"to":      to,
-		"subject": subject,
-		"html":    htmlBody,
-	}
-
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("failed to marshal resend payload: %w", err)
-	}
-
-	req, err := http.NewRequest("POST", "https://api.resend.com/emails", bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("failed to create resend request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+s.config.Email.ResendAPIKey)
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("resend HTTP request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("resend API error (status %d): %s", resp.StatusCode, string(respBody))
-	}
-
-	log.Printf("Email sent via Resend to: %v\n", to)
-	return nil
-}
-
 // sendViaResendTemplate sends email using Resend HTTP API with a template
-func (s *emailService) sendViaResendTemplate(to []string, subject string, templateId string, variables map[string]interface{}) error {
+// Supports optional attachment - if attachment is not nil, it will be included
+func (s *emailService) sendViaResendTemplate(to []string, subject string, templateId string, variables map[string]interface{}, attachment io.Reader, attachmentFilename string) error {
 	if s.config.Email.ResendAPIKey == "" {
 		return fmt.Errorf("RESEND_API_KEY is not configured")
 	}
@@ -258,8 +186,8 @@ func (s *emailService) sendViaResendTemplate(to []string, subject string, templa
 	}
 
 	payload := map[string]interface{}{
-		"from":    fmt.Sprintf("%s <%s>", s.config.Email.FromName, s.config.Email.FromEmail),
-		"to":      to,
+		"from": fmt.Sprintf("%s <%s>", s.config.Email.FromName, s.config.Email.FromEmail),
+		"to":   to,
 		"template": map[string]interface{}{
 			"id":        templateId,
 			"variables": variables,
@@ -270,6 +198,21 @@ func (s *emailService) sendViaResendTemplate(to []string, subject string, templa
 		payload["subject"] = subject
 	}
 
+	// Add attachment if provided
+	if attachment != nil && attachmentFilename != "" {
+		attachmentBytes, err := ioutil.ReadAll(attachment)
+		if err != nil {
+			return fmt.Errorf("failed to read attachment: %w", err)
+		}
+		attachmentBase64 := base64.StdEncoding.EncodeToString(attachmentBytes)
+		payload["attachments"] = []map[string]interface{}{
+			{
+				"filename": attachmentFilename,
+				"content":  attachmentBase64,
+			},
+		}
+	}
+
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to marshal resend payload: %w", err)
@@ -282,7 +225,7 @@ func (s *emailService) sendViaResendTemplate(to []string, subject string, templa
 	req.Header.Set("Authorization", "Bearer "+s.config.Email.ResendAPIKey)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("resend HTTP request failed: %w", err)
@@ -294,90 +237,22 @@ func (s *emailService) sendViaResendTemplate(to []string, subject string, templa
 		return fmt.Errorf("resend API error (status %d): %s", resp.StatusCode, string(respBody))
 	}
 
-	log.Printf("Template email sent via Resend to: %v (template: %s)\n", to, templateId)
+	log.Printf("Template email sent via Resend to: %v (template: %s, attachment: %s)\n", to, templateId, attachmentFilename)
 	return nil
 }
 
-// sendSMTPEmail sends an email using SMTP.
-// Port 465 → direct SSL/TLS (implicit TLS)
-// Port 587/25 → STARTTLS (smtp.SendMail)
-func (s *emailService) sendSMTPEmail(to, subject, htmlBody string) error {
-	// Skip sending if SMTP not configured
-	if s.config.Email.SMTPUser == "" || s.config.Email.SMTPPassword == "" {
-		log.Printf("SMTP not configured. Would send email to: %s\nSubject: %s\n", to, subject)
-		return nil
+// SendReportEmail sends a report email using "report-mail" template with optional attachment
+func (s *emailService) SendReportEmail(to []string, subject string, variables map[string]interface{}, attachment io.Reader, filename string) error {
+	if len(to) == 0 {
+		return fmt.Errorf("at least one recipient is required")
+	}
+	if subject == "" {
+		return fmt.Errorf("subject is required")
 	}
 
-	// Validate email address
-	if _, err := mail.ParseAddress(to); err != nil {
-		return fmt.Errorf("invalid email address: %w", err)
+	if s.config.Email.Provider != "resend" {
+		return fmt.Errorf("report email is only supported with the resend provider")
 	}
 
-	// Encode subject with UTF-8
-	encodedSubject := mime.QEncoding.Encode("utf-8", subject)
-
-	// Build raw message
-	message := fmt.Sprintf(
-		"From: %s <%s>\r\n"+
-			"To: %s\r\n"+
-			"Subject: %s\r\n"+
-			"MIME-Version: 1.0\r\n"+
-			"Content-Type: text/html; charset=\"UTF-8\"\r\n\r\n%s",
-		s.config.Email.FromName,
-		s.config.Email.FromEmail,
-		to,
-		encodedSubject,
-		htmlBody,
-	)
-
-	addr := fmt.Sprintf("%s:%d", s.config.Email.SMTPHost, s.config.Email.SMTPPort)
-	auth := smtp.PlainAuth("", s.config.Email.SMTPUser, s.config.Email.SMTPPassword, s.config.Email.SMTPHost)
-
-	if s.config.Email.SMTPPort == 465 {
-		// Port 465: implicit TLS — open TLS connection directly
-		tlsConfig := &tls.Config{
-			InsecureSkipVerify: false,
-			ServerName:         s.config.Email.SMTPHost,
-		}
-		conn, err := tls.Dial("tcp", addr, tlsConfig)
-		if err != nil {
-			return fmt.Errorf("failed to connect via TLS: %w", err)
-		}
-		defer conn.Close()
-
-		smtpClient, err := smtp.NewClient(conn, s.config.Email.SMTPHost)
-		if err != nil {
-			return fmt.Errorf("failed to create SMTP client: %w", err)
-		}
-		defer smtpClient.Close()
-
-		if err = smtpClient.Auth(auth); err != nil {
-			return fmt.Errorf("SMTP auth failed: %w", err)
-		}
-		if err = smtpClient.Mail(s.config.Email.FromEmail); err != nil {
-			return fmt.Errorf("SMTP MAIL FROM failed: %w", err)
-		}
-		if err = smtpClient.Rcpt(to); err != nil {
-			return fmt.Errorf("SMTP RCPT TO failed: %w", err)
-		}
-		w, err := smtpClient.Data()
-		if err != nil {
-			return fmt.Errorf("SMTP DATA failed: %w", err)
-		}
-		if _, err = fmt.Fprint(w, message); err != nil {
-			return fmt.Errorf("failed to write email body: %w", err)
-		}
-		if err = w.Close(); err != nil {
-			return fmt.Errorf("failed to close email writer: %w", err)
-		}
-		smtpClient.Quit()
-	} else {
-		// Port 587/25: STARTTLS
-		if err := smtp.SendMail(addr, auth, s.config.Email.FromEmail, []string{to}, []byte(message)); err != nil {
-			return fmt.Errorf("failed to send SMTP email: %w", err)
-		}
-	}
-
-	log.Printf("Email sent to: %s\n", to)
-	return nil
+	return s.sendViaResendTemplate(to, subject, "report-mail", variables, attachment, filename)
 }

@@ -157,13 +157,12 @@ func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastNam
 		fmt.Printf("No roles provided for user %d\n", user.ID)
 	}
 
-	// Send password reset email to the newly created user
-	fmt.Printf("Sending password reset email to: %s\n", companyEmail)
-	if err := s.emailService.SendPasswordResetEmail(user, firstName, lastName); err != nil {
-		// Log error but don't fail the operation - employee is already created
-		fmt.Printf("WARNING: failed to send password reset email to %s: %v\n", companyEmail, err)
+	// Send welcome email to the newly created user
+	fmt.Printf("Sending welcome email to: %s\n", companyEmail)
+	if err := s.emailService.SendWelcomeEmail(user.ID, user.Email, firstName, lastName); err != nil {
+		fmt.Printf("WARNING: failed to send welcome email to %s: %v\n", companyEmail, err)
 	} else {
-		fmt.Printf("Password reset email sent successfully to: %s\n", companyEmail)
+		fmt.Printf("Welcome email sent successfully to: %s\n", companyEmail)
 	}
 
 	// Audit the creation

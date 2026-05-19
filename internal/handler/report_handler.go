@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"kartezya-hr/internal/config"
 	"kartezya-hr/internal/service"
 	"kartezya-hr/internal/types"
 
@@ -14,11 +16,15 @@ import (
 
 type ReportHandler struct {
 	reportService service.ReportService
+	emailService  service.EmailService
+	config        *config.Config
 }
 
-func NewReportHandler(reportService service.ReportService) *ReportHandler {
+func NewReportHandler(reportService service.ReportService, emailService service.EmailService, cfg *config.Config) *ReportHandler {
 	return &ReportHandler{
 		reportService: reportService,
+		emailService:  emailService,
+		config:        cfg,
 	}
 }
 
@@ -468,4 +474,79 @@ func (h *ReportHandler) ExportContractReportExcel(c *gin.Context) {
 	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	c.Header("Content-Disposition", "attachment; filename=sozlesme_raporu.xlsx")
 	c.Data(http.StatusOK, "application/octet-stream", excelData)
+}
+
+// SendReportEmail godoc
+// @Summary Send report via email
+// @Description Send a report file as email attachment to configured recipients
+// @Tags reports
+// @Accept multipart/form-data
+// @Produce json
+// @Security BearerAuth
+// @Param subject formData string true "Email subject"
+// @Param body formData string true "Email body"
+// @Param report_type formData string true "Report type"
+// @Param recipients formData string true "Recipients JSON array"
+// @Param filters formData string false "Filters JSON"
+// @Param attachment formData file true "Report file attachment"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /reports/email [post]
+func (h *ReportHandler) SendReportEmail(c *gin.Context) {
+	subject := c.PostForm("subject")
+	body := c.PostForm("body")
+	reportType := c.PostForm("report_type")
+
+	if subject == "" || body == "" || reportType == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "subject, body and report_type are required",
+		})
+		return
+	}
+
+	// Get recipients from config based on report type
+	recipients := h.config.ReportEmail.GetRecipients(reportType)
+	if len(recipients) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "No recipients configured for report type: " + reportType,
+		})
+		return
+	}
+
+	// Get attachment file
+	file, header, err := c.Request.FormFile("attachment")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Attachment file is required",
+		})
+		return
+	}
+	defer file.Close()
+
+	log.Printf("[REPORT-EMAIL] Sending report email. Type: %s, Subject: %s, Recipients: %v, File: %s", reportType, subject, recipients, header.Filename)
+
+	// Send email with attachment via Resend
+	variables := map[string]interface{}{
+		"subject": subject,
+		"body":    body,
+	}
+	err = h.emailService.SendReportEmail(recipients, subject, variables, file, header.Filename)
+	if err != nil {
+		log.Printf("[REPORT-EMAIL] ERROR: Failed to send report email: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to send email: " + err.Error(),
+		})
+		return
+	}
+
+	log.Printf("[REPORT-EMAIL] Successfully sent report email to %v", recipients)
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Report email sent successfully",
+	})
 }

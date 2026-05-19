@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -17,7 +18,8 @@ type Config struct {
 	App      AppConfig
 	Email    EmailConfig
 	OAuth    OAuthConfig
-	Storage  StorageConfig
+	Storage     StorageConfig
+	ReportEmail ReportEmailConfig
 }
 
 type DatabaseConfig struct {
@@ -83,6 +85,13 @@ type StorageConfig struct {
 	AzureAccessKey string
 }
 
+type ReportEmailConfig struct {
+WorkDayRecipients  []string
+EffortRecipients   []string
+ContractRecipients []string
+GradeRecipients    []string
+}
+
 func Load() *Config {
 	// Load .env file if it exists
 	if err := godotenv.Load(); err != nil {
@@ -143,7 +152,13 @@ func Load() *Config {
 			YandexClientSecret: getEnv("YANDEX_CLIENT_SECRET", ""),
 			YandexRedirectURL:  getEnv("YANDEX_REDIRECT_URL", "http://localhost:8080/api/v1/auth/yandex/callback"),
 		},
-		Storage: StorageConfig{
+		ReportEmail: ReportEmailConfig{
+WorkDayRecipients:  parseEmailList(getEnv("REPORT_EMAIL_WORK_DAY", "huseyinkizilbulak76@gmail.com")),
+EffortRecipients:   parseEmailList(getEnv("REPORT_EMAIL_EFFORT", "huseyinkizilbulak76@gmail.com")),
+ContractRecipients: parseEmailList(getEnv("REPORT_EMAIL_CONTRACT", "huseyinkizilbulak76@gmail.com")),
+GradeRecipients:    parseEmailList(getEnv("REPORT_EMAIL_GRADE", "huseyinkizilbulak76@gmail.com")),
+},
+Storage: StorageConfig{
 			Provider:    getEnv("STORAGE_PROVIDER", "local"), // Options: local, s3, backblaze, azure
 			BasePath:    getEnv("STORAGE_BASE_PATH", "./uploads"),
 			BaseURL:     getEnv("STORAGE_BASE_URL", "http://localhost:8080"),
@@ -187,4 +202,34 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+func parseEmailList(value string) []string {
+if value == "" {
+return []string{}
+}
+parts := []string{}
+for _, item := range strings.Split(value, ",") {
+trimmed := strings.TrimSpace(item)
+if trimmed != "" {
+parts = append(parts, trimmed)
+}
+}
+return parts
+}
+
+// GetRecipients returns recipients for a given report type
+func (c *ReportEmailConfig) GetRecipients(reportType string) []string {
+switch reportType {
+case "work-day":
+return c.WorkDayRecipients
+case "effort":
+return c.EffortRecipients
+case "contract":
+return c.ContractRecipients
+case "grade":
+return c.GradeRecipients
+default:
+return []string{}
+}
 }
