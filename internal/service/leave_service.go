@@ -701,9 +701,22 @@ func (s *leaveService) CancelLeave(id uint, cancelReason string, userID uint, is
 			return errors.New("you can only cancel your own leave requests")
 		}
 
-		// Employees can only cancel PENDING requests
+		// Employees can only cancel PENDING requests, or APPROVED requests that haven't started yet
 		if existingLeave.Status != LeaveStatusPending {
-			return fmt.Errorf("you can only cancel pending leave requests, current status: %s", existingLeave.Status)
+			if existingLeave.Status == LeaveStatusApproved && existingLeave.StartDate.After(time.Now()) {
+				// Allowed: approved but future leave — reverse balance if needed
+				leaveType, err := s.leaveTypeRepo.GetByID(existingLeave.LeaveTypeID)
+				if err != nil {
+					return fmt.Errorf("failed to get leave type: %w", err)
+				}
+				if leaveType.Name == "Yıllık İzin" || leaveType.Name == "Annual Leave" {
+					if err := s.ReverseLeaveBalance(existingLeave.EmployeeID, existingLeave.LeaveTypeID, existingLeave.RequestedDays, userID); err != nil {
+						return fmt.Errorf("failed to reverse leave balance: %w", err)
+					}
+				}
+			} else {
+				return fmt.Errorf("you can only cancel pending leave requests or approved future leave requests, current status: %s", existingLeave.Status)
+			}
 		}
 	}
 
