@@ -138,7 +138,7 @@ func (s *contractService) GetAllContracts(page, limit int, sortParams types.Sort
 
 	return &PaginatedResponse{
 		Data: responses,
-		Page: PageInfo{Total: total, Page: page, Limit: limit},
+		Page: PageInfo{Total: total, Page: page, Limit: limit, TotalPages: (total + int64(limit) - 1) / int64(limit)},
 	}, nil
 }
 
