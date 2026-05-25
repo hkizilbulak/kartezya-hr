@@ -157,7 +157,7 @@ func main() {
 	jobPositionHandler := handler.NewJobPositionHandler(jobPositionService)
 	workInfoHandler := handler.NewWorkInformationHandler(workInfoService, employeeService)
 	lookupHandler := handler.NewLookupHandler(lookupService)
-	dashboardHandler := handler.NewDashboardHandler(employeeService, departmentService, companyService, leaveService, expenseService)
+	dashboardHandler := handler.NewDashboardHandler(employeeService, departmentService, companyService, leaveService, expenseService, eventService)
 	gradeHandler := handler.NewGradeHandler(gradeService)
 	employeeGradeHandler := handler.NewEmployeeGradeHandler(employeeGradeService, employeeService)
 	employeeContractHandler := handler.NewEmployeeContractHandler(employeeContractService, employeeService)

@@ -23,6 +23,7 @@ type EventService interface {
 	PublishEvent(id uint, modifiedBy string) error
 
 	GetActiveEventsForDashboard(userID uint) ([]*domain.Event, error)
+	GetActiveEventsCount() (int64, error)
 	ParticipateInEvent(eventId uint, userId uint, status domain.ParticipantStatus, companionCount int) error
 
 	ExportEventParticipants(eventId uint) ([]byte, error)
@@ -206,6 +207,10 @@ func (s *eventService) GetActiveEventsForDashboard(userID uint) ([]*domain.Event
 	}
 
 	return append(newEvents, answeredEvents...), nil
+}
+
+func (s *eventService) GetActiveEventsCount() (int64, error) {
+	return s.eventRepo.CountActiveEvents()
 }
 
 func (s *eventService) ParticipateInEvent(eventId uint, userId uint, status domain.ParticipantStatus, companionCount int) error {

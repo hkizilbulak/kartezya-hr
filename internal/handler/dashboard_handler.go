@@ -17,6 +17,7 @@ type DashboardHandler struct {
 	companyService    service.CompanyService
 	leaveService      service.LeaveService
 	expenseService    service.ExpenseService
+	eventService      service.EventService
 }
 
 func NewDashboardHandler(
@@ -25,6 +26,7 @@ func NewDashboardHandler(
 	companyService service.CompanyService,
 	leaveService service.LeaveService,
 	expenseService service.ExpenseService,
+	eventService service.EventService,
 ) *DashboardHandler {
 	return &DashboardHandler{
 		employeeService:   employeeService,
@@ -32,6 +34,7 @@ func NewDashboardHandler(
 		companyService:    companyService,
 		leaveService:      leaveService,
 		expenseService:    expenseService,
+		eventService:      eventService,
 	}
 }
 
@@ -43,6 +46,7 @@ type DashboardDataResponse struct {
 	PendingExpenseRequests int64 `json:"pending_expense_requests"`
 	PendingPaymentExpenses int64 `json:"pending_payment_expenses"`
 	PaidExpenses           int64 `json:"paid_expenses"`
+	ActiveEvents           int64 `json:"active_events"`
 }
 
 // Chart response types
@@ -132,6 +136,13 @@ func (h *DashboardHandler) GetDashboardData(c *gin.Context) {
 		paidExpenses = resp.Page.Total
 	}
 
+	// Fetch active events count (PUBLISHED and end_date >= now)
+	activeEvents, err := h.eventService.GetActiveEventsCount()
+	if err != nil {
+		log.Printf("Error fetching active events count: %v", err)
+		activeEvents = 0
+	}
+
 	dashboardData := DashboardDataResponse{
 		TotalEmployees:         totalEmployees,
 		TotalDepartments:       totalDepartments,
@@ -140,6 +151,7 @@ func (h *DashboardHandler) GetDashboardData(c *gin.Context) {
 		PendingExpenseRequests: pendingExpenseRequests,
 		PendingPaymentExpenses: pendingPaymentExpenses,
 		PaidExpenses:           paidExpenses,
+		ActiveEvents:           activeEvents,
 	}
 
 	c.JSON(http.StatusOK, gin.H{

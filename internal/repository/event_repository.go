@@ -18,6 +18,8 @@ type EventRepository interface {
 
 	// Dashboard: Get active events for a specific user
 	GetActiveEventsForDashboard(userID uint) ([]*domain.Event, error)
+	// Dashboard: Count published events with future end_date
+	CountActiveEvents() (int64, error)
 }
 
 type eventRepository struct {
@@ -122,4 +124,15 @@ func (r *eventRepository) GetActiveEventsForDashboard(userID uint) ([]*domain.Ev
 
 	err := query.Order("start_date ASC").Find(&events).Error
 	return events, err
+}
+
+func (r *eventRepository) CountActiveEvents() (int64, error) {
+	var count int64
+	now := time.Now()
+	eventsTable := domain.GetTableName("events")
+	err := r.db.Model(&domain.Event{}).
+		Where(eventsTable+".deleted = ? AND "+eventsTable+".status = ? AND "+eventsTable+".end_date >= ?",
+			false, domain.EventStatusPublished, now).
+		Count(&count).Error
+	return count, err
 }
