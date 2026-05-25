@@ -12,7 +12,7 @@ import (
 type ContractService interface {
 	CreateContract(req types.ContractRequest, createdBy string) (*domain.Contract, error)
 	GetContractByID(id uint) (*domain.Contract, error)
-	GetAllContracts(page, limit int, sortParams types.SortParams) (*PaginatedResponse, error)
+	GetAllContracts(page, limit int, sortParams types.SortParams, filters types.ContractFilters) (*PaginatedResponse, error)
 	UpdateContract(id uint, req types.ContractRequest, modifiedBy string) error
 	DeleteContract(id uint, deletedBy string) error
 }
@@ -82,7 +82,7 @@ func (s *contractService) GetContractByID(id uint) (*domain.Contract, error) {
 	return s.contractRepo.GetByID(id)
 }
 
-func (s *contractService) GetAllContracts(page, limit int, sortParams types.SortParams) (*PaginatedResponse, error) {
+func (s *contractService) GetAllContracts(page, limit int, sortParams types.SortParams, filters types.ContractFilters) (*PaginatedResponse, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -91,7 +91,7 @@ func (s *contractService) GetAllContracts(page, limit int, sortParams types.Sort
 	}
 	offset := (page - 1) * limit
 
-	contracts, total, err := s.contractRepo.GetAll(limit, offset, sortParams)
+	contracts, total, err := s.contractRepo.GetAll(limit, offset, sortParams, filters)
 	if err != nil {
 		return nil, err
 	}

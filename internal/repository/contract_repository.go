@@ -13,7 +13,7 @@ import (
 type ContractRepository interface {
 	Create(contract *domain.Contract, createdBy string) error
 	GetByID(id uint) (*domain.Contract, error)
-	GetAll(limit, offset int, sortParams types.SortParams) ([]*domain.Contract, int64, error)
+	GetAll(limit, offset int, sortParams types.SortParams, filters types.ContractFilters) ([]*domain.Contract, int64, error)
 	Update(contract *domain.Contract, modifiedBy string) error
 	Delete(id uint, deletedBy string) error
 }
@@ -46,11 +46,22 @@ func (r *contractRepository) GetByID(id uint) (*domain.Contract, error) {
 	return &contract, nil
 }
 
-func (r *contractRepository) GetAll(limit, offset int, sortParams types.SortParams) ([]*domain.Contract, int64, error) {
+func (r *contractRepository) GetAll(limit, offset int, sortParams types.SortParams, filters types.ContractFilters) ([]*domain.Contract, int64, error) {
 	var contracts []*domain.Contract
 	var total int64
 
 	query := r.db.Model(&domain.Contract{}).Where("deleted = ?", false)
+
+	if filters.Search != "" {
+		search := "%" + filters.Search + "%"
+		query = query.Where("contract_no ILIKE ? OR project_name ILIKE ?", search, search)
+	}
+	if filters.CustomerName != "" {
+		query = query.Where("customer_contact_name ILIKE ?", "%"+filters.CustomerName+"%")
+	}
+	if filters.Status != "" {
+		query = query.Where("status = ?", filters.Status)
+	}
 
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err

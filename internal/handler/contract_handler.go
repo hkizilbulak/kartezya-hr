@@ -54,7 +54,13 @@ func (h *ContractHandler) GetAll(c *gin.Context) {
 		Direction: direction,
 	}
 
-	resp, err := h.contractService.GetAllContracts(page, limit, sortParams)
+	filters := types.ContractFilters{
+		Search:       c.Query("search"),
+		CustomerName: c.Query("customer_name"),
+		Status:       c.Query("status"),
+	}
+
+	resp, err := h.contractService.GetAllContracts(page, limit, sortParams, filters)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return

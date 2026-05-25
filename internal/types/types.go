@@ -528,6 +528,13 @@ type GradeReportExportRequest struct {
 }
 
 // Contract definitions
+// ContractFilters represents query filters for contract listing
+type ContractFilters struct {
+	Search       string // searches contract_no and project_name
+	CustomerName string
+	Status       string
+}
+
 type ContractRequest struct {
 	CustomerContactName  string  `json:"customer_contact_name" binding:"required"`
 	CustomerContactPhone string  `json:"customer_contact_phone"`
@@ -541,17 +548,17 @@ type ContractRequest struct {
 }
 
 type ContractResponse struct {
-	ID                   uint    `json:"id"`
-	CreatedAt            string  `json:"created_at"`
-	UpdatedAt            string  `json:"updated_at"`
-	CustomerContactName  string  `json:"customer_contact_name"`
-	CustomerContactPhone string  `json:"customer_contact_phone"`
-	CustomerContactEmail string  `json:"customer_contact_email"`
-	ProjectName          string  `json:"project_name"`
-	ContractNo           string  `json:"contract_no"`
-	StartDate            string  `json:"start_date"`
-	EndDate              *string `json:"end_date"`
-	Status               string  `json:"status"`
+	ID                   uint                       `json:"id"`
+	CreatedAt            string                     `json:"created_at"`
+	UpdatedAt            string                     `json:"updated_at"`
+	CustomerContactName  string                     `json:"customer_contact_name"`
+	CustomerContactPhone string                     `json:"customer_contact_phone"`
+	CustomerContactEmail string                     `json:"customer_contact_email"`
+	ProjectName          string                     `json:"project_name"`
+	ContractNo           string                     `json:"contract_no"`
+	StartDate            string                     `json:"start_date"`
+	EndDate              *string                    `json:"end_date"`
+	Status               string                     `json:"status"`
 	EmployeeContracts    []EmployeeContractResponse `json:"employee_contracts,omitempty"`
 }
 
