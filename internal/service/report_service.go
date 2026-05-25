@@ -445,6 +445,8 @@ func (s *reportService) ExportContractReportExcel(request *types.ContractReportE
 			// get Field by exact key mapping (need standard json mapping matching)
 			val := ""
 			switch colConfig.Key {
+			case "fullName":
+				val = rowData.FirstName + " " + rowData.LastName
 			case "firstName":
 				val = rowData.FirstName
 			case "lastName":
