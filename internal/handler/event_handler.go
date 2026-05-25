@@ -25,18 +25,19 @@ func NewEventHandler(eventService service.EventService) *EventHandler {
 
 // Request DTOs
 type CreateEventRequest struct {
-	Name             string               `json:"name" binding:"required"`
-	Type             string               `json:"type" binding:"required"`
-	Description      string               `json:"description"`
-	StartDate        time.Time            `json:"start_date" binding:"required"`
-	EndDate          time.Time            `json:"end_date" binding:"required"`
-	Location         string               `json:"location"`
-	AudienceFilter   domain.EventAudience `json:"audience_filter"`
-	Quota            int                  `json:"quota"`
-	AllowCompanion   bool                 `json:"allow_companion"`
-	MaxCompanion     int                  `json:"max_companion"`
-	LastChangeDate   *time.Time           `json:"last_change_date"`
-	ResendTemplateId string               `json:"resend_template_id"`
+	Name              string               `json:"name" binding:"required"`
+	Type              string               `json:"type" binding:"required"`
+	Description       string               `json:"description"`
+	StartDate         time.Time            `json:"start_date" binding:"required"`
+	EndDate           time.Time            `json:"end_date" binding:"required"`
+	Location          string               `json:"location"`
+	AudienceFilter    domain.EventAudience `json:"audience_filter"`
+	Status            domain.EventStatus   `json:"status"`
+	Quota             int                  `json:"quota"`
+	AllowCompanion    bool                 `json:"allow_companion"`
+	MaxCompanion      int                  `json:"max_companion"`
+	LastChangeDate    *time.Time           `json:"last_change_date"`
+	ResendTemplateId  string               `json:"resend_template_id"`
 	TargetEmployeeIDs []uint               `json:"target_employee_ids"`
 }
 
@@ -125,6 +126,9 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 	event.MaxCompanion = req.MaxCompanion
 	event.LastChangeDate = req.LastChangeDate
 	event.ResendTemplateId = req.ResendTemplateId
+	if req.Status != "" {
+		event.Status = req.Status
+	}
 
 	if err := h.eventService.UpdateEvent(event, req.TargetEmployeeIDs, fmt.Sprintf("%v", userID)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
