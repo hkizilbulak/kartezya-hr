@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"time"
+	_ "time/tzdata" // embed timezone database for LoadLocation
 
 	"kartezya-hr/internal/config"
 	"kartezya-hr/internal/domain"
@@ -100,7 +101,8 @@ func (s *eventService) PublishEvent(id uint, modifiedBy string) error {
 
 	// Send Email using Resend template if configured
 	if event.ResendTemplateId != "" {
-		eventDate := event.StartDate.Format("02/01/2006 15:04") + " - " + event.EndDate.Format("02/01/2006 15:04")
+		istanbul, _ := time.LoadLocation("Europe/Istanbul")
+		eventDate := event.StartDate.In(istanbul).Format("02/01/2006 15:04") + " - " + event.EndDate.In(istanbul).Format("02/01/2006 15:04")
 		importantNote := "Katılım durumunu en kısa sürede bildirmeni rica ederiz."
 		if event.AllowCompanion && event.MaxCompanion > 0 {
 			importantNote = fmt.Sprintf("Bu etkinliğe +%d kişiyle katılabilirsin. Katılım durumunu en kısa sürede bildirmeni rica ederiz.", event.MaxCompanion)
