@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"kartezya-hr/internal/config"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/repository"
 	"kartezya-hr/internal/types"
@@ -35,6 +36,7 @@ type eventService struct {
 	userRepo             repository.UserRepository
 	employeeRepo         repository.EmployeeRepository
 	emailService         EmailService
+	config               *config.Config
 }
 
 func NewEventService(
@@ -43,6 +45,7 @@ func NewEventService(
 	userRepo repository.UserRepository,
 	employeeRepo repository.EmployeeRepository,
 	emailService EmailService,
+	cfg *config.Config,
 ) EventService {
 	return &eventService{
 		eventRepo:            eventRepo,
@@ -50,6 +53,7 @@ func NewEventService(
 		userRepo:             userRepo,
 		employeeRepo:         employeeRepo,
 		emailService:         emailService,
+		config:               cfg,
 	}
 }
 
@@ -105,35 +109,24 @@ func (s *eventService) PublishEvent(id uint, modifiedBy string) error {
 
 		// Get target audience emails
 		if event.AudienceFilter == domain.EventAudienceAllCompany {
-			filters := map[string]interface{}{
-				"status": "ACTIVE",
-			}
-			employees, _, err := s.employeeRepo.GetAllWithFilters(10000, 0, types.SortParams{Sort: "id", Direction: "ASC"}, filters)
-			if err == nil && len(employees) > 0 {
-				var emails []string
-				for _, emp := range employees {
-					if emp.CompanyEmail != "" {
-						emails = append(emails, emp.CompanyEmail)
-					} else if emp.Email != "" {
-						emails = append(emails, emp.Email)
-					}
+			// Use configured mail group addresses to avoid Resend BCC limit (max 50)
+			groupEmails := s.config.Email.EventAllCompanyGroup
+			if len(groupEmails) == 0 {
+				log.Printf("[EVENT] WARNING: EVENT_EMAIL_ALL_COMPANY is not configured, skipping ALL_COMPANY email for event %d", event.ID)
+			} else {
+				variables := map[string]interface{}{
+					"eventTitle":       event.Name,
+					"eventDate":        eventDate,
+					"eventLocation":    event.Location,
+					"eventDescription": event.Description,
+					"eventUrl":         eventUrl,
+					"importantNote":    importantNote,
 				}
-
-				if len(emails) > 0 {
-					variables := map[string]interface{}{
-						"eventTitle":       event.Name,
-						"eventDate":        eventDate,
-						"eventLocation":    event.Location,
-						"eventDescription": event.Description,
-						"eventUrl":         eventUrl,
-						"importantNote":    importantNote,
-					}
-					err := s.emailService.SendTemplateEmail(emails, "", event.ResendTemplateId, variables)
-					if err != nil {
-						log.Printf("[EVENT] ERROR: Failed to send event email: %v", err)
-					} else {
-						log.Printf("[EVENT] Successfully sent event email to %d recipients: %v", len(emails), emails)
-					}
+				err := s.emailService.SendTemplateEmail(groupEmails, "", event.ResendTemplateId, variables)
+				if err != nil {
+					log.Printf("[EVENT] ERROR: Failed to send event email to group %v: %v", groupEmails, err)
+				} else {
+					log.Printf("[EVENT] Successfully sent event email to all-company groups: %v", groupEmails)
 				}
 			}
 		} else {

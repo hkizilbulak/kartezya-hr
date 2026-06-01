@@ -12,12 +12,12 @@ import (
 )
 
 type Config struct {
-	Database DatabaseConfig
-	JWT      JWTConfig
-	Server   ServerConfig
-	App      AppConfig
-	Email    EmailConfig
-	OAuth    OAuthConfig
+	Database    DatabaseConfig
+	JWT         JWTConfig
+	Server      ServerConfig
+	App         AppConfig
+	Email       EmailConfig
+	OAuth       OAuthConfig
 	Storage     StorageConfig
 	ReportEmail ReportEmailConfig
 }
@@ -49,15 +49,16 @@ type AppConfig struct {
 }
 
 type EmailConfig struct {
-	SMTPHost     string
-	SMTPPort     int
-	SMTPUser     string
-	SMTPPassword string
-	FromEmail    string
-	FromName     string
-	FrontendURL  string
-	Provider     string // "smtp" or "resend"
-	ResendAPIKey string
+	SMTPHost             string
+	SMTPPort             int
+	SMTPUser             string
+	SMTPPassword         string
+	FromEmail            string
+	FromName             string
+	FrontendURL          string
+	Provider             string // "smtp" or "resend"
+	ResendAPIKey         string
+	EventAllCompanyGroup []string // Mail group addresses for all-company events (comma-separated)
 }
 
 type OAuthConfig struct {
@@ -86,10 +87,10 @@ type StorageConfig struct {
 }
 
 type ReportEmailConfig struct {
-WorkDayRecipients  []string
-EffortRecipients   []string
-ContractRecipients []string
-GradeRecipients    []string
+	WorkDayRecipients  []string
+	EffortRecipients   []string
+	ContractRecipients []string
+	GradeRecipients    []string
 }
 
 func Load() *Config {
@@ -137,15 +138,16 @@ func Load() *Config {
 			Version: getEnv("APP_VERSION", "1.0.0"),
 		},
 		Email: EmailConfig{
-			SMTPHost:     getEnv("SMTP_HOST", "smtp.gmail.com"),
-			SMTPPort:     smtpPort,
-			SMTPUser:     getEnv("SMTP_USER", ""),
-			SMTPPassword: getEnv("SMTP_PASSWORD", ""),
-			FromEmail:    getEnv("FROM_EMAIL", "info@kartezya.com"),
-			FromName:     getEnv("FROM_NAME", "Kartezya Teknoloji"),
-			FrontendURL:  getEnv("FRONTEND_URL", "http://localhost:3000"),
-			Provider:     getEnv("EMAIL_PROVIDER", "smtp"), // "smtp" or "resend"
-			ResendAPIKey: getEnv("RESEND_API_KEY", ""),
+			SMTPHost:             getEnv("SMTP_HOST", "smtp.gmail.com"),
+			SMTPPort:             smtpPort,
+			SMTPUser:             getEnv("SMTP_USER", ""),
+			SMTPPassword:         getEnv("SMTP_PASSWORD", ""),
+			FromEmail:            getEnv("FROM_EMAIL", "info@kartezya.com"),
+			FromName:             getEnv("FROM_NAME", "Kartezya Teknoloji"),
+			FrontendURL:          getEnv("FRONTEND_URL", "http://localhost:3000"),
+			Provider:             getEnv("EMAIL_PROVIDER", "smtp"), // "smtp" or "resend"
+			ResendAPIKey:         getEnv("RESEND_API_KEY", ""),
+			EventAllCompanyGroup: parseEmailList(getEnv("EVENT_EMAIL_ALL_COMPANY", "")),
 		},
 		OAuth: OAuthConfig{
 			YandexClientID:     getEnv("YANDEX_CLIENT_ID", ""),
@@ -153,12 +155,12 @@ func Load() *Config {
 			YandexRedirectURL:  getEnv("YANDEX_REDIRECT_URL", "http://localhost:8080/api/v1/auth/yandex/callback"),
 		},
 		ReportEmail: ReportEmailConfig{
-WorkDayRecipients:  parseEmailList(getEnv("REPORT_EMAIL_WORK_DAY", "huseyinkizilbulak76@gmail.com")),
-EffortRecipients:   parseEmailList(getEnv("REPORT_EMAIL_EFFORT", "huseyinkizilbulak76@gmail.com")),
-ContractRecipients: parseEmailList(getEnv("REPORT_EMAIL_CONTRACT", "huseyinkizilbulak76@gmail.com")),
-GradeRecipients:    parseEmailList(getEnv("REPORT_EMAIL_GRADE", "huseyinkizilbulak76@gmail.com")),
-},
-Storage: StorageConfig{
+			WorkDayRecipients:  parseEmailList(getEnv("REPORT_EMAIL_WORK_DAY", "huseyinkizilbulak76@gmail.com")),
+			EffortRecipients:   parseEmailList(getEnv("REPORT_EMAIL_EFFORT", "huseyinkizilbulak76@gmail.com")),
+			ContractRecipients: parseEmailList(getEnv("REPORT_EMAIL_CONTRACT", "huseyinkizilbulak76@gmail.com")),
+			GradeRecipients:    parseEmailList(getEnv("REPORT_EMAIL_GRADE", "huseyinkizilbulak76@gmail.com")),
+		},
+		Storage: StorageConfig{
 			Provider:    getEnv("STORAGE_PROVIDER", "local"), // Options: local, s3, backblaze, azure
 			BasePath:    getEnv("STORAGE_BASE_PATH", "./uploads"),
 			BaseURL:     getEnv("STORAGE_BASE_URL", "http://localhost:8080"),
@@ -205,31 +207,31 @@ func getEnv(key, defaultValue string) string {
 }
 
 func parseEmailList(value string) []string {
-if value == "" {
-return []string{}
-}
-parts := []string{}
-for _, item := range strings.Split(value, ",") {
-trimmed := strings.TrimSpace(item)
-if trimmed != "" {
-parts = append(parts, trimmed)
-}
-}
-return parts
+	if value == "" {
+		return []string{}
+	}
+	parts := []string{}
+	for _, item := range strings.Split(value, ",") {
+		trimmed := strings.TrimSpace(item)
+		if trimmed != "" {
+			parts = append(parts, trimmed)
+		}
+	}
+	return parts
 }
 
 // GetRecipients returns recipients for a given report type
 func (c *ReportEmailConfig) GetRecipients(reportType string) []string {
-switch reportType {
-case "work-day":
-return c.WorkDayRecipients
-case "effort":
-return c.EffortRecipients
-case "contract":
-return c.ContractRecipients
-case "grade":
-return c.GradeRecipients
-default:
-return []string{}
-}
+	switch reportType {
+	case "work-day":
+		return c.WorkDayRecipients
+	case "effort":
+		return c.EffortRecipients
+	case "contract":
+		return c.ContractRecipients
+	case "grade":
+		return c.GradeRecipients
+	default:
+		return []string{}
+	}
 }

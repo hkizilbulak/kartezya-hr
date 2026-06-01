@@ -141,7 +141,7 @@ func main() {
 	expenseService := service.NewExpenseService(expenseRepo, expenseTypeRepo, attachmentRepo, employeeRepo, storageProvider, auditService)
 	reportService := service.NewReportService(employeeRepo, workInfoRepo, leaveRepo, holidayRepo, leaveService)
 	jobService := service.NewJobService(jobRepo, auditService)
-	eventService := service.NewEventService(eventRepo, eventParticipantRepo, userRepo, employeeRepo, emailService)
+	eventService := service.NewEventService(eventRepo, eventParticipantRepo, userRepo, employeeRepo, emailService, cfg)
 
 	// Initialize and start scheduled jobs
 	scheduler := jobs.NewScheduler(db.DB, documentService, jobService)
