@@ -3,10 +3,10 @@ package service
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"encoding/base64"
 	"io"
 	"io/ioutil"
 	"log"
@@ -176,6 +176,7 @@ func (s *emailService) SendTemplateEmail(to []string, subject string, templateId
 
 // sendViaResendTemplate sends email using Resend HTTP API with a template
 // Supports optional attachment - if attachment is not nil, it will be included
+// Recipients are sent via BCC to protect privacy (to = sender address)
 func (s *emailService) sendViaResendTemplate(to []string, subject string, templateId string, variables map[string]interface{}, attachment io.Reader, attachmentFilename string) error {
 	if s.config.Email.ResendAPIKey == "" {
 		return fmt.Errorf("RESEND_API_KEY is not configured")
@@ -185,9 +186,13 @@ func (s *emailService) sendViaResendTemplate(to []string, subject string, templa
 		variables = make(map[string]interface{})
 	}
 
+	// Use sender address as "to" and put actual recipients in "bcc"
+	// This way recipients cannot see each other's email addresses
+	fromEmail := fmt.Sprintf("%s <%s>", s.config.Email.FromName, s.config.Email.FromEmail)
 	payload := map[string]interface{}{
-		"from": fmt.Sprintf("%s <%s>", s.config.Email.FromName, s.config.Email.FromEmail),
-		"to":   to,
+		"from": fromEmail,
+		"to":   []string{s.config.Email.FromEmail},
+		"bcc":  to,
 		"template": map[string]interface{}{
 			"id":        templateId,
 			"variables": variables,
