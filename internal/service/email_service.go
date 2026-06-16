@@ -186,13 +186,23 @@ func (s *emailService) sendViaResendTemplate(to []string, subject string, templa
 		variables = make(map[string]interface{})
 	}
 
-	// Use sender address as "to" and put actual recipients in "bcc"
-	// This way recipients cannot see each other's email addresses
 	fromEmail := fmt.Sprintf("%s <%s>", s.config.Email.FromName, s.config.Email.FromEmail)
+
+	// alıcı adresi filtresi
+	var validTo []string
+	for _, emailAddr := range to {
+		if emailAddr != "" && emailAddr != "undefined" && emailAddr != "null" {
+			validTo = append(validTo, emailAddr)
+		}
+	}
+
+	if len(validTo) == 0 {
+		validTo = []string{s.config.Email.FromEmail}
+	}
+
 	payload := map[string]interface{}{
 		"from": fromEmail,
-		"to":   []string{s.config.Email.FromEmail},
-		"bcc":  to,
+		"to":   validTo,
 		"template": map[string]interface{}{
 			"id":        templateId,
 			"variables": variables,

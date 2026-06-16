@@ -70,8 +70,8 @@ func main() {
 
 	// Seed database with default data
 	/*if err := seedDatabase(db); err != nil {
-		log.Printf("Warning: Failed to seed database: %v", err)
-	}*/
+	  	log.Printf("Warning: Failed to seed database: %v", err)
+	  }*/
 
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db.DB)
@@ -230,6 +230,8 @@ func main() {
 	auth := v1.Group("/auth")
 	{
 		auth.POST("/login", authHandler.Login)
+		// şifre sıfırlama mekanizması
+		auth.POST("/forgot-password", authHandler.ForgotPassword)
 		auth.POST("/validate-reset-token", authHandler.ValidateResetToken)
 		auth.POST("/reset-password", authHandler.ResetPassword)
 

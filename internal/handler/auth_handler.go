@@ -33,6 +33,11 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
+// şifre sıfırlama isteği
+type ForgotPasswordRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
 type ResetPasswordRequest struct {
 	Token       string `json:"token" binding:"required"`
 	Email       string `json:"email" binding:"required,email"`
@@ -85,7 +90,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
-			"error":   err.Error(),
+			"error":   "error",
 		})
 		return
 	}
@@ -94,6 +99,63 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		"success": true,
 		"data":    response,
 		"message": "Login successful",
+	})
+}
+
+// şifre sıfırlama mekanizması
+// @Summary Request password reset email
+// @Description Request a password reset email using email address for unauthenticated users
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param forgotPasswordRequest body ForgotPasswordRequest true "Forgot password request"
+// @Success 200 {object} APIResponse
+// @Failure 400 {object} APIResponse
+// @Failure 404 {object} APIResponse
+// @Failure 500 {object} APIResponse
+// @Router /auth/forgot-password [post]
+func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	var req ForgotPasswordRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid request format",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	user, err := h.userRepo.GetByEmail(req.Email)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":   "Bu e-posta adresine ait kullanıcı bulunamadı",
+		})
+		return
+	}
+
+	firstName := ""
+	lastName := ""
+	employee, empErr := h.employeeRepo.GetByUserID(user.ID)
+	if empErr != nil {
+		log.Printf("[AUTH] ForgotPassword - Employee not found for UserID: %d, error: %v", user.ID, empErr)
+	} else {
+		firstName = employee.FirstName
+		lastName = employee.LastName
+	}
+
+	if err := h.emailService.SendPasswordResetEmail(user.ID, user.Email, firstName, lastName); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to send password reset email: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Password reset email sent successfully",
 	})
 }
 
@@ -210,7 +272,7 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 	if err := h.emailService.ResetPassword(req.Token, req.NewPassword, h.authService); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"error":   err.Error(),
+			"error":   "err.Error()",
 		})
 		return
 	}
