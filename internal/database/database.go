@@ -109,6 +109,7 @@ func (d *Database) Migrate() error {
 		&domain.JobHistory{},     // Job Scheduler
 		&domain.Event{},          // Event Management
 		&domain.EventParticipant{}, // Event Management
+		&domain.FAQ{},            // FAQ Management
 		// Note: AuditLog is excluded - it's created by schema.sql
 	)
 
