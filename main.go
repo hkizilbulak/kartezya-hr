@@ -97,6 +97,7 @@ func main() {
 	jobRepo := repository.NewJobRepository(db.DB)
 	eventRepo := repository.NewEventRepository(db.DB)
 	eventParticipantRepo := repository.NewEventParticipantRepository(db.DB)
+	faqRepo := repository.NewFAQRepository(db.DB)
 
 	// Initialize storage provider
 	var storageProvider service.StorageProvider
@@ -142,6 +143,7 @@ func main() {
 	reportService := service.NewReportService(employeeRepo, workInfoRepo, leaveRepo, holidayRepo, leaveService)
 	jobService := service.NewJobService(jobRepo, auditService)
 	eventService := service.NewEventService(eventRepo, eventParticipantRepo, userRepo, employeeRepo, emailService, cfg)
+	faqService := service.NewFAQService(faqRepo, auditService)
 
 	// Initialize and start scheduled jobs
 	scheduler := jobs.NewScheduler(db.DB, documentService, jobService)
@@ -167,6 +169,7 @@ func main() {
 	expenseHandler := handler.NewExpenseHandler(expenseService)
 	jobHandler := handler.NewJobHandler(jobService, scheduler)
 	eventHandler := handler.NewEventHandler(eventService)
+	faqHandler := handler.NewFAQHandler(faqService)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -352,6 +355,17 @@ func main() {
 			departmentRoutes.PUT("/:id", authMiddleware.RequireAdmin(), departmentHandler.UpdateDepartment)
 			departmentRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), departmentHandler.DeleteDepartment)
 		}
+
+		// FAQ (Sıkça Sorulan Sorular) management routes
+        faqRoutes := protected.Group("/faqs")
+        {
+            // Admin only routes 
+            faqRoutes.GET("", authMiddleware.RequireAdmin(), faqHandler.GetAll)
+            faqRoutes.GET("/:id", authMiddleware.RequireAdmin(), faqHandler.GetByID)
+            faqRoutes.POST("", authMiddleware.RequireAdmin(), faqHandler.Create)
+            faqRoutes.PUT("/:id", authMiddleware.RequireAdmin(), faqHandler.Update)
+            faqRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), faqHandler.Delete)
+        }
 
 		// Job Position management routes
 		jobPositionRoutes := protected.Group("/job-positions")
