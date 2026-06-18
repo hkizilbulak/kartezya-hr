@@ -359,9 +359,11 @@ func main() {
 		// FAQ (Sıkça Sorulan Sorular) management routes
         faqRoutes := protected.Group("/faqs")
         {
-            // Admin only routes 
-            faqRoutes.GET("", authMiddleware.RequireAdmin(), faqHandler.GetAll)
-            faqRoutes.GET("/:id", authMiddleware.RequireAdmin(), faqHandler.GetByID)
+            // Tüm personelin görebileceği kısımlar
+            faqRoutes.GET("", faqHandler.GetAll)
+            faqRoutes.GET("/:id", faqHandler.GetByID)
+
+            // Sadece Admin'in değiştirebileceği kısımlar
             faqRoutes.POST("", authMiddleware.RequireAdmin(), faqHandler.Create)
             faqRoutes.PUT("/:id", authMiddleware.RequireAdmin(), faqHandler.Update)
             faqRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), faqHandler.Delete)
