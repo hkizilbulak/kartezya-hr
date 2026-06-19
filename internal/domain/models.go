@@ -483,6 +483,7 @@ const (
 	AttachmentTypeIdentity      AttachmentType = 6  // Kimlik
 	AttachmentTypeDiploma       AttachmentType = 7  // Diploma
 	AttachmentTypeCertificate   AttachmentType = 8  // Sertifika
+	AttachmentTypeResume        AttachmentType = 9  // CV / Özgeçmiş
 	AttachmentTypeOther         AttachmentType = 99 // Diğer
 )
 
