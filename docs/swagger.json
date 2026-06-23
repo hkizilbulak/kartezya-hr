@@ -200,6 +200,58 @@
                 }
             }
         },
+        "/auth/forgot-password": {
+            "post": {
+                "description": "Request a password reset email using email address for unauthenticated users",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Request password reset email",
+                "parameters": [
+                    {
+                        "description": "Forgot password request",
+                        "name": "forgotPasswordRequest",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.ForgotPasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/login": {
             "post": {
                 "description": "Authenticate user with email and password",
@@ -332,14 +384,14 @@
                 }
             }
         },
-        "/auth/send-password-reset-email-batch": {
+        "/auth/send-password-reset-email": {
             "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Send password reset emails to a batch of users",
+                "description": "Send password reset email to a user by user ID",
                 "consumes": [
                     "application/json"
                 ],
@@ -349,15 +401,15 @@
                 "tags": [
                     "auth"
                 ],
-                "summary": "Send password reset emails to multiple users",
+                "summary": "Send password reset email to a single user",
                 "parameters": [
                     {
-                        "description": "Batch password reset email request",
-                        "name": "batchRequest",
+                        "description": "Single password reset email request",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handler.SendPasswordResetEmailBatchRequest"
+                            "$ref": "#/definitions/handler.SendPasswordResetEmailRequest"
                         }
                     }
                 ],
@@ -365,19 +417,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/handler.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/handler.SendPasswordResetEmailBatchResponse"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/handler.APIResponse"
                         }
                     },
                     "400": {
@@ -1487,156 +1527,6 @@
                     },
                     "404": {
                         "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/email/send": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Send a custom HTML email to one or more recipients (Admin only)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "email"
-                ],
-                "summary": "Send custom email",
-                "parameters": [
-                    {
-                        "description": "Email request",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.SendEmailRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/handler.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/handler.SendEmailResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/email/template/send": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Send an email using a predefined template (Admin only)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "email"
-                ],
-                "summary": "Send template email",
-                "parameters": [
-                    {
-                        "description": "Template email request",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.SendTemplateEmailRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/handler.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/handler.SendEmailResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/handler.APIResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/handler.APIResponse"
                         }
@@ -3913,6 +3803,212 @@
                         "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/faqs": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sayfalama ve sıralama ile tüm SSS kayıtlarını getirir",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "faqs"
+                ],
+                "summary": "SSS kayıtlarını listeler",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Limit",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sıralama Alanı",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sıralama Yönü (ASC/DESC)",
+                        "name": "direction",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "İK personeli tarafından yeni bir Sıkça Sorulan Soru ekler (Yalnızca Admin)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "faqs"
+                ],
+                "summary": "Yeni bir SSS kaydı oluşturur",
+                "parameters": [
+                    {
+                        "description": "FAQ Data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.CreateFAQRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/faqs/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "ID'sine göre SSS kaydının detaylarını döner",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "faqs"
+                ],
+                "summary": "Tek bir SSS kaydını getirir",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "FAQ ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mevcut bir SSS kaydının başlık, açıklama ve durumunu günceller",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "faqs"
+                ],
+                "summary": "SSS kaydını günceller",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "FAQ ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "FAQ Data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.UpdateFAQRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "ID'si verilen SSS kaydını soft-delete yöntemiyle siler",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "faqs"
+                ],
+                "summary": "SSS kaydını siler",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "FAQ ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -6207,6 +6303,104 @@
                 }
             }
         },
+        "/other-requests": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "other_requests"
+                ],
+                "summary": "Talepleri listeler",
+                "responses": {}
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "other_requests"
+                ],
+                "summary": "Çalışan için yeni talep oluşturur",
+                "parameters": [
+                    {
+                        "description": "Request Data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.CreateOtherRequestReq"
+                        }
+                    }
+                ],
+                "responses": {}
+            }
+        },
+        "/other-requests/{id}/cancel": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "other_requests"
+                ],
+                "summary": "Çalışan tarafından talebi iptal eder",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Request ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {}
+            }
+        },
+        "/other-requests/{id}/complete": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "other_requests"
+                ],
+                "summary": "İK personeli tarafından talebi tamamlar",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Request ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {}
+            }
+        },
         "/reports/efor": {
             "get": {
                 "security": [
@@ -6293,6 +6487,92 @@
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/reports/email": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Send a report file as email attachment to configured recipients",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "reports"
+                ],
+                "summary": "Send report via email",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Email subject",
+                        "name": "subject",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Email body",
+                        "name": "body",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Report type",
+                        "name": "report_type",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Recipients JSON array",
+                        "name": "recipients",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filters JSON",
+                        "name": "filters",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "file",
+                        "description": "Report file attachment",
+                        "name": "attachment",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -6498,6 +6778,60 @@
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/request-types": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "request_types"
+                ],
+                "summary": "Talep Türlerini listeler",
+                "responses": {}
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "request_types"
+                ],
+                "summary": "Yeni Talep Türü oluşturur",
+                "parameters": [
+                    {
+                        "description": "Request Type Data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.CreateRequestTypeReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -7383,6 +7717,17 @@
                 }
             }
         },
+        "domain.FAQStatus": {
+            "type": "string",
+            "enum": [
+                "ACTIVE",
+                "INACTIVE"
+            ],
+            "x-enum-varnames": [
+                "FAQStatusActive",
+                "FAQStatusInactive"
+            ]
+        },
         "domain.Grade": {
             "type": "object",
             "properties": {
@@ -8151,6 +8496,24 @@
                 }
             }
         },
+        "handler.CreateFAQRequest": {
+            "type": "object",
+            "required": [
+                "description",
+                "title"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/domain.FAQStatus"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.CreateGradeRequest": {
             "type": "object",
             "required": [
@@ -8233,6 +8596,38 @@
                 }
             }
         },
+        "handler.CreateOtherRequestReq": {
+            "type": "object",
+            "required": [
+                "description",
+                "request_type_id"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "request_type_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.CreateRequestTypeReq": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "active": {
+                    "type": "boolean"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.CreateWorkInformationRequest": {
             "type": "object",
             "required": [
@@ -8272,6 +8667,9 @@
         "handler.DashboardDataResponse": {
             "type": "object",
             "properties": {
+                "active_events": {
+                    "type": "integer"
+                },
                 "paid_expenses": {
                     "type": "integer"
                 },
@@ -8292,6 +8690,17 @@
                 },
                 "total_employees": {
                     "type": "integer"
+                }
+            }
+        },
+        "handler.ForgotPasswordRequest": {
+            "type": "object",
+            "required": [
+                "email"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
                 }
             }
         },
@@ -8362,149 +8771,14 @@
                 }
             }
         },
-        "handler.SendEmailRequest": {
-            "type": "object",
-            "required": [
-                "body",
-                "subject",
-                "to"
-            ],
-            "properties": {
-                "body": {
-                    "type": "string",
-                    "example": "\u003cp\u003eMerhaba,\u003c/p\u003e\u003cp\u003eBu bir test mailidir.\u003c/p\u003e"
-                },
-                "subject": {
-                    "type": "string",
-                    "example": "Bilgilendirme"
-                },
-                "to": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "[\"user@example.com\"]"
-                    ]
-                }
-            }
-        },
-        "handler.SendEmailResponse": {
-            "type": "object",
-            "properties": {
-                "sent_count": {
-                    "type": "integer"
-                },
-                "to": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "handler.SendPasswordResetEmailBatchRequest": {
-            "type": "object",
-            "required": [
-                "users"
-            ],
-            "properties": {
-                "users": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handler.SendPasswordResetEmailRequest"
-                    }
-                }
-            }
-        },
-        "handler.SendPasswordResetEmailBatchResponse": {
-            "type": "object",
-            "properties": {
-                "failure_count": {
-                    "type": "integer"
-                },
-                "results": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handler.SendPasswordResetEmailBatchResultItem"
-                    }
-                },
-                "success_count": {
-                    "type": "integer"
-                },
-                "total_count": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handler.SendPasswordResetEmailBatchResultItem": {
-            "type": "object",
-            "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "error": {
-                    "type": "string"
-                },
-                "success": {
-                    "type": "boolean"
-                },
-                "user_id": {
-                    "type": "integer"
-                }
-            }
-        },
         "handler.SendPasswordResetEmailRequest": {
             "type": "object",
             "required": [
-                "email",
-                "first_name",
-                "last_name",
                 "user_id"
             ],
             "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "first_name": {
-                    "type": "string"
-                },
-                "last_name": {
-                    "type": "string"
-                },
                 "user_id": {
                     "type": "integer"
-                }
-            }
-        },
-        "handler.SendTemplateEmailRequest": {
-            "type": "object",
-            "required": [
-                "template_id",
-                "to"
-            ],
-            "properties": {
-                "subject": {
-                    "type": "string",
-                    "example": "Bilgilendirme"
-                },
-                "template_id": {
-                    "type": "string",
-                    "example": "b36f6d63-5477-4c7b-b5d1-67ec5d69ba2a"
-                },
-                "to": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "[\"user@example.com\"]"
-                    ]
-                },
-                "variables": {
-                    "type": "object"
                 }
             }
         },
@@ -8701,6 +8975,24 @@
                     "description": "Use null to clear, omit to keep existing",
                     "type": "integer",
                     "example": 1
+                }
+            }
+        },
+        "handler.UpdateFAQRequest": {
+            "type": "object",
+            "required": [
+                "description",
+                "title"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/domain.FAQStatus"
+                },
+                "title": {
+                    "type": "string"
                 }
             }
         },
@@ -9159,6 +9451,12 @@
                 },
                 "customer_contact_phone": {
                     "type": "string"
+                },
+                "employee_contracts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.EmployeeContractResponse"
+                    }
                 },
                 "end_date": {
                     "type": "string"

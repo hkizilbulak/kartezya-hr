@@ -69,9 +69,9 @@ func main() {
 	}
 
 	// Seed database with default data
-	/*if err := seedDatabase(db); err != nil {
+	if err := seedDatabase(db); err != nil {
 	  	log.Printf("Warning: Failed to seed database: %v", err)
-	  }*/
+	  }
 
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db.DB)
@@ -98,6 +98,7 @@ func main() {
 	eventRepo := repository.NewEventRepository(db.DB)
 	eventParticipantRepo := repository.NewEventParticipantRepository(db.DB)
 	faqRepo := repository.NewFAQRepository(db.DB)
+	otherRequestRepo := repository.NewOtherRequestRepository(db.DB)
 
 	// Initialize storage provider
 	var storageProvider service.StorageProvider
@@ -144,6 +145,7 @@ func main() {
 	jobService := service.NewJobService(jobRepo, auditService)
 	eventService := service.NewEventService(eventRepo, eventParticipantRepo, userRepo, employeeRepo, emailService, cfg)
 	faqService := service.NewFAQService(faqRepo, auditService)
+	otherRequestService := service.NewOtherRequestService(otherRequestRepo, auditService, emailService)
 
 	// Initialize and start scheduled jobs
 	scheduler := jobs.NewScheduler(db.DB, documentService, jobService)
@@ -170,6 +172,7 @@ func main() {
 	jobHandler := handler.NewJobHandler(jobService, scheduler)
 	eventHandler := handler.NewEventHandler(eventService)
 	faqHandler := handler.NewFAQHandler(faqService)
+	otherRequestHandler := handler.NewOtherRequestHandler(otherRequestService)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -367,6 +370,31 @@ func main() {
             faqRoutes.POST("", authMiddleware.RequireAdmin(), faqHandler.Create)
             faqRoutes.PUT("/:id", authMiddleware.RequireAdmin(), faqHandler.Update)
             faqRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), faqHandler.Delete)
+        }
+
+		// Other Requests management routes
+        otherReqRoutes := protected.Group("/other-requests")
+        {
+            // Çalışan ve İK ortak rotaları
+            otherReqRoutes.POST("", otherRequestHandler.CreateRequest)
+            otherReqRoutes.GET("", otherRequestHandler.GetAllRequests)
+            otherReqRoutes.PUT("/:id", otherRequestHandler.UpdateRequest)
+            otherReqRoutes.PATCH("/:id/cancel", otherRequestHandler.CancelRequest)
+            
+            // Sadece Admin / İK yetkisi gerektiren işlem
+            otherReqRoutes.PATCH("/:id/complete", authMiddleware.RequireAdmin(), otherRequestHandler.CompleteRequest)
+        }
+
+        // Request Types (Talep Türleri) management routes
+        requestTypeRoutes := protected.Group("/request-types")
+        requestTypeRoutes.Use(authMiddleware.RequireAdmin())
+        {
+            requestTypeRoutes.GET("", otherRequestHandler.GetAllRequestTypes)
+            requestTypeRoutes.POST("", otherRequestHandler.CreateRequestType)
+            
+            // Güncelleme (PUT) ve Silme (DELETE)
+            requestTypeRoutes.PUT("/:id", otherRequestHandler.UpdateRequestType)
+            requestTypeRoutes.DELETE("/:id", otherRequestHandler.DeleteRequestType)
         }
 
 		// Job Position management routes
@@ -681,6 +709,24 @@ func seedDatabase(db *database.Database) error {
 		}
 		if err := db.DB.Create(&jobPosition).Error; err != nil {
 			return err
+		}
+	}
+
+	// Create default Other Request Types
+	requestTypes := []domain.RequestType{
+		{Name: "Bordro Talebi", Description: "Aylık veya geçmiş dönem maaş bordrosu kopyası talebi", Active: true},
+		{Name: "Çalışma Belgesi", Description: "Vize, banka veya resmi kurum başvurularında kullanılacak çalışma belgesi", Active: true},
+		{Name: "Vize Evrakları", Description: "Konsolosluk başvuruları için gerekli olan şirket imza sirküleri, faaliyet belgesi vb. evraklar", Active: true},
+		{Name: "Avans Talebi", Description: "Maaş dönemi öncesi acil durum avans talebi", Active: true},
+	}
+
+	for _, reqType := range requestTypes {
+		var existing domain.RequestType
+		err := db.DB.Where("name = ?", reqType.Name).First(&existing).Error
+		if err != nil {
+			if err := db.DB.Create(&reqType).Error; err != nil {
+				return err
+			}
 		}
 	}
 
