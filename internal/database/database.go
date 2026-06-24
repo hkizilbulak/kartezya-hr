@@ -85,6 +85,8 @@ func (d *Database) Close() {
 func (d *Database) Migrate() error {
 	log.Println("Running GORM auto-migration...")
 
+	d.DB.Config.DisableForeignKeyConstraintWhenMigrating = true
+
 	// Auto-migrate all models except AuditLog (handled by schema.sql)
 	err := d.DB.AutoMigrate(
 		&domain.User{},
@@ -110,6 +112,8 @@ func (d *Database) Migrate() error {
 		&domain.Event{},          // Event Management
 		&domain.EventParticipant{}, // Event Management
 		&domain.FAQ{},            // FAQ Management
+		&domain.RequestType{},
+		&domain.OtherRequest{},
 		// Note: AuditLog is excluded - it's created by schema.sql
 	)
 

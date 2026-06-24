@@ -314,6 +314,14 @@ definitions:
       updated_at:
         type: string
     type: object
+  domain.FAQStatus:
+    enum:
+    - ACTIVE
+    - INACTIVE
+    type: string
+    x-enum-varnames:
+    - FAQStatusActive
+    - FAQStatusInactive
   domain.Grade:
     properties:
       created_at:
@@ -821,6 +829,18 @@ definitions:
     required:
     - name
     type: object
+  handler.CreateFAQRequest:
+    properties:
+      description:
+        type: string
+      status:
+        $ref: '#/definitions/domain.FAQStatus'
+      title:
+        type: string
+    required:
+    - description
+    - title
+    type: object
   handler.CreateGradeRequest:
     properties:
       description:
@@ -875,6 +895,27 @@ definitions:
     required:
     - name
     type: object
+  handler.CreateOtherRequestReq:
+    properties:
+      description:
+        type: string
+      request_type_id:
+        type: integer
+    required:
+    - description
+    - request_type_id
+    type: object
+  handler.CreateRequestTypeReq:
+    properties:
+      active:
+        type: boolean
+      description:
+        type: string
+      name:
+        type: string
+    required:
+    - name
+    type: object
   handler.CreateWorkInformationRequest:
     properties:
       company_id:
@@ -902,6 +943,8 @@ definitions:
     type: object
   handler.DashboardDataResponse:
     properties:
+      active_events:
+        type: integer
       paid_expenses:
         type: integer
       pending_expense_requests:
@@ -916,6 +959,13 @@ definitions:
         type: integer
       total_employees:
         type: integer
+    type: object
+  handler.ForgotPasswordRequest:
+    properties:
+      email:
+        type: string
+    required:
+    - email
     type: object
   handler.GenderChartData:
     properties:
@@ -961,104 +1011,12 @@ definitions:
     - new_password
     - token
     type: object
-  handler.SendEmailRequest:
-    properties:
-      body:
-        example: <p>Merhaba,</p><p>Bu bir test mailidir.</p>
-        type: string
-      subject:
-        example: Bilgilendirme
-        type: string
-      to:
-        example:
-        - '["user@example.com"]'
-        items:
-          type: string
-        minItems: 1
-        type: array
-    required:
-    - body
-    - subject
-    - to
-    type: object
-  handler.SendEmailResponse:
-    properties:
-      sent_count:
-        type: integer
-      to:
-        items:
-          type: string
-        type: array
-    type: object
-  handler.SendPasswordResetEmailBatchRequest:
-    properties:
-      users:
-        items:
-          $ref: '#/definitions/handler.SendPasswordResetEmailRequest'
-        type: array
-    required:
-    - users
-    type: object
-  handler.SendPasswordResetEmailBatchResponse:
-    properties:
-      failure_count:
-        type: integer
-      results:
-        items:
-          $ref: '#/definitions/handler.SendPasswordResetEmailBatchResultItem'
-        type: array
-      success_count:
-        type: integer
-      total_count:
-        type: integer
-    type: object
-  handler.SendPasswordResetEmailBatchResultItem:
-    properties:
-      email:
-        type: string
-      error:
-        type: string
-      success:
-        type: boolean
-      user_id:
-        type: integer
-    type: object
   handler.SendPasswordResetEmailRequest:
     properties:
-      email:
-        type: string
-      first_name:
-        type: string
-      last_name:
-        type: string
       user_id:
         type: integer
     required:
-    - email
-    - first_name
-    - last_name
     - user_id
-    type: object
-  handler.SendTemplateEmailRequest:
-    properties:
-      subject:
-        example: Bilgilendirme
-        type: string
-      template_id:
-        example: b36f6d63-5477-4c7b-b5d1-67ec5d69ba2a
-        type: string
-      to:
-        example:
-        - '["user@example.com"]'
-        items:
-          type: string
-        minItems: 1
-        type: array
-      variables:
-        type: object
-    required:
-    - template_id
-    - to
     type: object
   handler.UpdateCompanyRequest:
     properties:
@@ -1190,6 +1148,18 @@ definitions:
         description: Use null to clear, omit to keep existing
         example: 1
         type: integer
+    type: object
+  handler.UpdateFAQRequest:
+    properties:
+      description:
+        type: string
+      status:
+        $ref: '#/definitions/domain.FAQStatus'
+      title:
+        type: string
+    required:
+    - description
+    - title
     type: object
   handler.UpdateGradeRequest:
     properties:
@@ -1493,6 +1463,10 @@ definitions:
         type: string
       customer_contact_phone:
         type: string
+      employee_contracts:
+        items:
+          $ref: '#/definitions/types.EmployeeContractResponse'
+        type: array
       end_date:
         type: string
       id:
@@ -2145,6 +2119,41 @@ paths:
       summary: Change user password (authenticated)
       tags:
       - auth
+  /auth/forgot-password:
+    post:
+      consumes:
+      - application/json
+      description: Request a password reset email using email address for unauthenticated
+        users
+      parameters:
+      - description: Forgot password request
+        in: body
+        name: forgotPasswordRequest
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ForgotPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      summary: Request password reset email
+      tags:
+      - auth
   /auth/login:
     post:
       consumes:
@@ -2227,30 +2236,25 @@ paths:
       summary: Reset user password with token
       tags:
       - auth
-  /auth/send-password-reset-email-batch:
+  /auth/send-password-reset-email:
     post:
       consumes:
       - application/json
-      description: Send password reset emails to a batch of users
+      description: Send password reset email to a user by user ID
       parameters:
-      - description: Batch password reset email request
+      - description: Single password reset email request
         in: body
-        name: batchRequest
+        name: request
         required: true
         schema:
-          $ref: '#/definitions/handler.SendPasswordResetEmailBatchRequest'
+          $ref: '#/definitions/handler.SendPasswordResetEmailRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            allOf:
-            - $ref: '#/definitions/handler.APIResponse'
-            - properties:
-                data:
-                  $ref: '#/definitions/handler.SendPasswordResetEmailBatchResponse'
-              type: object
+            $ref: '#/definitions/handler.APIResponse'
         "400":
           description: Bad Request
           schema:
@@ -2261,7 +2265,7 @@ paths:
             $ref: '#/definitions/handler.APIResponse'
       security:
       - BearerAuth: []
-      summary: Send password reset emails to multiple users
+      summary: Send password reset email to a single user
       tags:
       - auth
   /auth/validate-reset-token:
@@ -2935,96 +2939,6 @@ paths:
       summary: Update department
       tags:
       - departments
-  /email/send:
-    post:
-      consumes:
-      - application/json
-      description: Send a custom HTML email to one or more recipients (Admin only)
-      parameters:
-      - description: Email request
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handler.SendEmailRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/handler.APIResponse'
-            - properties:
-                data:
-                  $ref: '#/definitions/handler.SendEmailResponse'
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handler.APIResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handler.APIResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/handler.APIResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: Send custom email
-      tags:
-      - email
-  /email/template/send:
-    post:
-      consumes:
-      - application/json
-      description: Send an email using a predefined template (Admin only)
-      parameters:
-      - description: Template email request
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handler.SendTemplateEmailRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/handler.APIResponse'
-            - properties:
-                data:
-                  $ref: '#/definitions/handler.SendEmailResponse'
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handler.APIResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handler.APIResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/handler.APIResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: Send template email
-      tags:
-      - email
   /employee-contracts:
     get:
       consumes:
@@ -4457,6 +4371,138 @@ paths:
       summary: Get active expense types
       tags:
       - expense-types
+  /faqs:
+    get:
+      consumes:
+      - application/json
+      description: Sayfalama ve sıralama ile tüm SSS kayıtlarını getirir
+      parameters:
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      - description: Sıralama Alanı
+        in: query
+        name: sort
+        type: string
+      - description: Sıralama Yönü (ASC/DESC)
+        in: query
+        name: direction
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: SSS kayıtlarını listeler
+      tags:
+      - faqs
+    post:
+      consumes:
+      - application/json
+      description: İK personeli tarafından yeni bir Sıkça Sorulan Soru ekler (Yalnızca
+        Admin)
+      parameters:
+      - description: FAQ Data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateFAQRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Yeni bir SSS kaydı oluşturur
+      tags:
+      - faqs
+  /faqs/{id}:
+    delete:
+      description: ID'si verilen SSS kaydını soft-delete yöntemiyle siler
+      parameters:
+      - description: FAQ ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: SSS kaydını siler
+      tags:
+      - faqs
+    get:
+      description: ID'sine göre SSS kaydının detaylarını döner
+      parameters:
+      - description: FAQ ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Tek bir SSS kaydını getirir
+      tags:
+      - faqs
+    put:
+      consumes:
+      - application/json
+      description: Mevcut bir SSS kaydının başlık, açıklama ve durumunu günceller
+      parameters:
+      - description: FAQ ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: FAQ Data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateFAQRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: SSS kaydını günceller
+      tags:
+      - faqs
   /grades:
     get:
       consumes:
@@ -5871,6 +5917,66 @@ paths:
       summary: Get all roles for lookup
       tags:
       - Lookup
+  /other-requests:
+    get:
+      produces:
+      - application/json
+      responses: {}
+      security:
+      - BearerAuth: []
+      summary: Talepleri listeler
+      tags:
+      - other_requests
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Request Data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateOtherRequestReq'
+      produces:
+      - application/json
+      responses: {}
+      security:
+      - BearerAuth: []
+      summary: Çalışan için yeni talep oluşturur
+      tags:
+      - other_requests
+  /other-requests/{id}/cancel:
+    patch:
+      parameters:
+      - description: Request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses: {}
+      security:
+      - BearerAuth: []
+      summary: Çalışan tarafından talebi iptal eder
+      tags:
+      - other_requests
+  /other-requests/{id}/complete:
+    patch:
+      parameters:
+      - description: Request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses: {}
+      security:
+      - BearerAuth: []
+      summary: İK personeli tarafından talebi tamamlar
+      tags:
+      - other_requests
   /reports/efor:
     get:
       consumes:
@@ -5930,6 +6036,64 @@ paths:
       security:
       - BearerAuth: []
       summary: Get Efor Report
+      tags:
+      - reports
+  /reports/email:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Send a report file as email attachment to configured recipients
+      parameters:
+      - description: Email subject
+        in: formData
+        name: subject
+        required: true
+        type: string
+      - description: Email body
+        in: formData
+        name: body
+        required: true
+        type: string
+      - description: Report type
+        in: formData
+        name: report_type
+        required: true
+        type: string
+      - description: Recipients JSON array
+        in: formData
+        name: recipients
+        required: true
+        type: string
+      - description: Filters JSON
+        in: formData
+        name: filters
+        type: string
+      - description: Report file attachment
+        in: formData
+        name: attachment
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Send report via email
       tags:
       - reports
   /reports/grade/export:
@@ -6066,6 +6230,39 @@ paths:
       summary: Export Work Day Report as Excel
       tags:
       - reports
+  /request-types:
+    get:
+      produces:
+      - application/json
+      responses: {}
+      security:
+      - BearerAuth: []
+      summary: Talep Türlerini listeler
+      tags:
+      - request_types
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Request Type Data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateRequestTypeReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Yeni Talep Türü oluşturur
+      tags:
+      - request_types
   /work-information:
     get:
       consumes:

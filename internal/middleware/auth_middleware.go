@@ -48,8 +48,9 @@ func (m *AuthMiddleware) JWTAuth() gin.HandlerFunc {
 
 		// Set user context
 		c.Set("userID", claims.UserID)
-		c.Set("email", claims.Email)
-		c.Set("roles", claims.Roles)
+c.Set("email", claims.Email)      
+c.Set("userEmail", claims.Email) 
+c.Set("roles", claims.Roles)
 
 		c.Next()
 	}

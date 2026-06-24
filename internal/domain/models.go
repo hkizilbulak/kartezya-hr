@@ -469,6 +469,7 @@ const (
 	AttachmentRelatedTypeUser     AttachmentRelatedType = 3 // Kullanıcı/Profil
 	AttachmentRelatedTypeEmployee AttachmentRelatedType = 4 // Çalışan Özlük Dosyası
 	AttachmentRelatedTypeContract AttachmentRelatedType = 5 // Sözleşme
+	AttachmentRelatedTypeOtherReq AttachmentRelatedType = 6 // Diğer Talepler
 )
 
 // AttachmentType Enum - Defines document category
