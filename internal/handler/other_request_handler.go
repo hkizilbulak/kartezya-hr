@@ -314,6 +314,24 @@ func (h *OtherRequestHandler) CompleteRequest(c *gin.Context) {
     c.JSON(http.StatusOK, gin.H{"success": true, "message": "Talep başarıyla tamamlandı"})
 }
 
+func (h *OtherRequestHandler) RollbackRequest(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz talep ID", "success": false})
+		return
+	}
+
+	userEmail, _ := c.Get("email")
+
+	if err := h.reqService.RollbackRequest(uint(id), fmt.Sprintf("%v", userEmail)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "success": false})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Talep başarıyla geri alındı", "success": true})
+}
+
 // ==================== 3. DÖKÜMAN / DOSYA YÖNETİMİ ====================
 
 // UploadDocument godoc
