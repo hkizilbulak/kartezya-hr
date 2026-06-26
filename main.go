@@ -373,29 +373,29 @@ func main() {
         }
 
 		// Other Requests management routes
-		otherReqRoutes := protected.Group("/other-requests")
+        otherReqRoutes := protected.Group("/other-requests")
         {
             otherReqRoutes.POST("", otherRequestHandler.CreateRequest)
             otherReqRoutes.GET("", otherRequestHandler.GetAllRequests)
             otherReqRoutes.PUT("/:id", otherRequestHandler.UpdateRequest)
             otherReqRoutes.PATCH("/:id/cancel", otherRequestHandler.CancelRequest)
             otherReqRoutes.PATCH("/:id/complete", authMiddleware.RequireAdmin(), otherRequestHandler.CompleteRequest)
+			otherReqRoutes.PATCH("/:id/rollback", authMiddleware.RequireAdmin(), otherRequestHandler.RollbackRequest)
             
             otherReqRoutes.POST("/:id/documents", authMiddleware.RequireAdmin(), otherRequestHandler.UploadDocument)
             otherReqRoutes.GET("/:id/documents", otherRequestHandler.GetDocuments)
             otherReqRoutes.DELETE("/documents/:docId", authMiddleware.RequireAdmin(), otherRequestHandler.DeleteDocument)
         }
 
-		// Request Types (Talep Türleri) management routes
+        // Request Types (Talep Türleri) management routes
         requestTypeRoutes := protected.Group("/request-types")
-        requestTypeRoutes.Use(authMiddleware.RequireAdmin())
         {
             requestTypeRoutes.GET("", otherRequestHandler.GetAllRequestTypes)
-            requestTypeRoutes.POST("", otherRequestHandler.CreateRequestType)
-            requestTypeRoutes.PUT("/:id", otherRequestHandler.UpdateRequestType)
-            requestTypeRoutes.DELETE("/:id", otherRequestHandler.DeleteRequestType)
+            
+            requestTypeRoutes.POST("", authMiddleware.RequireAdmin(), otherRequestHandler.CreateRequestType)
+            requestTypeRoutes.PUT("/:id", authMiddleware.RequireAdmin(), otherRequestHandler.UpdateRequestType)
+            requestTypeRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), otherRequestHandler.DeleteRequestType)
         }
-
 
 		// Job Position management routes
 		jobPositionRoutes := protected.Group("/job-positions")

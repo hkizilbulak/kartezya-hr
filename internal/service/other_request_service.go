@@ -24,6 +24,7 @@ type OtherRequestService interface {
     UpdateRequest(req *domain.OtherRequest, userEmail string) error
     CancelRequest(id uint, userEmail string) error
     CompleteRequest(id uint, completerID uint, userEmail string) error
+    RollbackRequest(id uint, userEmail string) error
 
     // Yüklü Dosya / Doküman Yönetimi
     UploadRequestDocument(requestID uint, file *multipart.FileHeader) (*domain.Attachment, error)
@@ -156,9 +157,14 @@ func (s *otherRequestService) CompleteRequest(id uint, completerID uint, userEma
         existingReq = freshReq
     }
 
+    typeName := "Bilinmeyen Talep Türü"
+    if existingReq.RequestType != nil {
+        typeName = existingReq.RequestType.Name
+    }
+
     subject := "Talebiniz Tamamlandı"
     variables := map[string]interface{}{
-        "type":        existingReq.RequestType.Name,
+        "type":        typeName,
         "completedAt": now.Format("02.01.2006 15:04"),
         "description": existingReq.Description,
     }
@@ -170,6 +176,24 @@ func (s *otherRequestService) CompleteRequest(id uint, completerID uint, userEma
         }
     } else {
         println("Mail Gönderilemedi: Talep sahibi (Employee) bilgisi veya CompanyEmail alanı boş.")
+    }
+
+    return nil
+}
+
+func (s *otherRequestService) RollbackRequest(id uint, userEmail string) error {
+    existingReq, err := s.repo.GetRequestByID(id)
+    if err != nil {
+        return err
+    }
+
+    existingReq.Status = domain.RequestStatusActive
+    existingReq.CompletedBy = nil
+    existingReq.CompletedAt = nil
+
+    err = s.repo.UpdateRequest(existingReq, userEmail)
+    if err != nil {
+        return err
     }
 
     return nil
