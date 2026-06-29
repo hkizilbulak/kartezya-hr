@@ -19,7 +19,7 @@ type OtherRequestRepository interface {
     // Talep
     CreateRequest(req *domain.OtherRequest, userID uint, createdBy string) error
     GetRequestByID(id uint) (*domain.OtherRequest, error)
-    GetAllRequests(limit, offset int, sortParams types.SortParams) ([]*domain.OtherRequest, int64, error)
+    GetAllRequests(filterEmployeeID *uint, limit, offset int, sortParams types.SortParams) ([]*domain.OtherRequest, int64, error)
     UpdateRequest(req *domain.OtherRequest, modifiedBy string) error
     CancelRequest(id uint, deletedBy string) error
 
@@ -56,6 +56,9 @@ func (r *otherRequestRepository) GetAllRequestTypes(limit, offset int, sortParam
     var reqTypes []*domain.RequestType
     var total int64
 
+    query := r.db.Model(&domain.RequestType{}).Where("deleted = ?", false)
+    query.Count(&total)
+
     sortField := "created_at"
     direction := "DESC"
 
@@ -73,9 +76,6 @@ func (r *otherRequestRepository) GetAllRequestTypes(limit, offset int, sortParam
             sortField = "created_at"
         }
     }
-
-    query := r.db.Model(&domain.RequestType{}).Where("deleted = ?", false)
-    query.Count(&total)
 
     err := query.Order(fmt.Sprintf("%s %s", sortField, direction)).
         Limit(limit).Offset(offset).
@@ -126,9 +126,18 @@ func (r *otherRequestRepository) GetRequestByID(id uint) (*domain.OtherRequest, 
     return &req, nil
 }
 
-func (r *otherRequestRepository) GetAllRequests(limit, offset int, sortParams types.SortParams) ([]*domain.OtherRequest, int64, error) {
+func (r *otherRequestRepository) GetAllRequests(filterEmployeeID *uint, limit, offset int, sortParams types.SortParams) ([]*domain.OtherRequest, int64, error) {
     var reqs []*domain.OtherRequest
     var total int64
+
+    query := r.db.Model(&domain.OtherRequest{}).Where("deleted = ?", false)
+
+    // Admin degilse sadece kendi kayitlarini listele
+    if filterEmployeeID != nil {
+        query = query.Where("employee_id = ?", *filterEmployeeID)
+    }
+
+    query.Count(&total)
 
     sortField := "created_at"
     direction := "DESC"
@@ -147,9 +156,6 @@ func (r *otherRequestRepository) GetAllRequests(limit, offset int, sortParams ty
             sortField = "updated_at"
         }
     }
-
-    query := r.db.Model(&domain.OtherRequest{}).Where("deleted = ?", false)
-    query.Count(&total)
 
     err := query.Preload("Employee").
         Preload("RequestType").

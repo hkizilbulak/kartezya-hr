@@ -145,7 +145,7 @@ func main() {
 	jobService := service.NewJobService(jobRepo, auditService)
 	eventService := service.NewEventService(eventRepo, eventParticipantRepo, userRepo, employeeRepo, emailService, cfg)
 	faqService := service.NewFAQService(faqRepo, auditService)
-	otherRequestService := service.NewOtherRequestService(otherRequestRepo, auditService, emailService)
+    otherRequestService := service.NewOtherRequestService(otherRequestRepo, attachmentRepo, auditService, emailService, storageProvider, employeeRepo)
 
 	// Initialize and start scheduled jobs
 	scheduler := jobs.NewScheduler(db.DB, documentService, jobService)
@@ -380,12 +380,14 @@ func main() {
             otherReqRoutes.PUT("/:id", otherRequestHandler.UpdateRequest)
             otherReqRoutes.PATCH("/:id/cancel", otherRequestHandler.CancelRequest)
             otherReqRoutes.PATCH("/:id/complete", authMiddleware.RequireAdmin(), otherRequestHandler.CompleteRequest)
-			otherReqRoutes.PATCH("/:id/rollback", authMiddleware.RequireAdmin(), otherRequestHandler.RollbackRequest)
+            otherReqRoutes.PATCH("/:id/rollback", authMiddleware.RequireAdmin(), otherRequestHandler.RollbackRequest)
             
-            otherReqRoutes.POST("/:id/documents", authMiddleware.RequireAdmin(), otherRequestHandler.UploadDocument)
+            otherReqRoutes.POST("/:id/documents", otherRequestHandler.UploadDocument)
             otherReqRoutes.GET("/:id/documents", otherRequestHandler.GetDocuments)
-            otherReqRoutes.DELETE("/documents/:docId", authMiddleware.RequireAdmin(), otherRequestHandler.DeleteDocument)
-        }
+            otherReqRoutes.DELETE("/documents/:docId", otherRequestHandler.DeleteDocument)
+            
+            otherReqRoutes.GET("/documents/:docId/download", otherRequestHandler.DownloadDocument)       
+		}
 
         // Request Types (Talep Türleri) management routes
         requestTypeRoutes := protected.Group("/request-types")

@@ -167,21 +167,19 @@ func (h *OtherRequestHandler) CreateRequest(c *gin.Context) {
         return
     }
 
-    userID, exists := c.Get("userID")
+    userID, _, _, ok := getUserContext(c)
     userEmail, emailExists := c.Get("userEmail")
-    if !exists || !emailExists {
+    if !ok || !emailExists {
         c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "User not authenticated"})
         return
     }
-
-    userIDUint, _ := strconv.ParseUint(fmt.Sprintf("%v", userID), 10, 32)
 
     otherReq := &domain.OtherRequest{
         RequestTypeID: req.RequestTypeID,
         Description:   req.Description,
     }
 
-    if err := h.reqService.CreateRequest(otherReq, uint(userIDUint), fmt.Sprintf("%v", userEmail)); err != nil {
+    if err := h.reqService.CreateRequest(otherReq, userID, fmt.Sprintf("%v", userEmail)); err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
         return
     }
@@ -196,11 +194,23 @@ func (h *OtherRequestHandler) CreateRequest(c *gin.Context) {
 // @Security BearerAuth
 // @Router /other-requests [get]
 func (h *OtherRequestHandler) GetAllRequests(c *gin.Context) {
+    userID, _, roles, ok := getUserContext(c)
+    if !ok {
+        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Authentication required"})
+        return
+    }
+
     limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
     offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
     sortParams := types.SortParams{Sort: c.Query("sort"), Direction: c.Query("direction")}
 
-    reqs, total, err := h.reqService.GetAllRequests(limit, offset, sortParams)
+    var filterEmployeeID *uint
+    //Eğer admin/ik değilse filtre uygula
+    if !isAdmin(roles) {
+        filterEmployeeID = &userID
+    }
+
+    reqs, total, err := h.reqService.GetAllRequests(filterEmployeeID, limit, offset, sortParams)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
         return
@@ -297,16 +307,14 @@ func (h *OtherRequestHandler) CompleteRequest(c *gin.Context) {
         return
     }
 
-    userID, _ := c.Get("userID")
+    userID, _, _, ok := getUserContext(c)
     userEmail, exists := c.Get("userEmail")
-    if !exists {
+    if !ok || !exists {
         c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "User not authenticated"})
         return
     }
 
-    completerID, _ := strconv.ParseUint(fmt.Sprintf("%v", userID), 10, 32)
-
-    if err := h.reqService.CompleteRequest(uint(id), uint(completerID), fmt.Sprintf("%v", userEmail)); err != nil {
+    if err := h.reqService.CompleteRequest(uint(id), userID, fmt.Sprintf("%v", userEmail)); err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
         return
     }
@@ -315,21 +323,21 @@ func (h *OtherRequestHandler) CompleteRequest(c *gin.Context) {
 }
 
 func (h *OtherRequestHandler) RollbackRequest(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz talep ID", "success": false})
-		return
-	}
+    idStr := c.Param("id")
+    id, err := strconv.ParseUint(idStr, 10, 32)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz talep ID", "success": false})
+        return
+    }
 
-	userEmail, _ := c.Get("email")
+    userEmail, _ := c.Get("email")
 
-	if err := h.reqService.RollbackRequest(uint(id), fmt.Sprintf("%v", userEmail)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "success": false})
-		return
-	}
+    if err := h.reqService.RollbackRequest(uint(id), fmt.Sprintf("%v", userEmail)); err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "success": false})
+        return
+    }
 
-	c.JSON(http.StatusOK, gin.H{"message": "Talep başarıyla geri alındı", "success": true})
+    c.JSON(http.StatusOK, gin.H{"message": "Talep başarıyla geri alındı", "success": true})
 }
 
 // ==================== 3. DÖKÜMAN / DOSYA YÖNETİMİ ====================
@@ -453,4 +461,31 @@ func (h *OtherRequestHandler) DeleteRequestType(c *gin.Context) {
     }
 
     c.JSON(http.StatusOK, gin.H{"success": true, "message": "Talep türü başarıyla silindi"})
+}
+
+func (h *OtherRequestHandler) DownloadDocument(c *gin.Context) {
+    userID, _, roles, ok := getUserContext(c)
+    if !ok {
+        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Authentication required"})
+        return
+    }
+
+    documentID := c.Param("docId")
+    if documentID == "" {
+        c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Geçersiz doküman ID"})
+        return
+    }
+
+    url, err := h.reqService.DownloadRequestDocument(documentID, userID, isAdmin(roles))
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "success": true,
+        "data": gin.H{
+            "url": url,
+        },
+    })
 }
