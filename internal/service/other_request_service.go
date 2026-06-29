@@ -1,7 +1,9 @@
 package service
 
 import (
+    "fmt"
     "mime/multipart"
+    "path/filepath"
     "time"
 
     "kartezya-hr/internal/domain"
@@ -20,7 +22,7 @@ type OtherRequestService interface {
     // Talep
     CreateRequest(req *domain.OtherRequest, userID uint, userEmail string) error
     GetRequestByID(id uint) (*domain.OtherRequest, error)
-    GetAllRequests(limit, offset int, sortParams types.SortParams) ([]*domain.OtherRequest, int64, error)
+    GetAllRequests(filterEmployeeID *uint, limit, offset int, sortParams types.SortParams) ([]*domain.OtherRequest, int64, error)
     UpdateRequest(req *domain.OtherRequest, userEmail string) error
     CancelRequest(id uint, userEmail string) error
     CompleteRequest(id uint, completerID uint, userEmail string) error
@@ -30,19 +32,26 @@ type OtherRequestService interface {
     UploadRequestDocument(requestID uint, file *multipart.FileHeader) (*domain.Attachment, error)
     GetRequestDocuments(requestID uint) ([]*domain.Attachment, error)
     DeleteRequestDocument(documentID string) error
+    DownloadRequestDocument(documentID string, userID uint, isAdmin bool) (string, error)
 }
 
 type otherRequestService struct {
     repo         repository.OtherRequestRepository
+    attachmentRepo repository.AttachmentRepository
     auditService AuditService
     emailService EmailService
+    storage      StorageProvider
+    employeeRepo repository.EmployeeRepository
 }
 
-func NewOtherRequestService(repo repository.OtherRequestRepository, auditService AuditService, emailService EmailService) OtherRequestService {
+func NewOtherRequestService(repo repository.OtherRequestRepository, attachmentRepo repository.AttachmentRepository, auditService AuditService, emailService EmailService, storage StorageProvider, employeeRepo repository.EmployeeRepository) OtherRequestService {
     return &otherRequestService{
         repo:         repo,
+        attachmentRepo: attachmentRepo,
         auditService: auditService,
         emailService: emailService,
+        storage:      storage,
+        employeeRepo: employeeRepo,
     }
 }
 
@@ -97,8 +106,8 @@ func (s *otherRequestService) GetRequestByID(id uint) (*domain.OtherRequest, err
     return s.repo.GetRequestByID(id)
 }
 
-func (s *otherRequestService) GetAllRequests(limit, offset int, sortParams types.SortParams) ([]*domain.OtherRequest, int64, error) {
-    return s.repo.GetAllRequests(limit, offset, sortParams)
+func (s *otherRequestService) GetAllRequests(filterEmployeeID *uint, limit, offset int, sortParams types.SortParams) ([]*domain.OtherRequest, int64, error) {
+    return s.repo.GetAllRequests(filterEmployeeID, limit, offset, sortParams)
 }
 
 func (s *otherRequestService) UpdateRequest(req *domain.OtherRequest, userEmail string) error {
@@ -210,13 +219,39 @@ func (s *otherRequestService) UploadRequestDocument(requestID uint, file *multip
         return nil, err
     }
 
-    // 2. Yeni attachment nesnesini oluştur
-    attachment := domain.Attachment{
-        FileName: file.Filename,
-        FileSize: file.Size,
+    // 2. *multipart.FileHeader nesnesini multipart.File nesnesine dönüştür 
+    src, err := file.Open()
+    if err != nil {
+        return nil, fmt.Errorf("failed to open upload file: %w", err)
+    }
+    defer src.Close()
+
+    // 3. Dosyanın orijinal uzantısını dinamik olarak çek
+    ext := filepath.Ext(file.Filename)
+    if ext == "" {
+        ext = ".png" 
     }
 
-    // 3. Projenin ortak DB instance'ını çağırıp Attachment tablosuna kaydı ata
+    // 4. Benzersiz bir döküman ID'si (UUID) üret ve dinamik uzantıyı ekle
+    docUUID := fmt.Sprintf("%d-%d", requestID, time.Now().Unix())
+    targetPath := fmt.Sprintf("other-requests/%s%s", docUUID, ext) 
+
+    // 5. Fiziksel dosyayı depolama sağlayıcısına yükle
+    err = s.storage.Upload(src, targetPath)
+    if err != nil {
+        return nil, fmt.Errorf("failed to upload physical file: %w", err)
+    }
+
+    // 6. Yeni attachment nesnesini oluştur
+    attachment := domain.Attachment{
+        ID:          docUUID,
+        FileName:    file.Filename,
+        FileSize:    file.Size,
+        Path:        targetPath, 
+        RelatedID:   &requestID,
+    }
+
+    // 7. Talebe bağla ve veritabanını güncelle
     request.Attachments = append(request.Attachments, attachment)
     err = s.repo.UpdateRequest(request, request.CreatedBy)
     if err != nil {
@@ -246,5 +281,44 @@ func (s *otherRequestService) GetRequestDocuments(requestID uint) ([]*domain.Att
 // DeleteRequestDocument godoc
 // @Summary Talebe ait dökümanı sistemden ve veritabanından siler
 func (s *otherRequestService) DeleteRequestDocument(documentID string) error {
-    return s.repo.DeleteAttachment(documentID)
+    return nil
+}
+
+func (s *otherRequestService) DownloadRequestDocument(documentID string, userID uint, isAdmin bool) (string, error) {
+    attachment, err := s.attachmentRepo.FindByID(documentID)
+    if err != nil {
+        return "", fmt.Errorf("document not found")
+    }
+    
+    // Yetki Kontrolü: İstek atan Admin/İK değilse, dökümanın bağlı olduğu talebin sahibi mi doğrula
+    if !isAdmin && attachment.RelatedID != nil {
+        employee, err := s.employeeRepo.GetByUserID(userID)
+        if err == nil && employee != nil {
+            request, err := s.repo.GetRequestByID(*attachment.RelatedID)
+            if err == nil && request != nil && request.EmployeeID != employee.ID {
+                return "", fmt.Errorf("unauthorized to download this document")
+            }
+        }
+    }
+    
+    var targetPath string
+
+    if attachment.Path != "" {
+        targetPath = attachment.Path
+    } else {
+        ext := filepath.Ext(attachment.FileName)
+        if ext == "" {
+            ext = ".png"
+        }
+        
+        targetPath = fmt.Sprintf("other-requests/%s%s", documentID, ext)
+    }
+
+    // Storage sağlayıcısı üzerinden 15 dakikalık imzalı URL üretimi
+    url, err := s.storage.GeneratePresignedURL(targetPath, 15)
+    if err != nil {
+        return "", fmt.Errorf("failed to generate download URL: %w", err)
+    }
+
+    return url, nil
 }
