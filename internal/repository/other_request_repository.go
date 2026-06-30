@@ -1,188 +1,193 @@
 package repository
 
 import (
-    "fmt"
-    "kartezya-hr/internal/domain"
-    "kartezya-hr/internal/types"
+	"fmt"
+	"kartezya-hr/internal/domain"
+	"kartezya-hr/internal/types"
 
-    "gorm.io/gorm"
+	"gorm.io/gorm"
 )
 
 type OtherRequestRepository interface {
-    // Talep Türü
-    CreateRequestType(reqType *domain.RequestType, createdBy string) error
-    GetRequestTypeByID(id uint) (*domain.RequestType, error)
-    GetAllRequestTypes(limit, offset int, sortParams types.SortParams) ([]*domain.RequestType, int64, error)
-    UpdateRequestType(reqType *domain.RequestType, modifiedBy string) error
-    DeleteRequestType(id uint, deletedBy string) error
+	// Talep Türü
+	CreateRequestType(reqType *domain.RequestType, createdBy string) error
+	GetRequestTypeByID(id uint) (*domain.RequestType, error)
+	GetAllRequestTypes(limit, offset int, sortParams types.SortParams) ([]*domain.RequestType, int64, error)
+	UpdateRequestType(reqType *domain.RequestType, modifiedBy string) error
+	DeleteRequestType(id uint, deletedBy string) error
 
-    // Talep
-    CreateRequest(req *domain.OtherRequest, userID uint, createdBy string) error
-    GetRequestByID(id uint) (*domain.OtherRequest, error)
-    GetAllRequests(filterEmployeeID *uint, limit, offset int, sortParams types.SortParams) ([]*domain.OtherRequest, int64, error)
-    UpdateRequest(req *domain.OtherRequest, modifiedBy string) error
-    CancelRequest(id uint, deletedBy string) error
-
-    // Döküman Yönetimi
-    DeleteAttachment(documentID string) error
+	// Talep
+	CreateRequest(req *domain.OtherRequest, userID uint, createdBy string) error
+	GetRequestByID(id uint) (*domain.OtherRequest, error)
+	GetRequestsByUserID(userID uint) ([]*domain.OtherRequest, error)
+	GetAllRequests(filterEmployeeID *uint, limit, offset int, sortParams types.SortParams) ([]*domain.OtherRequest, int64, error)
+	UpdateRequest(req *domain.OtherRequest, modifiedBy string) error
+	CancelRequest(id uint, deletedBy string) error
 }
 
 type otherRequestRepository struct {
-    db *gorm.DB
+	db *gorm.DB
 }
 
 func NewOtherRequestRepository(db *gorm.DB) OtherRequestRepository {
-    return &otherRequestRepository{db: db}
+	return &otherRequestRepository{db: db}
 }
 
 // ==================== TALEP TÜRÜ ====================
 
 func (r *otherRequestRepository) CreateRequestType(reqType *domain.RequestType, createdBy string) error {
-    reqType.CreatedBy = createdBy
-    reqType.ModifiedBy = createdBy
-    return r.db.Create(reqType).Error
+	reqType.CreatedBy = createdBy
+	reqType.ModifiedBy = createdBy
+	return r.db.Create(reqType).Error
 }
 
 func (r *otherRequestRepository) GetRequestTypeByID(id uint) (*domain.RequestType, error) {
-    var reqType domain.RequestType
-    err := r.db.Where("id = ? AND deleted = ?", id, false).First(&reqType).Error
-    if err != nil {
-        return nil, err
-    }
-    return &reqType, nil
+	var reqType domain.RequestType
+	err := r.db.Where("id = ? AND deleted = ?", id, false).First(&reqType).Error
+	return &reqType, err
 }
 
 func (r *otherRequestRepository) GetAllRequestTypes(limit, offset int, sortParams types.SortParams) ([]*domain.RequestType, int64, error) {
-    var reqTypes []*domain.RequestType
-    var total int64
+	var reqTypes []*domain.RequestType
+	var total int64
 
-    query := r.db.Model(&domain.RequestType{}).Where("deleted = ?", false)
-    query.Count(&total)
+	query := r.db.Model(&domain.RequestType{}).Where("deleted = ?", false)
+	query.Count(&total)
 
-    sortField := "created_at"
-    direction := "DESC"
+	if sortParams.Sort != "" {
+		orderClause := sortParams.Sort
+		if sortParams.Direction == "DESC" {
+			orderClause += " DESC"
+		} else {
+			orderClause += " ASC"
+		}
+		query = query.Order(orderClause)
+	} else {
+		query = query.Order("created_at DESC")
+	}
 
-    if sortParams.Direction == "ASC" {
-        direction = "ASC"
-    }
+	if limit > 0 {
+		query = query.Limit(limit).Offset(offset)
+	}
 
-    if sortParams.Sort != "" {
-        switch sortParams.Sort {
-        case "name":
-            sortField = "name"
-        case "active":
-            sortField = "active"
-        case "created_at":
-            sortField = "created_at"
-        }
-    }
-
-    err := query.Order(fmt.Sprintf("%s %s", sortField, direction)).
-        Limit(limit).Offset(offset).
-        Find(&reqTypes).Error
-
-    return reqTypes, total, err
+	err := query.Find(&reqTypes).Error
+	return reqTypes, total, err
 }
 
 func (r *otherRequestRepository) UpdateRequestType(reqType *domain.RequestType, modifiedBy string) error {
-    reqType.ModifiedBy = modifiedBy
-    return r.db.Where("deleted = ?", false).Save(reqType).Error
+	return r.db.Model(reqType).Updates(map[string]interface{}{
+		"name":        reqType.Name,
+		"description": reqType.Description,
+		"active":      reqType.Active,
+		"modified_by": modifiedBy,
+	}).Error
 }
 
 func (r *otherRequestRepository) DeleteRequestType(id uint, deletedBy string) error {
-    return r.db.Unscoped().Where("id = ?", id).Delete(&domain.RequestType{}).Error
+	return r.db.Model(&domain.RequestType{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"deleted":     true,
+		"modified_by": deletedBy,
+	}).Error
 }
 
 // ==================== TALEP ====================
 
 func (r *otherRequestRepository) CreateRequest(req *domain.OtherRequest, userID uint, createdBy string) error {
-    var employee domain.Employee
-    if err := r.db.Where("user_id = ? AND deleted = ?", userID, false).First(&employee).Error; err != nil {
-        return fmt.Errorf("Bu kullanıcıya ait aktif bir çalışan kaydı bulunamadı!")
-    }
+	var employee domain.Employee
+	if err := r.db.Where("user_id = ? AND deleted = ?", userID, false).First(&employee).Error; err != nil {
+		return fmt.Errorf("Bu kullanıcıya ait aktif bir çalışan kaydı bulunamadı!")
+	}
 
-    req.EmployeeID = employee.ID
-    req.CreatedBy = createdBy
-    req.ModifiedBy = createdBy
+	req.EmployeeID = employee.ID
+	req.CreatedBy = createdBy
+	req.ModifiedBy = createdBy
 
-    if err := r.db.Create(req).Error; err != nil {
-        return err
-    }
+	if err := r.db.Create(req).Error; err != nil {
+		return err
+	}
 
-    // Servis katmanında mail atılırken Employee ve RequestType bilgilerinin boş kalmaması için ilişkileri yüklüyoruz
-    return r.db.Preload("Employee").Preload("RequestType").First(req, req.ID).Error
+	return r.db.Preload("Employee").Preload("RequestType").First(req, req.ID).Error
 }
 
 func (r *otherRequestRepository) GetRequestByID(id uint) (*domain.OtherRequest, error) {
-    var req domain.OtherRequest
-    err := r.db.Preload("Employee").
-        Preload("RequestType").
-        Preload("Completer").
-        Preload("Attachments").
-        Where("id = ? AND deleted = ?", id, false).First(&req).Error
-    if err != nil {
-        return nil, err
-    }
-    return &req, nil
+	var req domain.OtherRequest
+	err := r.db.Preload("Employee").
+		Preload("RequestType").
+		Preload("Completer").
+		Preload("Attachments").
+		Where("id = ? AND deleted = ?", id, false).First(&req).Error
+	return &req, err
+}
+
+func (r *otherRequestRepository) GetRequestsByUserID(userID uint) ([]*domain.OtherRequest, error) {
+	var reqs []*domain.OtherRequest
+	var emp domain.Employee
+
+	if err := r.db.Where("user_id = ? AND deleted = ?", userID, false).First(&emp).Error; err != nil {
+		return nil, fmt.Errorf("Kullanıcı profilinize tanımlı aktif bir çalışan kaydı bulunamadı!")
+	}
+
+	err := r.db.Preload("Employee").
+		Preload("RequestType").
+		Preload("Attachments").
+		Where("employee_id = ? AND deleted = ?", emp.ID, false).
+		Order("created_at DESC").
+		Find(&reqs).Error
+
+	return reqs, err
 }
 
 func (r *otherRequestRepository) GetAllRequests(filterEmployeeID *uint, limit, offset int, sortParams types.SortParams) ([]*domain.OtherRequest, int64, error) {
-    var reqs []*domain.OtherRequest
-    var total int64
+	var reqs []*domain.OtherRequest
+	var total int64
 
-    query := r.db.Model(&domain.OtherRequest{}).Where("deleted = ?", false)
+	query := r.db.Preload("Employee").
+		Preload("RequestType").
+		Preload("Attachments").
+		Where("deleted = ?", false)
 
-    // Admin degilse sadece kendi kayitlarini listele
-    if filterEmployeeID != nil {
-        query = query.Where("employee_id = ?", *filterEmployeeID)
-    }
+	if filterEmployeeID != nil {
+		query = query.Where("employee_id = ?", *filterEmployeeID)
+	}
 
-    query.Count(&total)
+	query.Model(&domain.OtherRequest{}).Count(&total)
 
-    sortField := "created_at"
-    direction := "DESC"
+	if sortParams.Sort != "" {
+		orderClause := sortParams.Sort
+		if sortParams.Direction == "DESC" {
+			orderClause += " DESC"
+		} else {
+			orderClause += " ASC"
+		}
+		query = query.Order(orderClause)
+	} else {
+		query = query.Order("created_at DESC")
+	}
 
-    if sortParams.Direction == "ASC" {
-        direction = "ASC"
-    }
+	if limit > 0 {
+		query = query.Limit(limit).Offset(offset)
+	}
 
-    if sortParams.Sort != "" {
-        switch sortParams.Sort {
-        case "status":
-            sortField = "status"
-        case "created_at":
-            sortField = "created_at"
-        case "updated_at":
-            sortField = "updated_at"
-        }
-    }
-
-    err := query.Preload("Employee").
-        Preload("RequestType").
-        Preload("Attachments").
-        Order(fmt.Sprintf("%s %s", sortField, direction)).
-        Limit(limit).Offset(offset).
-        Find(&reqs).Error
-
-    return reqs, total, err
+	err := query.Find(&reqs).Error
+	return reqs, total, err
 }
 
 func (r *otherRequestRepository) UpdateRequest(req *domain.OtherRequest, modifiedBy string) error {
-    req.ModifiedBy = modifiedBy
-    return r.db.Where("deleted = ?", false).Save(req).Error
+	return r.db.Model(req).Updates(map[string]interface{}{
+		"request_type_id": req.RequestTypeID,
+		"description":     req.Description,
+		"status":          req.Status,
+		"completed_by":    req.CompletedBy,
+		"completed_at":    req.CompletedAt,
+		"modified_by":     modifiedBy,
+	}).Error
 }
 
-// Talep silindiğinde silme yapılmaz, durumu CANCELLED yapılır.
 func (r *otherRequestRepository) CancelRequest(id uint, deletedBy string) error {
-    return r.db.Model(&domain.OtherRequest{}).
-        Where("id = ? AND deleted = ?", id, false).
-        Updates(map[string]interface{}{
-            "status":      domain.RequestStatusCancelled,
-            "modified_by": deletedBy,
-        }).Error
-}
-
-// DeleteAttachment dökümanı veritabanından tamamen siler.
-func (r *otherRequestRepository) DeleteAttachment(documentID string) error {
-    return r.db.Where("id = ?", documentID).Delete(&domain.Attachment{}).Error
+	return r.db.Model(&domain.OtherRequest{}).
+		Where("id = ? AND deleted = ?", id, false).
+		Updates(map[string]interface{}{
+			"status":      domain.RequestStatusCancelled,
+			"modified_by": deletedBy,
+		}).Error
 }

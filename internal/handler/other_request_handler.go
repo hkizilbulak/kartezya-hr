@@ -1,9 +1,9 @@
 package handler
 
 import (
-    "fmt"
     "net/http"
     "strconv"
+    "fmt"
 
     "kartezya-hr/internal/domain"
     "kartezya-hr/internal/service"
@@ -46,7 +46,7 @@ type UpdateOtherRequestReq struct {
 
 // ==================== 1. TALEP TÜRÜ İŞLEMLERİ (ADMIN) ====================
 
-// CreateRequestType handles Request Type creation
+// CreateRequestType godoc
 // @Summary Yeni Talep Türü oluşturur
 // @Tags request_types
 // @Accept json
@@ -56,15 +56,20 @@ type UpdateOtherRequestReq struct {
 // @Success 201 {object} map[string]interface{}
 // @Router /request-types [post]
 func (h *OtherRequestHandler) CreateRequestType(c *gin.Context) {
-    var req CreateRequestTypeReq
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid format", "details": err.Error()})
+    userID, _, roles, ok := getUserContext(c)
+    if !ok {
+        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Authentication required"})
         return
     }
 
-    userEmail, exists := c.Get("userEmail")
-    if !exists {
-        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "User email not found in context"})
+    if !isAdmin(roles) {
+        c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Admin access required"})
+        return
+    }
+
+    var req CreateRequestTypeReq
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
         return
     }
 
@@ -74,7 +79,7 @@ func (h *OtherRequestHandler) CreateRequestType(c *gin.Context) {
         Active:      req.Active,
     }
 
-    if err := h.reqService.CreateRequestType(reqType, fmt.Sprintf("%v", userEmail)); err != nil {
+    if err := h.reqService.CreateRequestType(reqType, userID); err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
         return
     }
@@ -82,7 +87,7 @@ func (h *OtherRequestHandler) CreateRequestType(c *gin.Context) {
     c.JSON(http.StatusCreated, gin.H{"success": true, "data": reqType, "message": "Talep türü başarıyla oluşturuldu"})
 }
 
-// GetAllRequestTypes handles fetching Request Type list
+// GetAllRequestTypes godoc
 // @Summary Talep Türlerini listeler
 // @Tags request_types
 // @Produce json
@@ -102,7 +107,7 @@ func (h *OtherRequestHandler) GetAllRequestTypes(c *gin.Context) {
     c.JSON(http.StatusOK, gin.H{"success": true, "data": reqTypes, "total": total})
 }
 
-// UpdateRequestType handles updating Request Type
+// UpdateRequestType godoc
 // @Summary Talep Türünü günceller
 // @Tags request_types
 // @Accept json
@@ -113,8 +118,18 @@ func (h *OtherRequestHandler) GetAllRequestTypes(c *gin.Context) {
 // @Success 200 {object} map[string]interface{}
 // @Router /request-types/{id} [put]
 func (h *OtherRequestHandler) UpdateRequestType(c *gin.Context) {
-    idStr := c.Param("id")
-    id, err := strconv.ParseUint(idStr, 10, 32)
+    userID, _, roles, ok := getUserContext(c)
+    if !ok {
+        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Authentication required"})
+        return
+    }
+
+    if !isAdmin(roles) {
+        c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Admin access required"})
+        return
+    }
+
+    id, err := parseUintParam(c, "id")
     if err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid ID"})
         return
@@ -122,17 +137,11 @@ func (h *OtherRequestHandler) UpdateRequestType(c *gin.Context) {
 
     var req UpdateRequestTypeReq
     if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid format", "details": err.Error()})
+        c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
         return
     }
 
-    userEmail, exists := c.Get("userEmail")
-    if !exists {
-        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "User email not found in context"})
-        return
-    }
-
-    reqType, err := h.reqService.GetRequestTypeByID(uint(id))
+    reqType, err := h.reqService.GetRequestTypeByID(id)
     if err != nil {
         c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Talep türü bulunamadı"})
         return
@@ -142,7 +151,7 @@ func (h *OtherRequestHandler) UpdateRequestType(c *gin.Context) {
     reqType.Description = req.Description
     reqType.Active = req.Active
 
-    if err := h.reqService.UpdateRequestType(reqType, fmt.Sprintf("%v", userEmail)); err != nil {
+    if err := h.reqService.UpdateRequestType(reqType, userID); err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
         return
     }
@@ -150,9 +159,43 @@ func (h *OtherRequestHandler) UpdateRequestType(c *gin.Context) {
     c.JSON(http.StatusOK, gin.H{"success": true, "data": reqType, "message": "Talep türü başarıyla güncellendi"})
 }
 
+// DeleteRequestType godoc
+// @Summary Talep Türünü siler
+// @Tags request_types
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Request Type ID"
+// @Success 200 {object} map[string]interface{}
+// @Router /request-types/{id} [delete]
+func (h *OtherRequestHandler) DeleteRequestType(c *gin.Context) {
+    userID, _, roles, ok := getUserContext(c)
+    if !ok {
+        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Authentication required"})
+        return
+    }
+
+    if !isAdmin(roles) {
+        c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Admin access required"})
+        return
+    }
+
+    id, err := parseUintParam(c, "id")
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid ID"})
+        return
+    }
+
+    if err := h.reqService.DeleteRequestType(id, userID); err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"success": true, "message": "Talep türü başarıyla silindi"})
+}
+
 // ==================== 2. DİĞER TALEPLER İŞLEMLERİ (ÇALIŞAN / İK) ====================
 
-// CreateRequest handles new request creation
+// CreateRequest godoc
 // @Summary Çalışan için yeni talep oluşturur
 // @Tags other_requests
 // @Accept json
@@ -161,16 +204,15 @@ func (h *OtherRequestHandler) UpdateRequestType(c *gin.Context) {
 // @Param request body CreateOtherRequestReq true "Request Data"
 // @Router /other-requests [post]
 func (h *OtherRequestHandler) CreateRequest(c *gin.Context) {
-    var req CreateOtherRequestReq
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid format", "details": err.Error()})
+    userID, _, _, ok := getUserContext(c)
+    if !ok {
+        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Authentication required"})
         return
     }
 
-    userID, _, _, ok := getUserContext(c)
-    userEmail, emailExists := c.Get("userEmail")
-    if !ok || !emailExists {
-        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "User not authenticated"})
+    var req CreateOtherRequestReq
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
         return
     }
 
@@ -179,7 +221,7 @@ func (h *OtherRequestHandler) CreateRequest(c *gin.Context) {
         Description:   req.Description,
     }
 
-    if err := h.reqService.CreateRequest(otherReq, userID, fmt.Sprintf("%v", userEmail)); err != nil {
+    if err := h.reqService.CreateRequest(otherReq, userID); err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
         return
     }
@@ -187,7 +229,7 @@ func (h *OtherRequestHandler) CreateRequest(c *gin.Context) {
     c.JSON(http.StatusCreated, gin.H{"success": true, "data": otherReq, "message": "Talep başarıyla oluşturuldu"})
 }
 
-// GetAllRequests handles fetching all requests
+// GetAllRequests godoc
 // @Summary Talepleri listeler
 // @Tags other_requests
 // @Produce json
@@ -205,7 +247,6 @@ func (h *OtherRequestHandler) GetAllRequests(c *gin.Context) {
     sortParams := types.SortParams{Sort: c.Query("sort"), Direction: c.Query("direction")}
 
     var filterEmployeeID *uint
-    //Eğer admin/ik değilse filtre uygula
     if !isAdmin(roles) {
         filterEmployeeID = &userID
     }
@@ -219,7 +260,54 @@ func (h *OtherRequestHandler) GetAllRequests(c *gin.Context) {
     c.JSON(http.StatusOK, gin.H{"success": true, "data": reqs, "total": total})
 }
 
-// UpdateRequest handles updating a request
+// GetMyRequests godoc
+// @Summary Giriş yapan çalışanın kendi taleplerini listeler
+// @Tags other_requests
+// @Produce json
+// @Security BearerAuth
+// @Router /other-requests/me [get]
+func (h *OtherRequestHandler) GetMyRequests(c *gin.Context) {
+    userID, _, _, ok := getUserContext(c)
+    if !ok {
+        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Authentication required"})
+        return
+    }
+
+    requests, err := h.reqService.GetRequestsByUserID(userID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"success": true, "data": requests})
+}
+
+
+// GetRequestByID godoc
+// @Summary Talep detayını getirir
+// @Tags other_requests
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Request ID"
+// @Success 200 {object} map[string]interface{}
+// @Router /other-requests/{id} [get]
+func (h *OtherRequestHandler) GetRequestByID(c *gin.Context) {
+    id, err := parseUintParam(c, "id")
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Geçersiz ID"})
+        return
+    }
+
+    req, err := h.reqService.GetRequestByID(id)
+    if err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Talep bulunamadı"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"success": true, "data": req})
+}
+
+// UpdateRequest godoc
 // @Summary Talebi günceller (Talep tipi veya açıklaması değişirse statü ACTIVE olur)
 // @Tags other_requests
 // @Accept json
@@ -229,8 +317,13 @@ func (h *OtherRequestHandler) GetAllRequests(c *gin.Context) {
 // @Param request body UpdateOtherRequestReq true "Request Data"
 // @Router /other-requests/{id} [put]
 func (h *OtherRequestHandler) UpdateRequest(c *gin.Context) {
-    idStr := c.Param("id")
-    id, err := strconv.ParseUint(idStr, 10, 32)
+    userID, _, _, ok := getUserContext(c)
+    if !ok {
+        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Authentication required"})
+        return
+    }
+
+    id, err := parseUintParam(c, "id")
     if err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid ID"})
         return
@@ -238,17 +331,11 @@ func (h *OtherRequestHandler) UpdateRequest(c *gin.Context) {
 
     var req UpdateOtherRequestReq
     if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid format", "details": err.Error()})
+        c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
         return
     }
 
-    userEmail, exists := c.Get("userEmail")
-    if !exists {
-        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "User not authenticated"})
-        return
-    }
-
-    existingReq, err := h.reqService.GetRequestByID(uint(id))
+    existingReq, err := h.reqService.GetRequestByID(id)
     if err != nil {
         c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Talep bulunamadı"})
         return
@@ -257,7 +344,7 @@ func (h *OtherRequestHandler) UpdateRequest(c *gin.Context) {
     existingReq.RequestTypeID = req.RequestTypeID
     existingReq.Description = req.Description
 
-    if err := h.reqService.UpdateRequest(existingReq, fmt.Sprintf("%v", userEmail)); err != nil {
+    if err := h.reqService.UpdateRequest(existingReq, userID); err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
         return
     }
@@ -265,7 +352,7 @@ func (h *OtherRequestHandler) UpdateRequest(c *gin.Context) {
     c.JSON(http.StatusOK, gin.H{"success": true, "data": existingReq, "message": "Talep başarıyla güncellendi"})
 }
 
-// CancelRequest handles canceling a request
+// CancelRequest godoc
 // @Summary Çalışan tarafından talebi iptal eder
 // @Tags other_requests
 // @Produce json
@@ -273,27 +360,32 @@ func (h *OtherRequestHandler) UpdateRequest(c *gin.Context) {
 // @Param id path int true "Request ID"
 // @Router /other-requests/{id}/cancel [patch]
 func (h *OtherRequestHandler) CancelRequest(c *gin.Context) {
-    id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+    // 1. roles bilgisini _ yerine değişken olarak al
+    userID, _, roles, ok := getUserContext(c)
+    if !ok {
+        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Authentication required"})
+        return
+    }
+
+    // 2. Admin yetkisini kontrol et
+    isUserAdmin := isAdmin(roles)
+
+    id, err := parseUintParam(c, "id")
     if err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid ID"})
         return
     }
 
-    userEmail, exists := c.Get("userEmail")
-    if !exists {
-        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "User not authenticated"})
-        return
-    }
-
-    if err := h.reqService.CancelRequest(uint(id), fmt.Sprintf("%v", userEmail)); err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-        return
+    // 3. Servise isAdmin bilgisini gönder
+    if err := h.reqService.CancelRequest(id, userID, isUserAdmin); err != nil {
+    c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+    return
     }
 
     c.JSON(http.StatusOK, gin.H{"success": true, "message": "Talep başarıyla iptal edildi"})
 }
 
-// CompleteRequest handles completing a request by HR
+// CompleteRequest godoc
 // @Summary İK personeli tarafından talebi tamamlar
 // @Tags other_requests
 // @Produce json
@@ -301,20 +393,24 @@ func (h *OtherRequestHandler) CancelRequest(c *gin.Context) {
 // @Param id path int true "Request ID"
 // @Router /other-requests/{id}/complete [patch]
 func (h *OtherRequestHandler) CompleteRequest(c *gin.Context) {
-    id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+    userID, _, roles, ok := getUserContext(c)
+    if !ok {
+        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Authentication required"})
+        return
+    }
+
+    if !isAdmin(roles) {
+        c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Admin access required"})
+        return
+    }
+
+    id, err := parseUintParam(c, "id")
     if err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid ID"})
         return
     }
 
-    userID, _, _, ok := getUserContext(c)
-    userEmail, exists := c.Get("userEmail")
-    if !ok || !exists {
-        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "User not authenticated"})
-        return
-    }
-
-    if err := h.reqService.CompleteRequest(uint(id), userID, fmt.Sprintf("%v", userEmail)); err != nil {
+    if err := h.reqService.CompleteRequest(id, userID); err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
         return
     }
@@ -323,16 +419,24 @@ func (h *OtherRequestHandler) CompleteRequest(c *gin.Context) {
 }
 
 func (h *OtherRequestHandler) RollbackRequest(c *gin.Context) {
-    idStr := c.Param("id")
-    id, err := strconv.ParseUint(idStr, 10, 32)
+    userID, _, roles, ok := getUserContext(c)
+    if !ok {
+        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Authentication required"})
+        return
+    }
+
+    if !isAdmin(roles) {
+        c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Admin access required"})
+        return
+    }
+
+    id, err := parseUintParam(c, "id")
     if err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz talep ID", "success": false})
         return
     }
 
-    userEmail, _ := c.Get("email")
-
-    if err := h.reqService.RollbackRequest(uint(id), fmt.Sprintf("%v", userEmail)); err != nil {
+    if err := h.reqService.RollbackRequest(id, userID); err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "success": false})
         return
     }
@@ -343,24 +447,14 @@ func (h *OtherRequestHandler) RollbackRequest(c *gin.Context) {
 // ==================== 3. DÖKÜMAN / DOSYA YÖNETİMİ ====================
 
 // UploadDocument godoc
-// @Summary Talebe doküman (dosya) ekler
-// @Tags other_requests
-// @Accept multipart/form-data
-// @Produce json
-// @Security BearerAuth
-// @Param id path int true "Request ID"
-// @Param file formData file true "Belge dosyası"
-// @Success 200 {object} map[string]interface{}
-// @Router /other-requests/{id}/documents [post]
 func (h *OtherRequestHandler) UploadDocument(c *gin.Context) {
-    _, exists := c.Get("userEmail")
-    if !exists {
-        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Oturum bulunamadı"})
+    userID, _, roles, ok := getUserContext(c)
+    if !ok {
+        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Authentication required"})
         return
     }
 
-    idParam := c.Param("id")
-    requestID, err := strconv.ParseUint(idParam, 10, 32)
+    requestID, err := parseUintParam(c, "id")
     if err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Geçersiz talep ID"})
         return
@@ -368,11 +462,13 @@ func (h *OtherRequestHandler) UploadDocument(c *gin.Context) {
 
     file, err := c.FormFile("file")
     if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Dosya yüklenmedi"})
+        // Hata durumunda konsola hatayı yazdır
+        fmt.Printf("Upload hatası: %v\n", err) 
+        c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Dosya yüklenmedi: " + err.Error()})
         return
     }
 
-    document, err := h.reqService.UploadRequestDocument(uint(requestID), file)
+    document, err := h.reqService.UploadRequestDocument(requestID, file, userID, isAdmin(roles))
     if err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
         return
@@ -386,22 +482,20 @@ func (h *OtherRequestHandler) UploadDocument(c *gin.Context) {
 }
 
 // GetDocuments godoc
-// @Summary Talep dokümanlarını listeler
-// @Tags other_requests
-// @Produce json
-// @Security BearerAuth
-// @Param id path int true "Request ID"
-// @Success 200 {object} map[string]interface{}
-// @Router /other-requests/{id}/documents [get]
 func (h *OtherRequestHandler) GetDocuments(c *gin.Context) {
-    idParam := c.Param("id")
-    requestID, err := strconv.ParseUint(idParam, 10, 32)
+    userID, _, roles, ok := getUserContext(c)
+    if !ok {
+        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Authentication required"})
+        return
+    }
+
+    requestID, err := parseUintParam(c, "id")
     if err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Geçersiz talep ID"})
         return
     }
 
-    documents, err := h.reqService.GetRequestDocuments(uint(requestID))
+    documents, err := h.reqService.GetRequestDocuments(requestID, userID, isAdmin(roles))
     if err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
         return
@@ -411,21 +505,20 @@ func (h *OtherRequestHandler) GetDocuments(c *gin.Context) {
 }
 
 // DeleteDocument godoc
-// @Summary Talep dokümanını siler
-// @Tags other_requests
-// @Produce json
-// @Security BearerAuth
-// @Param id path string true "Document ID (UUID)"
-// @Success 200 {object} map[string]interface{}
-// @Router /other-requests/documents/{id} [delete]
 func (h *OtherRequestHandler) DeleteDocument(c *gin.Context) {
+    userID, _, roles, ok := getUserContext(c)
+    if !ok {
+        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Authentication required"})
+        return
+    }
+
     documentID := c.Param("docId")
     if documentID == "" {
         c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Geçersiz doküman ID"})
         return
     }
 
-    if err := h.reqService.DeleteRequestDocument(documentID); err != nil {
+    if err := h.reqService.DeleteRequestDocument(documentID, userID, isAdmin(roles)); err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
         return
     }
@@ -433,36 +526,7 @@ func (h *OtherRequestHandler) DeleteDocument(c *gin.Context) {
     c.JSON(http.StatusOK, gin.H{"success": true, "message": "Doküman başarıyla silindi"})
 }
 
-// DeleteRequestType handles deleting a Request Type
-// @Summary Talep Türünü siler
-// @Tags request_types
-// @Produce json
-// @Security BearerAuth
-// @Param id path int true "Request Type ID"
-// @Success 200 {object} map[string]interface{}
-// @Router /request-types/{id} [delete]
-func (h *OtherRequestHandler) DeleteRequestType(c *gin.Context) {
-    idStr := c.Param("id")
-    id, err := strconv.ParseUint(idStr, 10, 32)
-    if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid ID"})
-        return
-    }
-
-    userEmail, exists := c.Get("userEmail")
-    if !exists {
-        c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "User email not found in context"})
-        return
-    }
-
-    if err := h.reqService.DeleteRequestType(uint(id), fmt.Sprintf("%v", userEmail)); err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-        return
-    }
-
-    c.JSON(http.StatusOK, gin.H{"success": true, "message": "Talep türü başarıyla silindi"})
-}
-
+// DownloadDocument godoc
 func (h *OtherRequestHandler) DownloadDocument(c *gin.Context) {
     userID, _, roles, ok := getUserContext(c)
     if !ok {
