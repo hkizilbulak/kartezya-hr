@@ -27,6 +27,9 @@ type EmailService interface {
 	ValidatePasswordResetToken(token string) (*domain.User, error)
 	SendTemplateEmail(to []string, subject string, templateId string, variables map[string]interface{}) error
 	SendReportEmail(to []string, subject string, variables map[string]interface{}, attachment io.Reader, filename string) error
+	// Diğer talep bildirimleri
+	SendNewRequestEmail(req *domain.OtherRequest) error
+	SendRequestCompletedEmail(req *domain.OtherRequest) error
 }
 
 type emailService struct {
@@ -42,21 +45,59 @@ func NewEmailService(config *config.Config, userRepo repository.UserRepository) 
 	}
 }
 
+// ==================== TALEP BİLDİRİMLERİ ====================
+
+func (s *emailService) SendNewRequestEmail(req *domain.OtherRequest) error {
+    if req.Employee == nil {
+        return fmt.Errorf("employee info is missing for request email")
+    }
+
+    variables := map[string]interface{}{
+        "fullname":    fmt.Sprintf("%s %s", req.Employee.FirstName, req.Employee.LastName),
+        "requestType": req.RequestType.Name,
+        "description": req.Description,
+        "date":        req.CreatedAt.Format("02.01.2006 15:04"),
+    }
+
+    // Config'deki İK listesini al, boşsa fallback olarak hr@kartezya.com kullan
+    recipients := s.config.Email.HREmails
+    if len(recipients) == 0 {
+        recipients = []string{"hr@kartezya.com"}
+    }
+
+    return s.SendTemplateEmail(recipients, "Yeni Talep Oluşturuldu", "new-request-email", variables)
+}
+
+func (s *emailService) SendRequestCompletedEmail(req *domain.OtherRequest) error {
+	if req.Employee == nil {
+		return fmt.Errorf("employee info is missing for request email")
+	}
+	email := req.Employee.CompanyEmail
+	if email == "" {
+		email = req.Employee.Email
+	}
+
+	variables := map[string]interface{}{
+		"fullname":      fmt.Sprintf("%s %s", req.Employee.FirstName, req.Employee.LastName),
+		"requestType":   req.RequestType.Name,
+		"completedDate": req.CompletedAt.Format("02.01.2006 15:04"),
+		"description":   req.Description,
+	}
+	return s.SendTemplateEmail([]string{email}, "Talebiniz Tamamlandı", "request-completed-email", variables)
+}
+
+// ==================== DİĞER METODLAR ====================
+
 // GeneratePasswordResetToken generates a secure random token and stores it
 func (s *emailService) GeneratePasswordResetToken(userID uint) (string, error) {
-	// Generate a random token (32 bytes = 256 bits)
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
 		return "", fmt.Errorf("failed to generate random token: %w", err)
 	}
 
-	// Convert to hex string
 	token := hex.EncodeToString(tokenBytes)
-
-	// Set expiration to 24 hours from now
 	expiresAt := time.Now().Add(24 * time.Hour)
 
-	// Store token in database
 	if err := s.userRepo.UpdatePasswordResetToken(userID, token, &expiresAt); err != nil {
 		return "", fmt.Errorf("failed to store reset token: %w", err)
 	}
@@ -71,7 +112,6 @@ func (s *emailService) ValidatePasswordResetToken(token string) (*domain.User, e
 		return nil, fmt.Errorf("invalid or expired password reset token")
 	}
 
-	// Check if token has expired (additional check, already done in repository)
 	if user.PasswordResetExpires != nil && time.Now().After(*user.PasswordResetExpires) {
 		return nil, fmt.Errorf("password reset token has expired")
 	}
@@ -81,19 +121,16 @@ func (s *emailService) ValidatePasswordResetToken(token string) (*domain.User, e
 
 // ResetPassword resets the user password after validating the token
 func (s *emailService) ResetPassword(token string, newPassword string, authService AuthService) error {
-	// Validate token and get user
 	user, err := s.ValidatePasswordResetToken(token)
 	if err != nil {
 		return err
 	}
 
-	// Hash new password
 	hashedPassword, err := authService.HashPassword(newPassword)
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	// Update password and clear reset token
 	user.Password = hashedPassword
 	user.PasswordResetToken = ""
 	user.PasswordResetExpires = nil
@@ -102,7 +139,6 @@ func (s *emailService) ResetPassword(token string, newPassword string, authServi
 		return fmt.Errorf("failed to update password: %w", err)
 	}
 
-	// Clear the reset token from database
 	if err := s.userRepo.ClearPasswordResetToken(user.ID); err != nil {
 		log.Printf("Warning: failed to clear reset token: %v", err)
 	}
@@ -111,16 +147,13 @@ func (s *emailService) ResetPassword(token string, newPassword string, authServi
 }
 
 func (s *emailService) SendWelcomeEmail(userId uint, email string, firstName string, lastName string) error {
-	// Generate reset token
 	resetToken, err := s.GeneratePasswordResetToken(userId)
 	if err != nil {
 		return fmt.Errorf("failed to generate reset token: %w", err)
 	}
 
-	// Build reset URL
 	resetURL := fmt.Sprintf("%s/reset-password?token=%s&email=%s", s.config.Email.FrontendURL, resetToken, email)
 
-	// Send email using template
 	variables := map[string]interface{}{
 		"fullname": fmt.Sprintf("%s %s", firstName, lastName),
 		"resetUrl": resetURL,
@@ -133,18 +166,14 @@ func (s *emailService) SendWelcomeEmail(userId uint, email string, firstName str
 	return nil
 }
 
-// SendPasswordResetEmailWithUserId sends a password reset email using a user ID
 func (s *emailService) SendPasswordResetEmail(userId uint, email string, firstName string, lastName string) error {
-	// Generate reset token
 	resetToken, err := s.GeneratePasswordResetToken(userId)
 	if err != nil {
 		return fmt.Errorf("failed to generate reset token: %w", err)
 	}
 
-	// Build reset URL
 	resetURL := fmt.Sprintf("%s/reset-password?token=%s&email=%s", s.config.Email.FrontendURL, resetToken, email)
 
-	// Send email using template
 	variables := map[string]interface{}{
 		"fullname": fmt.Sprintf("%s %s", firstName, lastName),
 		"resetUrl": resetURL,
@@ -157,8 +186,6 @@ func (s *emailService) SendPasswordResetEmail(userId uint, email string, firstNa
 	return nil
 }
 
-// SendTemplateEmail sends an email using a predefined template.
-// Currently only supported by the Resend provider.
 func (s *emailService) SendTemplateEmail(to []string, subject string, templateId string, variables map[string]interface{}) error {
 	if len(to) == 0 {
 		return fmt.Errorf("at least one recipient is required")
@@ -174,9 +201,6 @@ func (s *emailService) SendTemplateEmail(to []string, subject string, templateId
 	return fmt.Errorf("template emails are currently only supported with the resend provider")
 }
 
-// sendViaResendTemplate sends email using Resend HTTP API with a template
-// Supports optional attachment - if attachment is not nil, it will be included
-// Recipients are sent via BCC to protect privacy (to = sender address)
 func (s *emailService) sendViaResendTemplate(to []string, subject string, templateId string, variables map[string]interface{}, attachment io.Reader, attachmentFilename string) error {
 	if s.config.Email.ResendAPIKey == "" {
 		return fmt.Errorf("RESEND_API_KEY is not configured")
@@ -188,7 +212,6 @@ func (s *emailService) sendViaResendTemplate(to []string, subject string, templa
 
 	fromEmail := fmt.Sprintf("%s <%s>", s.config.Email.FromName, s.config.Email.FromEmail)
 
-	// alıcı adresi filtresi
 	var validTo []string
 	for _, emailAddr := range to {
 		if emailAddr != "" && emailAddr != "undefined" && emailAddr != "null" {
@@ -213,7 +236,6 @@ func (s *emailService) sendViaResendTemplate(to []string, subject string, templa
 		payload["subject"] = subject
 	}
 
-	// Add attachment if provided
 	if attachment != nil && attachmentFilename != "" {
 		attachmentBytes, err := ioutil.ReadAll(attachment)
 		if err != nil {
@@ -256,7 +278,6 @@ func (s *emailService) sendViaResendTemplate(to []string, subject string, templa
 	return nil
 }
 
-// SendReportEmail sends a report email using "report-mail" template with optional attachment
 func (s *emailService) SendReportEmail(to []string, subject string, variables map[string]interface{}, attachment io.Reader, filename string) error {
 	if len(to) == 0 {
 		return fmt.Errorf("at least one recipient is required")

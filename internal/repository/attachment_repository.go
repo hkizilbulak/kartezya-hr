@@ -18,6 +18,7 @@ type AttachmentRepository interface {
 	FindTemporaryOlderThan(hours int) ([]domain.Attachment, error)
 	UpdateStatus(id string, status domain.AttachmentStatus, relatedID *uint) error
 	Delete(id string) error
+	DeleteAttachment(id string) error
 	PhysicalDelete(id string) error
 	CheckHashExists(hash string, ownerID uint) (bool, error)
 	LinkToRecord(ids []string, relatedType domain.AttachmentRelatedType, relatedID uint) error
@@ -66,8 +67,6 @@ func (r *attachmentRepository) FindByOwnerID(ownerID uint) ([]domain.Attachment,
 func (r *attachmentRepository) FindByRelatedRecord(relatedType domain.AttachmentRelatedType, relatedID uint) ([]domain.Attachment, error) {
 	var attachments []domain.Attachment
 
-	// For Employee attachments, also consider records where the user is the owner,
-	// even if they are not explicitly or properly linked yet.
 	if relatedType == domain.AttachmentRelatedTypeEmployee {
 		err := r.db.Where("related_type = ? AND (related_id = ? OR owner_id = ?) AND status != ?",
 			relatedType, relatedID, relatedID, domain.AttachmentStatusArchived).
@@ -123,6 +122,11 @@ func (r *attachmentRepository) UpdateStatus(id string, status domain.AttachmentS
 // Delete marks attachment as archived (soft delete)
 func (r *attachmentRepository) Delete(id string) error {
 	return r.UpdateStatus(id, domain.AttachmentStatusArchived, nil)
+}
+
+// DeleteAttachment serves as an alias for Delete to match Service calls
+func (r *attachmentRepository) DeleteAttachment(id string) error {
+	return r.Delete(id)
 }
 
 // PhysicalDelete permanently removes attachment from database

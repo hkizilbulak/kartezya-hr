@@ -376,20 +376,22 @@ func main() {
         otherReqRoutes := protected.Group("/other-requests")
         {
             otherReqRoutes.POST("", otherRequestHandler.CreateRequest)
-            otherReqRoutes.GET("", otherRequestHandler.GetAllRequests)
+            otherReqRoutes.GET("/me", otherRequestHandler.GetMyRequests)
+			otherReqRoutes.GET("/:id", otherRequestHandler.GetRequestByID)
             otherReqRoutes.PUT("/:id", otherRequestHandler.UpdateRequest)
             otherReqRoutes.PATCH("/:id/cancel", otherRequestHandler.CancelRequest)
-            otherReqRoutes.PATCH("/:id/complete", authMiddleware.RequireAdmin(), otherRequestHandler.CompleteRequest)
-            otherReqRoutes.PATCH("/:id/rollback", authMiddleware.RequireAdmin(), otherRequestHandler.RollbackRequest)
             
             otherReqRoutes.POST("/:id/documents", otherRequestHandler.UploadDocument)
             otherReqRoutes.GET("/:id/documents", otherRequestHandler.GetDocuments)
             otherReqRoutes.DELETE("/documents/:docId", otherRequestHandler.DeleteDocument)
-            
             otherReqRoutes.GET("/documents/:docId/download", otherRequestHandler.DownloadDocument)       
-		}
 
-        // Request Types (Talep Türleri) management routes
+            otherReqRoutes.GET("", authMiddleware.RequireAdmin(), otherRequestHandler.GetAllRequests) 
+            otherReqRoutes.PATCH("/:id/complete", authMiddleware.RequireAdmin(), otherRequestHandler.CompleteRequest)
+            otherReqRoutes.PATCH("/:id/rollback", authMiddleware.RequireAdmin(), otherRequestHandler.RollbackRequest)
+        }
+
+        // Request Types management routes
         requestTypeRoutes := protected.Group("/request-types")
         {
             requestTypeRoutes.GET("", otherRequestHandler.GetAllRequestTypes)

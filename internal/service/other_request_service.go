@@ -1,10 +1,11 @@
 package service
 
 import (
+    "errors"
     "fmt"
     "mime/multipart"
-    "path/filepath"
     "time"
+    "log"
 
     "kartezya-hr/internal/domain"
     "kartezya-hr/internal/repository"
@@ -12,53 +13,58 @@ import (
 )
 
 type OtherRequestService interface {
-    // Talep Türü
-    CreateRequestType(reqType *domain.RequestType, userEmail string) error
+    CreateRequestType(reqType *domain.RequestType, userID uint) error
     GetRequestTypeByID(id uint) (*domain.RequestType, error)
     GetAllRequestTypes(limit, offset int, sortParams types.SortParams) ([]*domain.RequestType, int64, error)
-    UpdateRequestType(reqType *domain.RequestType, userEmail string) error
-    DeleteRequestType(id uint, userEmail string) error
+    UpdateRequestType(reqType *domain.RequestType, userID uint) error
+    DeleteRequestType(id uint, userID uint) error
 
-    // Talep
-    CreateRequest(req *domain.OtherRequest, userID uint, userEmail string) error
+    CreateRequest(req *domain.OtherRequest, userID uint) error
     GetRequestByID(id uint) (*domain.OtherRequest, error)
+    GetRequestsByUserID(userID uint) ([]*domain.OtherRequest, error)
     GetAllRequests(filterEmployeeID *uint, limit, offset int, sortParams types.SortParams) ([]*domain.OtherRequest, int64, error)
-    UpdateRequest(req *domain.OtherRequest, userEmail string) error
-    CancelRequest(id uint, userEmail string) error
-    CompleteRequest(id uint, completerID uint, userEmail string) error
-    RollbackRequest(id uint, userEmail string) error
+    UpdateRequest(req *domain.OtherRequest, userID uint) error
+    CancelRequest(id uint, userID uint, isAdmin bool) error
+    CompleteRequest(id uint, completerID uint) error
+    RollbackRequest(id uint, userID uint) error
 
-    // Yüklü Dosya / Doküman Yönetimi
-    UploadRequestDocument(requestID uint, file *multipart.FileHeader) (*domain.Attachment, error)
-    GetRequestDocuments(requestID uint) ([]*domain.Attachment, error)
-    DeleteRequestDocument(documentID string) error
+    UploadRequestDocument(requestID uint, file *multipart.FileHeader, userID uint, isAdmin bool) (*domain.Attachment, error)
+    GetRequestDocuments(requestID uint, userID uint, isAdmin bool) ([]domain.Attachment, error)
+    DeleteRequestDocument(documentID string, userID uint, isAdmin bool) error
     DownloadRequestDocument(documentID string, userID uint, isAdmin bool) (string, error)
 }
 
 type otherRequestService struct {
-    repo         repository.OtherRequestRepository
+    repo           repository.OtherRequestRepository
     attachmentRepo repository.AttachmentRepository
-    auditService AuditService
-    emailService EmailService
-    storage      StorageProvider
-    employeeRepo repository.EmployeeRepository
+    auditService   AuditService
+    emailService   EmailService
+    storage        StorageProvider
+    employeeRepo   repository.EmployeeRepository
 }
 
-func NewOtherRequestService(repo repository.OtherRequestRepository, attachmentRepo repository.AttachmentRepository, auditService AuditService, emailService EmailService, storage StorageProvider, employeeRepo repository.EmployeeRepository) OtherRequestService {
+func NewOtherRequestService(
+    repo repository.OtherRequestRepository,
+    attachmentRepo repository.AttachmentRepository,
+    auditService AuditService,
+    emailService EmailService,
+    storage StorageProvider,
+    employeeRepo repository.EmployeeRepository,
+) OtherRequestService {
     return &otherRequestService{
-        repo:         repo,
+        repo:           repo,
         attachmentRepo: attachmentRepo,
-        auditService: auditService,
-        emailService: emailService,
-        storage:      storage,
-        employeeRepo: employeeRepo,
+        auditService:   auditService,
+        emailService:   emailService,
+        storage:        storage,
+        employeeRepo:   employeeRepo,
     }
 }
 
 // ==================== TALEP TÜRÜ İŞLEMLERİ ====================
 
-func (s *otherRequestService) CreateRequestType(reqType *domain.RequestType, userEmail string) error {
-    return s.repo.CreateRequestType(reqType, userEmail)
+func (s *otherRequestService) CreateRequestType(reqType *domain.RequestType, userID uint) error {
+    return s.repo.CreateRequestType(reqType, fmt.Sprintf("%d", userID))
 }
 
 func (s *otherRequestService) GetRequestTypeByID(id uint) (*domain.RequestType, error) {
@@ -69,256 +75,203 @@ func (s *otherRequestService) GetAllRequestTypes(limit, offset int, sortParams t
     return s.repo.GetAllRequestTypes(limit, offset, sortParams)
 }
 
-func (s *otherRequestService) UpdateRequestType(reqType *domain.RequestType, userEmail string) error {
-    return s.repo.UpdateRequestType(reqType, userEmail)
+func (s *otherRequestService) UpdateRequestType(reqType *domain.RequestType, userID uint) error {
+    return s.repo.UpdateRequestType(reqType, fmt.Sprintf("%d", userID))
 }
 
-func (s *otherRequestService) DeleteRequestType(id uint, userEmail string) error {
-    return s.repo.DeleteRequestType(id, userEmail)
+func (s *otherRequestService) DeleteRequestType(id uint, userID uint) error {
+    return s.repo.DeleteRequestType(id, fmt.Sprintf("%d", userID))
 }
 
 // ==================== TALEP İŞLEMLERİ ====================
 
-func (s *otherRequestService) CreateRequest(req *domain.OtherRequest, userID uint, userEmail string) error {
+func (s *otherRequestService) CreateRequest(req *domain.OtherRequest, userID uint) error {
     req.Status = domain.RequestStatusActive
-
-    err := s.repo.CreateRequest(req, userID, userEmail)
-    if err != nil {
-        return err
+    err := s.repo.CreateRequest(req, userID, fmt.Sprintf("%d", userID))
+    if err == nil {
+        s.auditService.CreateAuditLog("OtherRequest", req.ID, "CREATE", nil, req, fmt.Sprintf("%d", userID))
+        
+        if emailErr := s.emailService.SendNewRequestEmail(req); emailErr != nil {
+            log.Printf("E-POSTA GÖNDERİM HATASI (Create): %v", emailErr)
+        }
     }
-
-    subject := "Yeni Talep Alındı - " + userEmail
-    variables := map[string]interface{}{
-        "email":       userEmail,
-        "status":      req.Status,
-        "description": req.Description,
-    }
-    
-    err = s.emailService.SendTemplateEmail([]string{"hr@kartezya.com"}, subject, "notification-template", variables)
-    if err != nil {
-        println("İK Bildirim Maili Gönderilirken Hata Oluştu:", err.Error())
-    }
-
-    return nil
+    return err
 }
 
 func (s *otherRequestService) GetRequestByID(id uint) (*domain.OtherRequest, error) {
     return s.repo.GetRequestByID(id)
 }
 
+func (s *otherRequestService) GetRequestsByUserID(userID uint) ([]*domain.OtherRequest, error) {
+    return s.repo.GetRequestsByUserID(userID)
+}
+
 func (s *otherRequestService) GetAllRequests(filterEmployeeID *uint, limit, offset int, sortParams types.SortParams) ([]*domain.OtherRequest, int64, error) {
     return s.repo.GetAllRequests(filterEmployeeID, limit, offset, sortParams)
 }
 
-func (s *otherRequestService) UpdateRequest(req *domain.OtherRequest, userEmail string) error {
-    existingReq, err := s.repo.GetRequestByID(req.ID)
-    if err != nil {
-        return err
+func (s *otherRequestService) UpdateRequest(req *domain.OtherRequest, userID uint) error {
+    existing, err := s.repo.GetRequestByID(req.ID)
+    if err != nil { return err }
+
+    if existing.Status == domain.RequestStatusCompleted {
+        return errors.New("Tamamlanmış talepler güncellenemez")
     }
 
-    if existingReq.Status == domain.RequestStatusCompleted {
-        return s.repo.UpdateRequest(req, userEmail)
+    req.Status = domain.RequestStatusActive
+    err = s.repo.UpdateRequest(req, fmt.Sprintf("%d", userID))
+    if err == nil {
+        s.auditService.CreateAuditLog("OtherRequest", req.ID, "UPDATE", existing, req, fmt.Sprintf("%d", userID))
     }
-
-    // Talep Tipi veya Açıklamada değişiklik yapıldığında ya da talep halihazırda CANCELLED ise statü otomatik ACTIVE olur
-    if existingReq.RequestTypeID != req.RequestTypeID || existingReq.Description != req.Description || existingReq.Status == domain.RequestStatusCancelled {
-        req.Status = domain.RequestStatusActive
-    } else {
-        req.Status = existingReq.Status
-    }
-
-    return s.repo.UpdateRequest(req, userEmail)
+    return err
 }
 
-func (s *otherRequestService) CancelRequest(id uint, userEmail string) error {
-    existingReq, err := s.repo.GetRequestByID(id)
-    if err != nil {
-        return err
-    }
+func (s *otherRequestService) CancelRequest(id uint, userID uint, isAdmin bool) error {
+    req, err := s.repo.GetRequestByID(id)
+    if err != nil { return err }
 
-    if existingReq.Status == domain.RequestStatusCompleted {
-        return s.repo.UpdateRequest(existingReq, userEmail)
+    if req.Status == domain.RequestStatusCompleted && !isAdmin {
+        return errors.New("tamamlanmış talepler silinemez")
     }
-
-    existingReq.Status = domain.RequestStatusCancelled
-    return s.repo.UpdateRequest(existingReq, userEmail)
+    
+    req.Status = domain.RequestStatusCancelled
+    err = s.repo.UpdateRequest(req, fmt.Sprintf("%d", userID))
+    if err == nil {
+        s.auditService.CreateAuditLog("OtherRequest", id, "CANCEL", nil, req, fmt.Sprintf("%d", userID))
+    }
+    return err
 }
 
-func (s *otherRequestService) CompleteRequest(id uint, completerID uint, userEmail string) error {
-    existingReq, err := s.repo.GetRequestByID(id)
-    if err != nil {
-        return err
-    }
-
+func (s *otherRequestService) CompleteRequest(id uint, completerID uint) error {
+    req, err := s.repo.GetRequestByID(id)
+    if err != nil { return err }
+    
+    req.Status = domain.RequestStatusCompleted
+    req.CompletedBy = &completerID
     now := time.Now()
-    existingReq.Status = domain.RequestStatusCompleted
-    existingReq.CompletedBy = &completerID
-    existingReq.CompletedAt = &now
-
-    err = s.repo.UpdateRequest(existingReq, userEmail)
-    if err != nil {
-        return err
-    }
-
-    // GORM güncelleme yaptıktan sonra ilişkilerin bellekten düşmesini engellemek için kaydı ilişkileriyle beraber DB'den tekrar çekiyoruz
-    freshReq, err := s.repo.GetRequestByID(id)
-    if err == nil && freshReq != nil {
-        existingReq = freshReq
-    }
-
-    typeName := "Bilinmeyen Talep Türü"
-    if existingReq.RequestType != nil {
-        typeName = existingReq.RequestType.Name
-    }
-
-    subject := "Talebiniz Tamamlandı"
-    variables := map[string]interface{}{
-        "type":        typeName,
-        "completedAt": now.Format("02.01.2006 15:04"),
-        "description": existingReq.Description,
-    }
-
-    if existingReq.Employee != nil && existingReq.Employee.CompanyEmail != "" {
-        err = s.emailService.SendTemplateEmail([]string{existingReq.Employee.CompanyEmail}, subject, "notification-template", variables)
-        if err != nil {
-            println("Çalışan Bilgilendirme Maili Gönderilirken Hata Oluştu:", err.Error())
+    req.CompletedAt = &now
+    
+    err = s.repo.UpdateRequest(req, fmt.Sprintf("%d", completerID))
+    if err == nil {
+        s.auditService.CreateAuditLog("OtherRequest", id, "COMPLETE", nil, req, fmt.Sprintf("%d", completerID))
+        
+        if emailErr := s.emailService.SendRequestCompletedEmail(req); emailErr != nil {
+            log.Printf("E-POSTA GÖNDERİM HATASI (Complete): %v", emailErr)
         }
-    } else {
-        println("Mail Gönderilemedi: Talep sahibi (Employee) bilgisi veya CompanyEmail alanı boş.")
     }
-
-    return nil
+    return err
 }
 
-func (s *otherRequestService) RollbackRequest(id uint, userEmail string) error {
-    existingReq, err := s.repo.GetRequestByID(id)
-    if err != nil {
-        return err
+func (s *otherRequestService) RollbackRequest(id uint, userID uint) error {
+    req, err := s.repo.GetRequestByID(id)
+    if err != nil { return err }
+
+    req.Status = domain.RequestStatusActive
+    req.CompletedBy = nil
+    req.CompletedAt = nil
+    
+    err = s.repo.UpdateRequest(req, fmt.Sprintf("%d", userID))
+    if err == nil {
+        s.auditService.CreateAuditLog("OtherRequest", id, "ROLLBACK", nil, req, fmt.Sprintf("%d", userID))
     }
-
-    existingReq.Status = domain.RequestStatusActive
-    existingReq.CompletedBy = nil
-    existingReq.CompletedAt = nil
-
-    err = s.repo.UpdateRequest(existingReq, userEmail)
-    if err != nil {
-        return err
-    }
-
-    return nil
+    return err
 }
 
-// ==================== DÖKÜMAN / DOSYA YÖNETİMİ ====================
+// ==================== DÖKÜMAN YÖNETİMİ ====================
 
-// UploadRequestDocument godoc
-// @Summary Talebe ait yeni bir döküman yükler ve kaydeder
-func (s *otherRequestService) UploadRequestDocument(requestID uint, file *multipart.FileHeader) (*domain.Attachment, error) {
-    // 1. Önce talep kaydının gerçekten var olduğunu doğrula
+func (s *otherRequestService) UploadRequestDocument(requestID uint, file *multipart.FileHeader, userID uint, isAdmin bool) (*domain.Attachment, error) {
     request, err := s.repo.GetRequestByID(requestID)
-    if err != nil {
-        return nil, err
+    if err != nil { return nil, errors.New("talep bulunamadı") }
+    
+    if request.Status == domain.RequestStatusCompleted {
+        return nil, errors.New("tamamlanmış taleplere doküman yüklenemez")
     }
 
-    // 2. *multipart.FileHeader nesnesini multipart.File nesnesine dönüştür 
-    src, err := file.Open()
-    if err != nil {
-        return nil, fmt.Errorf("failed to open upload file: %w", err)
+    employee, err := s.employeeRepo.GetByUserID(userID)
+    if err != nil { return nil, errors.New("çalışan kaydı bulunamadı") }
+    if !isAdmin && request.EmployeeID != employee.ID {
+        return nil, errors.New("sadece kendi taleplerinize doküman yükleyebilirsiniz")
     }
+
+    src, err := file.Open()
+    if err != nil { return nil, fmt.Errorf("dosya açılamadı: %w", err) }
     defer src.Close()
 
-    // 3. Dosyanın orijinal uzantısını dinamik olarak çek
-    ext := filepath.Ext(file.Filename)
-    if ext == "" {
-        ext = ".png" 
+    timestamp := time.Now().Format("20060102150405")
+    docID := fmt.Sprintf("%d_%s", requestID, timestamp)
+    
+    storagePath := GenerateStoragePath(domain.AttachmentRelatedTypeOtherRequest, file.Filename, docID)
+
+    if err := s.storage.Upload(src, storagePath); err != nil {
+        return nil, fmt.Errorf("dosya file server'a yüklenemedi: %w", err)
     }
 
-    // 4. Benzersiz bir döküman ID'si (UUID) üret ve dinamik uzantıyı ekle
-    docUUID := fmt.Sprintf("%d-%d", requestID, time.Now().Unix())
-    targetPath := fmt.Sprintf("other-requests/%s%s", docUUID, ext) 
-
-    // 5. Fiziksel dosyayı depolama sağlayıcısına yükle
-    err = s.storage.Upload(src, targetPath)
-    if err != nil {
-        return nil, fmt.Errorf("failed to upload physical file: %w", err)
-    }
-
-    // 6. Yeni attachment nesnesini oluştur
-    attachment := domain.Attachment{
-        ID:          docUUID,
-        FileName:    file.Filename,
-        FileSize:    file.Size,
-        Path:        targetPath, 
+    attachment := &domain.Attachment{
+        ID:          domain.GenerateUUID(),
+        OwnerID:     userID,
+        RelatedType: domain.AttachmentRelatedTypeOtherRequest,
         RelatedID:   &requestID,
+        Type:        domain.AttachmentTypeDocument,
+        Status:      domain.AttachmentStatusLinked,
+        FileName:    file.Filename,
+        Path:        storagePath,
+        ContentType: file.Header.Get("Content-Type"),
+        FileSize:    file.Size,
     }
 
-    // 7. Talebe bağla ve veritabanını güncelle
-    request.Attachments = append(request.Attachments, attachment)
-    err = s.repo.UpdateRequest(request, request.CreatedBy)
-    if err != nil {
-        return nil, err
-    }
-
-    lastIdx := len(request.Attachments) - 1
-    return &request.Attachments[lastIdx], nil
-}
-
-// GetRequestDocuments godoc
-// @Summary Talebe ait yüklü dökümanları listeler
-func (s *otherRequestService) GetRequestDocuments(requestID uint) ([]*domain.Attachment, error) {
-    request, err := s.repo.GetRequestByID(requestID)
-    if err != nil {
-        return nil, err
+    if err := s.attachmentRepo.Create(attachment); err != nil {
+        _ = s.storage.Delete(storagePath)
+        return nil, fmt.Errorf("döküman kaydı oluşturulamadı: %w", err)
     }
     
-    result := make([]*domain.Attachment, len(request.Attachments))
-    for i := range request.Attachments {
-        result[i] = &request.Attachments[i]
-    }
-    
-    return result, nil
+    s.auditService.CreateAuditLog("Attachment", 0, "UPLOAD", nil, attachment, fmt.Sprintf("%d", userID))
+    return attachment, nil
 }
 
-// DeleteRequestDocument godoc
-// @Summary Talebe ait dökümanı sistemden ve veritabanından siler
-func (s *otherRequestService) DeleteRequestDocument(documentID string) error {
-    return nil
+func (s *otherRequestService) GetRequestDocuments(requestID uint, userID uint, isAdmin bool) ([]domain.Attachment, error) {
+    return s.attachmentRepo.FindByRelatedRecord(domain.AttachmentRelatedTypeOtherRequest, requestID)
+}
+
+func (s *otherRequestService) DeleteRequestDocument(documentID string, userID uint, isAdmin bool) error {
+    attachment, err := s.attachmentRepo.FindByID(documentID)
+    if err != nil { return errors.New("döküman bulunamadı") }
+
+    if attachment.RelatedType != domain.AttachmentRelatedTypeOtherRequest {
+        return errors.New("geçersiz talep dökümanı")
+    }
+
+    request, err := s.repo.GetRequestByID(*attachment.RelatedID)
+    if err != nil { return errors.New("talep bulunamadı") }
+    
+    if request.Status == domain.RequestStatusCompleted {
+        return errors.New("tamamlanmış taleplerden doküman silinemez")
+    }
+    
+    employee, err := s.employeeRepo.GetByUserID(userID)
+    if err != nil { return errors.New("çalışan kaydı bulunamadı") }
+    
+    if !isAdmin && request.EmployeeID != employee.ID {
+        return errors.New("sadece kendi taleplerinizdeki dokümanları silebilirsiniz")
+    }
+
+    // Storage üzerinden silme (File Server'dan siler)
+    if err := s.storage.Delete(attachment.Path); err != nil {
+        fmt.Printf("Storage hatası: %v\n", err)
+    }
+    
+    err = s.attachmentRepo.DeleteAttachment(documentID)
+    if err == nil {
+        s.auditService.CreateAuditLog("Attachment", 0, "DELETE", attachment, nil, fmt.Sprintf("%d", userID))
+    }
+    return err
 }
 
 func (s *otherRequestService) DownloadRequestDocument(documentID string, userID uint, isAdmin bool) (string, error) {
     attachment, err := s.attachmentRepo.FindByID(documentID)
-    if err != nil {
-        return "", fmt.Errorf("document not found")
-    }
+    if err != nil { return "", errors.New("döküman bulunamadı") }
     
-    // Yetki Kontrolü: İstek atan Admin/İK değilse, dökümanın bağlı olduğu talebin sahibi mi doğrula
-    if !isAdmin && attachment.RelatedID != nil {
-        employee, err := s.employeeRepo.GetByUserID(userID)
-        if err == nil && employee != nil {
-            request, err := s.repo.GetRequestByID(*attachment.RelatedID)
-            if err == nil && request != nil && request.EmployeeID != employee.ID {
-                return "", fmt.Errorf("unauthorized to download this document")
-            }
-        }
-    }
-    
-    var targetPath string
-
-    if attachment.Path != "" {
-        targetPath = attachment.Path
-    } else {
-        ext := filepath.Ext(attachment.FileName)
-        if ext == "" {
-            ext = ".png"
-        }
-        
-        targetPath = fmt.Sprintf("other-requests/%s%s", documentID, ext)
-    }
-
-    // Storage sağlayıcısı üzerinden 15 dakikalık imzalı URL üretimi
-    url, err := s.storage.GeneratePresignedURL(targetPath, 15)
-    if err != nil {
-        return "", fmt.Errorf("failed to generate download URL: %w", err)
-    }
-
+    // File Server'dan geçici link üretme
+    url, err := s.storage.GeneratePresignedURL(attachment.Path, 15)
+    if err != nil { return "", fmt.Errorf("indirme linki üretilemedi: %w", err) }
     return url, nil
 }

@@ -464,37 +464,36 @@ func (AuditLog) TableName() string {
 type AttachmentRelatedType int
 
 const (
-	AttachmentRelatedTypeExpense  AttachmentRelatedType = 1 // Masraf
-	AttachmentRelatedTypeLeave    AttachmentRelatedType = 2 // İzin
-	AttachmentRelatedTypeUser     AttachmentRelatedType = 3 // Kullanıcı/Profil
-	AttachmentRelatedTypeEmployee AttachmentRelatedType = 4 // Çalışan Özlük Dosyası
-	AttachmentRelatedTypeContract AttachmentRelatedType = 5 // Sözleşme
-	AttachmentRelatedTypeOtherReq AttachmentRelatedType = 6 // Diğer Talepler
+    AttachmentRelatedTypeExpense      AttachmentRelatedType = 1 // Masraf
+    AttachmentRelatedTypeLeave        AttachmentRelatedType = 2 // İzin
+    AttachmentRelatedTypeUser         AttachmentRelatedType = 3 // Kullanıcı/Profil
+    AttachmentRelatedTypeEmployee     AttachmentRelatedType = 4 // Çalışan Özlük Dosyası
+    AttachmentRelatedTypeContract     AttachmentRelatedType = 5 // Sözleşme
+    AttachmentRelatedTypeOtherRequest AttachmentRelatedType = 6 // Diğer Talepler
 )
 
 // AttachmentType Enum - Defines document category
 type AttachmentType int
-
 const (
-	AttachmentTypeInvoice       AttachmentType = 1  // Fatura
-	AttachmentTypeMedicalReport AttachmentType = 2  // Sağlık Raporu
-	AttachmentTypeAvatar        AttachmentType = 3  // Profil Resmi
-	AttachmentTypeReceipt       AttachmentType = 4  // Makbuz
-	AttachmentTypeContract      AttachmentType = 5  // Sözleşme
-	AttachmentTypeIdentity      AttachmentType = 6  // Kimlik
-	AttachmentTypeDiploma       AttachmentType = 7  // Diploma
-	AttachmentTypeCertificate   AttachmentType = 8  // Sertifika
-	AttachmentTypeResume        AttachmentType = 9  // CV / Özgeçmiş
-	AttachmentTypeOther         AttachmentType = 99 // Diğer
+    AttachmentTypeInvoice       AttachmentType = 1  // Fatura
+    AttachmentTypeMedicalReport AttachmentType = 2  // Sağlık Raporu
+    AttachmentTypeAvatar        AttachmentType = 3  // Profil Resmi
+    AttachmentTypeReceipt       AttachmentType = 4  // Makbuz
+    AttachmentTypeContract      AttachmentType = 5  // Sözleşme
+    AttachmentTypeIdentity      AttachmentType = 6  // Kimlik
+    AttachmentTypeDiploma       AttachmentType = 7  // Diploma
+    AttachmentTypeCertificate   AttachmentType = 8  // Sertifika
+    AttachmentTypeResume        AttachmentType = 9  // CV / Özgeçmiş
+    AttachmentTypeDocument      AttachmentType = 99 // Döküman
+    AttachmentTypeOther         AttachmentType = 99 // Diğer
 )
 
 // AttachmentStatus Enum - Defines attachment lifecycle status
 type AttachmentStatus int
-
 const (
-	AttachmentStatusTemporary AttachmentStatus = 1 // Geçici (yüklenmiş ama henüz ilişkilendirilmemiş)
-	AttachmentStatusLinked    AttachmentStatus = 2 // İlişkilendirilmiş (bir kayda bağlanmış)
-	AttachmentStatusArchived  AttachmentStatus = 3 // Arşivlenmiş (silinmiş gibi ama fiziksel olarak durur)
+    AttachmentStatusTemporary AttachmentStatus = 1 // Geçici
+    AttachmentStatusLinked    AttachmentStatus = 2 // İlişkilendirilmiş
+    AttachmentStatusArchived  AttachmentStatus = 3 // Arşivlenmiş
 )
 
 // Attachment represents a generic document/file in the system

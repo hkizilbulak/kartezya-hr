@@ -59,6 +59,7 @@ type EmailConfig struct {
 	Provider             string // "smtp" or "resend"
 	ResendAPIKey         string
 	EventAllCompanyGroup []string // Mail group addresses for all-company events (comma-separated)
+	HREmails             []string
 }
 
 type OAuthConfig struct {
@@ -148,6 +149,7 @@ func Load() *Config {
 			Provider:             getEnv("EMAIL_PROVIDER", "smtp"), // "smtp" or "resend"
 			ResendAPIKey:         getEnv("RESEND_API_KEY", ""),
 			EventAllCompanyGroup: parseEmailList(getEnv("EVENT_EMAIL_ALL_COMPANY", "")),
+			HREmails:             parseEmailList(getEnv("HR_EMAILS", "hr@kartezya.com")),
 		},
 		OAuth: OAuthConfig{
 			YandexClientID:     getEnv("YANDEX_CLIENT_ID", ""),
