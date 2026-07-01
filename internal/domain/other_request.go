@@ -24,7 +24,7 @@ func (RequestType) TableName() string {
 type OtherRequest struct {
     AuditableModel
     EmployeeID    uint   `json:"employee_id" gorm:"not null;index"`
-    RequestTypeID uint   `json:"request_type_id" gorm:"not null;index"`
+    RequestTypeID uint `json:"request_type_id" gorm:"column:request_type_id;not null;index"`
     Description   string `json:"description" gorm:"type:text;not null"`
     Status        string `json:"status" gorm:"size:20;not null;default:'ACTIVE';index"`
 
