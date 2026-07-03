@@ -86,15 +86,19 @@ func (s *otherRequestService) DeleteRequestType(id uint, userID uint) error {
 // ==================== TALEP İŞLEMLERİ ====================
 
 func (s *otherRequestService) CreateRequest(req *domain.OtherRequest, userID uint) error {
-	req.Status = domain.RequestStatusActive
-	err := s.repo.CreateRequest(req, userID, fmt.Sprintf("%d", userID))
-	if err == nil {
-		s.auditService.CreateAuditLog("OtherRequest", req.ID, "CREATE", nil, req, fmt.Sprintf("%d", userID))
-		if emailErr := s.emailService.SendNewRequestEmail(req); emailErr != nil {
-			log.Printf("E-POSTA GÖNDERİM HATASI (Create): %v", emailErr)
-		}
-	}
-	return err
+    req.Status = domain.RequestStatusActive
+    err := s.repo.CreateRequest(req, userID, fmt.Sprintf("%d", userID))
+    
+    if err == nil {
+        s.auditService.CreateAuditLog("OtherRequest", req.ID, "CREATE", nil, req, fmt.Sprintf("%d", userID))
+        
+        go func(r *domain.OtherRequest) {
+            if emailErr := s.emailService.SendNewRequestEmail(r); emailErr != nil {
+                log.Printf("E-POSTA GÖNDERİM HATASI (Create): %v", emailErr)
+            }
+        }(req) 
+    }
+    return err
 }
 
 func (s *otherRequestService) GetRequestByID(id uint) (*domain.OtherRequest, error) {
@@ -149,22 +153,28 @@ func (s *otherRequestService) CancelRequest(id uint, userID uint, isAdmin bool) 
 }
 
 func (s *otherRequestService) CompleteRequest(id uint, completerID uint) error {
-	req, err := s.repo.GetRequestByID(id)
-	if err != nil {
-		return err
-	}
-	req.Status = domain.RequestStatusCompleted
-	req.CompletedBy = &completerID
-	now := time.Now()
-	req.CompletedAt = &now
-	err = s.repo.UpdateRequest(req, fmt.Sprintf("%d", completerID))
-	if err == nil {
-		s.auditService.CreateAuditLog("OtherRequest", id, "COMPLETE", nil, req, fmt.Sprintf("%d", completerID))
-		if emailErr := s.emailService.SendRequestCompletedEmail(req); emailErr != nil {
-			log.Printf("E-POSTA GÖNDERİM HATASI (Complete): %v", emailErr)
-		}
-	}
-	return err
+    req, err := s.repo.GetRequestByID(id)
+    if err != nil {
+        return err
+    }
+    
+    req.Status = domain.RequestStatusCompleted
+    req.CompletedBy = &completerID
+    now := time.Now()
+    req.CompletedAt = &now
+    
+    err = s.repo.UpdateRequest(req, fmt.Sprintf("%d", completerID))
+    
+    if err == nil {
+        s.auditService.CreateAuditLog("OtherRequest", id, "COMPLETE", nil, req, fmt.Sprintf("%d", completerID))
+        
+        go func(r *domain.OtherRequest) {
+            if emailErr := s.emailService.SendRequestCompletedEmail(r); emailErr != nil {
+                log.Printf("E-POSTA GÖNDERİM HATASI (Complete): %v", emailErr)
+            }
+        }(req)
+    }
+    return err
 }
 
 func (s *otherRequestService) RollbackRequest(id uint, userID uint) error {
