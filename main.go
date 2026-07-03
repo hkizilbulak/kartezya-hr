@@ -173,7 +173,7 @@ func main() {
 	eventHandler := handler.NewEventHandler(eventService)
 	faqHandler := handler.NewFAQHandler(faqService)
 	otherRequestHandler := handler.NewOtherRequestHandler(otherRequestService)
-	emailHandler := handler.NewEmailHandler(emailService)
+	emailHandler := handler.NewEmailHandler(emailService, cfg)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -509,6 +509,7 @@ func main() {
 		// Dynamic Email routes (ADMIN only)
 		emailRoutes := protected.Group("/emails")
 		{
+			emailRoutes.GET("/templates", emailHandler.ListResendTemplates)
 			emailRoutes.POST("/send-template", emailHandler.SendDynamicTemplateEmail)
 		}
 

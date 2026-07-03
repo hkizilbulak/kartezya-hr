@@ -1,8 +1,13 @@
 package handler
 
 import (
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"time"
 
+	"kartezya-hr/internal/config"
 	"kartezya-hr/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -10,10 +15,11 @@ import (
 
 type EmailHandler struct {
 	emailService service.EmailService
+	cfg          *config.Config
 }
 
-func NewEmailHandler(emailService service.EmailService) *EmailHandler {
-	return &EmailHandler{emailService: emailService}
+func NewEmailHandler(emailService service.EmailService, cfg *config.Config) *EmailHandler {
+	return &EmailHandler{emailService: emailService, cfg: cfg}
 }
 
 // SendDynamicTemplateEmail godoc
@@ -85,4 +91,59 @@ type SendDynamicEmailRequest struct {
 	TemplateCode string                 `json:"template_code" binding:"required"`
 	Subject      string                 `json:"subject"`
 	TemplateData map[string]interface{} `json:"template_data" binding:"required"`
+}
+
+// ListResendTemplates proxies the Resend template list to the frontend
+// GET /emails/templates
+func (h *EmailHandler) ListResendTemplates(c *gin.Context) {
+	if h.cfg.Email.ResendAPIKey == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "RESEND_API_KEY is not configured"})
+		return
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	req, err := http.NewRequest("GET", "https://api.resend.com/templates?limit=100", nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to build request: %v", err)})
+		return
+	}
+	req.Header.Set("Authorization", "Bearer "+h.cfg.Email.ResendAPIKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("resend request failed: %v", err)})
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read resend response"})
+		return
+	}
+
+	if resp.StatusCode >= 300 {
+		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("resend API error (%d): %s", resp.StatusCode, string(body))})
+		return
+	}
+
+	// Parse and return only the fields we need
+	var resendResp struct {
+		Data []struct {
+			ID     string `json:"id"`
+			Name   string `json:"name"`
+			Status string `json:"status"`
+			Alias  string `json:"alias"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &resendResp); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse resend response"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    resendResp.Data,
+	})
 }
