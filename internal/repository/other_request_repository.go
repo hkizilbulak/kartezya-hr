@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"log"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/types"
 
@@ -54,17 +55,14 @@ func (r *otherRequestRepository) GetAllRequestTypes(limit, offset int, sortParam
 	query := r.db.Model(&domain.RequestType{}).Where("deleted = ?", false)
 	query.Count(&total)
 
-	if sortParams.Sort != "" {
-		orderClause := sortParams.Sort
-		if sortParams.Direction == "DESC" {
-			orderClause += " DESC"
-		} else {
-			orderClause += " ASC"
-		}
-		query = query.Order(orderClause)
-	} else {
-		query = query.Order("created_at DESC")
+	allowedSort := []string{"created_at", "name", "id"}
+	safeSort := sanitizeSort(sortParams.Sort, allowedSort)
+	
+	orderDir := "ASC"
+	if sortParams.Direction == "DESC" {
+		orderDir = "DESC"
 	}
+	query = query.Order(safeSort + " " + orderDir)
 
 	if limit > 0 {
 		query = query.Limit(limit).Offset(offset)
@@ -138,49 +136,57 @@ func (r *otherRequestRepository) GetRequestsByUserID(userID uint) ([]*domain.Oth
 }
 
 func (r *otherRequestRepository) GetAllRequests(filterEmployeeID *uint, limit, offset int, sortParams types.SortParams) ([]*domain.OtherRequest, int64, error) {
-	var reqs []*domain.OtherRequest
-	var total int64
+    var reqs []*domain.OtherRequest
+    var total int64
 
-	query := r.db.Preload("Employee").
-		Preload("RequestType").
-		Preload("Attachments").
-		Where("deleted = ?", false)
+    query := r.db.Model(&domain.OtherRequest{}).
+        Preload("Employee").
+        Preload("RequestType").
+        Preload("Attachments").
+        Where("deleted = ?", false)
 
-	if filterEmployeeID != nil {
-		query = query.Where("employee_id = ?", *filterEmployeeID)
-	}
+    if filterEmployeeID != nil {
+        query = query.Where("employee_id = ?", *filterEmployeeID)
+    }
 
-	query.Model(&domain.OtherRequest{}).Count(&total)
+    if err := query.Count(&total).Error; err != nil {
+        log.Printf("ERROR: Count query failed: %v", err)
+        return nil, 0, err
+    }
 
-	if sortParams.Sort != "" {
-		orderClause := sortParams.Sort
-		if sortParams.Direction == "DESC" {
-			orderClause += " DESC"
-		} else {
-			orderClause += " ASC"
-		}
-		query = query.Order(orderClause)
-	} else {
-		query = query.Order("created_at DESC")
-	}
+    allowedSort := []string{"created_at", "id"}
+    safeSort := sanitizeSort(sortParams.Sort, allowedSort)
+    orderDir := "ASC"
+    if sortParams.Direction == "DESC" {
+        orderDir = "DESC"
+    }
+    query = query.Order(safeSort + " " + orderDir)
 
-	if limit > 0 {
-		query = query.Limit(limit).Offset(offset)
-	}
+    if limit > 0 {
+        query = query.Limit(limit).Offset(offset)
+    }
 
-	err := query.Find(&reqs).Error
-	return reqs, total, err
+    err := query.Find(&reqs).Error
+    if err != nil {
+        log.Printf("ERROR: Find query failed: %v", err)
+        return nil, 0, err
+    }
+
+    log.Printf("DEBUG: GetAllRequests - Bulunan: %d, Toplam: %d", len(reqs), total)
+    return reqs, total, nil
 }
 
 func (r *otherRequestRepository) UpdateRequest(req *domain.OtherRequest, modifiedBy string) error {
-	return r.db.Model(req).Updates(map[string]interface{}{
-		"request_type_id": req.RequestTypeID,
-		"description":     req.Description,
-		"status":          req.Status,
-		"completed_by":    req.CompletedBy,
-		"completed_at":    req.CompletedAt,
-		"modified_by":     modifiedBy,
-	}).Error
+    return r.db.Model(&domain.OtherRequest{}).
+        Where("id = ?", req.ID).
+        Updates(map[string]interface{}{
+            "request_type_id": req.RequestTypeID,
+            "description":     req.Description,
+            "status":          req.Status,
+            "completed_by":    req.CompletedBy,
+            "completed_at":    req.CompletedAt,
+            "modified_by":     modifiedBy,
+        }).Error
 }
 
 func (r *otherRequestRepository) CancelRequest(id uint, deletedBy string) error {
@@ -190,4 +196,13 @@ func (r *otherRequestRepository) CancelRequest(id uint, deletedBy string) error 
 			"status":      domain.RequestStatusCancelled,
 			"modified_by": deletedBy,
 		}).Error
+}
+
+func sanitizeSort(sortField string, allowedFields []string) string {
+	for _, field := range allowedFields {
+		if field == sortField {
+			return sortField
+		}
+	}
+	return "created_at" 
 }
