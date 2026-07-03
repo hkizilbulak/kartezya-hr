@@ -339,6 +339,8 @@ func GenerateStoragePath(relatedType domain.AttachmentRelatedType, filename stri
 		folder = "employee"
 	case domain.AttachmentRelatedTypeContract:
 		folder = "contract"
+	case domain.AttachmentRelatedTypeOtherRequest: 
+    folder = "other_requests"	
 	}
 
 	// Get file extension
