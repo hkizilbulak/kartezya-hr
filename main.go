@@ -70,8 +70,8 @@ func main() {
 
 	// Seed database with default data
 	if err := seedDatabase(db); err != nil {
-	  	log.Printf("Warning: Failed to seed database: %v", err)
-	  }
+		log.Printf("Warning: Failed to seed database: %v", err)
+	}
 
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db.DB)
@@ -145,7 +145,7 @@ func main() {
 	jobService := service.NewJobService(jobRepo, auditService)
 	eventService := service.NewEventService(eventRepo, eventParticipantRepo, userRepo, employeeRepo, emailService, cfg)
 	faqService := service.NewFAQService(faqRepo, auditService)
-    otherRequestService := service.NewOtherRequestService(otherRequestRepo, attachmentRepo, auditService, emailService, storageProvider, employeeRepo)
+	otherRequestService := service.NewOtherRequestService(otherRequestRepo, attachmentRepo, auditService, emailService, storageProvider, employeeRepo)
 
 	// Initialize and start scheduled jobs
 	scheduler := jobs.NewScheduler(db.DB, documentService, jobService)
@@ -173,6 +173,7 @@ func main() {
 	eventHandler := handler.NewEventHandler(eventService)
 	faqHandler := handler.NewFAQHandler(faqService)
 	otherRequestHandler := handler.NewOtherRequestHandler(otherRequestService)
+	emailHandler := handler.NewEmailHandler(emailService)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -360,46 +361,46 @@ func main() {
 		}
 
 		// FAQ (Sıkça Sorulan Sorular) management routes
-        faqRoutes := protected.Group("/faqs")
-        {
-            // Tüm personelin görebileceği kısımlar
-            faqRoutes.GET("", faqHandler.GetAll)
-            faqRoutes.GET("/:id", faqHandler.GetByID)
+		faqRoutes := protected.Group("/faqs")
+		{
+			// Tüm personelin görebileceği kısımlar
+			faqRoutes.GET("", faqHandler.GetAll)
+			faqRoutes.GET("/:id", faqHandler.GetByID)
 
-            // Sadece Admin'in değiştirebileceği kısımlar
-            faqRoutes.POST("", authMiddleware.RequireAdmin(), faqHandler.Create)
-            faqRoutes.PUT("/:id", authMiddleware.RequireAdmin(), faqHandler.Update)
-            faqRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), faqHandler.Delete)
-        }
+			// Sadece Admin'in değiştirebileceği kısımlar
+			faqRoutes.POST("", authMiddleware.RequireAdmin(), faqHandler.Create)
+			faqRoutes.PUT("/:id", authMiddleware.RequireAdmin(), faqHandler.Update)
+			faqRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), faqHandler.Delete)
+		}
 
 		// Other Requests management routes
-        otherReqRoutes := protected.Group("/other-requests")
-        {
-            otherReqRoutes.POST("", otherRequestHandler.CreateRequest)
-            otherReqRoutes.GET("/me", otherRequestHandler.GetMyRequests)
+		otherReqRoutes := protected.Group("/other-requests")
+		{
+			otherReqRoutes.POST("", otherRequestHandler.CreateRequest)
+			otherReqRoutes.GET("/me", otherRequestHandler.GetMyRequests)
 			otherReqRoutes.GET("/:id", otherRequestHandler.GetRequestByID)
-            otherReqRoutes.PUT("/:id", otherRequestHandler.UpdateRequest)
-            otherReqRoutes.PATCH("/:id/cancel", otherRequestHandler.CancelRequest)
-            
-            otherReqRoutes.POST("/:id/documents", otherRequestHandler.UploadDocument)
-            otherReqRoutes.GET("/:id/documents", otherRequestHandler.GetDocuments)
-            otherReqRoutes.DELETE("/documents/:docId", otherRequestHandler.DeleteDocument)
-            otherReqRoutes.GET("/documents/:docId/download", otherRequestHandler.DownloadDocument)       
+			otherReqRoutes.PUT("/:id", otherRequestHandler.UpdateRequest)
+			otherReqRoutes.PATCH("/:id/cancel", otherRequestHandler.CancelRequest)
 
-            otherReqRoutes.GET("", authMiddleware.RequireAdmin(), otherRequestHandler.GetAllRequests) 
-            otherReqRoutes.PATCH("/:id/complete", authMiddleware.RequireAdmin(), otherRequestHandler.CompleteRequest)
-            otherReqRoutes.PATCH("/:id/rollback", authMiddleware.RequireAdmin(), otherRequestHandler.RollbackRequest)
-        }
+			otherReqRoutes.POST("/:id/documents", otherRequestHandler.UploadDocument)
+			otherReqRoutes.GET("/:id/documents", otherRequestHandler.GetDocuments)
+			otherReqRoutes.DELETE("/documents/:docId", otherRequestHandler.DeleteDocument)
+			otherReqRoutes.GET("/documents/:docId/download", otherRequestHandler.DownloadDocument)
 
-        // Request Types management routes
-        requestTypeRoutes := protected.Group("/request-types")
-        {
-            requestTypeRoutes.GET("", otherRequestHandler.GetAllRequestTypes)
-            
-            requestTypeRoutes.POST("", authMiddleware.RequireAdmin(), otherRequestHandler.CreateRequestType)
-            requestTypeRoutes.PUT("/:id", authMiddleware.RequireAdmin(), otherRequestHandler.UpdateRequestType)
-            requestTypeRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), otherRequestHandler.DeleteRequestType)
-        }
+			otherReqRoutes.GET("", authMiddleware.RequireAdmin(), otherRequestHandler.GetAllRequests)
+			otherReqRoutes.PATCH("/:id/complete", authMiddleware.RequireAdmin(), otherRequestHandler.CompleteRequest)
+			otherReqRoutes.PATCH("/:id/rollback", authMiddleware.RequireAdmin(), otherRequestHandler.RollbackRequest)
+		}
+
+		// Request Types management routes
+		requestTypeRoutes := protected.Group("/request-types")
+		{
+			requestTypeRoutes.GET("", otherRequestHandler.GetAllRequestTypes)
+
+			requestTypeRoutes.POST("", authMiddleware.RequireAdmin(), otherRequestHandler.CreateRequestType)
+			requestTypeRoutes.PUT("/:id", authMiddleware.RequireAdmin(), otherRequestHandler.UpdateRequestType)
+			requestTypeRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), otherRequestHandler.DeleteRequestType)
+		}
 
 		// Job Position management routes
 		jobPositionRoutes := protected.Group("/job-positions")
@@ -503,6 +504,12 @@ func main() {
 
 			// Link documents to a record (used internally by other services)
 			documentRoutes.POST("/link", documentHandler.LinkDocuments)
+		}
+
+		// Dynamic Email routes (ADMIN only)
+		emailRoutes := protected.Group("/emails")
+		{
+			emailRoutes.POST("/send-template", emailHandler.SendDynamicTemplateEmail)
 		}
 
 		// Expense Management routes
