@@ -66,13 +66,7 @@ func (s *emailService) SendNewRequestEmail(req *domain.OtherRequest) error {
 	if len(recipients) == 0 {
 		recipients = []string{"hr@kartezya.com"}
 	}
-	// Config'deki İK listesini al, boşsa fallback olarak hr@kartezya.com kullan
-	recipients := s.config.Email.HREmails
-	if len(recipients) == 0 {
-		recipients = []string{"hr@kartezya.com"}
-	}
 
-	return s.SendTemplateEmail(recipients, "Yeni Talep Oluşturuldu", "new-request-email", variables)
 	return s.SendTemplateEmail(recipients, "Yeni Talep Oluşturuldu", "new-request-email", variables)
 }
 
