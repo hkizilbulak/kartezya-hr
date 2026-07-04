@@ -70,8 +70,8 @@ func main() {
 
 	// Seed database with default data
 	if err := seedDatabase(db); err != nil {
-	  	log.Printf("Warning: Failed to seed database: %v", err)
-	  }
+		log.Printf("Warning: Failed to seed database: %v", err)
+	}
 
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db.DB)
@@ -99,6 +99,7 @@ func main() {
 	eventParticipantRepo := repository.NewEventParticipantRepository(db.DB)
 	faqRepo := repository.NewFAQRepository(db.DB)
 	otherRequestRepo := repository.NewOtherRequestRepository(db.DB)
+	mailConfigRepo := repository.NewMailConfigRepository(db.DB)
 
 	// Initialize storage provider
 	var storageProvider service.StorageProvider
@@ -129,7 +130,8 @@ func main() {
 	authService := service.NewAuthService(userRepo, userRoleRepo, roleRepo, auditService, cfg)
 	emailService := service.NewEmailService(cfg, userRepo)
 	documentService := service.NewDocumentService(attachmentRepo, storageProvider, cfg)
-	employeeService := service.NewEmployeeService(employeeRepo, userRepo, userRoleRepo, roleRepo, authService, auditService, workInfoRepo, emailService)
+	mailConfigService := service.NewMailConfigService(mailConfigRepo)
+	employeeService := service.NewEmployeeService(employeeRepo, userRepo, userRoleRepo, roleRepo, authService, auditService, workInfoRepo, emailService, mailConfigService)
 	leaveService := service.NewLeaveService(leaveRepo, leaveTypeRepo, leaveBalanceRepo, employeeRepo, holidayRepo, attachmentRepo, storageProvider, auditService)
 	departmentService := service.NewDepartmentService(departmentRepo, companyRepo, auditService)
 	companyService := service.NewCompanyService(companyRepo, departmentRepo, departmentService, auditService)
@@ -143,9 +145,9 @@ func main() {
 	expenseService := service.NewExpenseService(expenseRepo, expenseTypeRepo, attachmentRepo, employeeRepo, storageProvider, auditService)
 	reportService := service.NewReportService(employeeRepo, workInfoRepo, leaveRepo, holidayRepo, leaveService)
 	jobService := service.NewJobService(jobRepo, auditService)
-	eventService := service.NewEventService(eventRepo, eventParticipantRepo, userRepo, employeeRepo, emailService, cfg)
+	eventService := service.NewEventService(eventRepo, eventParticipantRepo, userRepo, employeeRepo, emailService, mailConfigService, cfg)
 	faqService := service.NewFAQService(faqRepo, auditService)
-    otherRequestService := service.NewOtherRequestService(otherRequestRepo, attachmentRepo, auditService, emailService, storageProvider, employeeRepo)
+	otherRequestService := service.NewOtherRequestService(otherRequestRepo, attachmentRepo, auditService, emailService, storageProvider, employeeRepo)
 
 	// Initialize and start scheduled jobs
 	scheduler := jobs.NewScheduler(db.DB, documentService, jobService)
@@ -153,9 +155,9 @@ func main() {
 	defer scheduler.Stop()
 
 	// Initialize handlers
-	authHandler := handler.NewAuthHandler(authService, emailService, userRepo, employeeRepo)
+	authHandler := handler.NewAuthHandler(authService, emailService, userRepo, employeeRepo, mailConfigService)
 	employeeHandler := handler.NewEmployeeHandler(employeeService)
-	leaveHandler := handler.NewLeaveHandler(leaveService, employeeService)
+	leaveHandler := handler.NewLeaveHandler(leaveService, employeeService, emailService, mailConfigService)
 	companyHandler := handler.NewCompanyHandler(companyService)
 	departmentHandler := handler.NewDepartmentHandler(departmentService)
 	jobPositionHandler := handler.NewJobPositionHandler(jobPositionService)
@@ -166,13 +168,15 @@ func main() {
 	employeeGradeHandler := handler.NewEmployeeGradeHandler(employeeGradeService, employeeService)
 	employeeContractHandler := handler.NewEmployeeContractHandler(employeeContractService, employeeService)
 	contractHandler := handler.NewContractHandler(contractService)
-	reportHandler := handler.NewReportHandler(reportService, emailService, cfg)
+	reportHandler := handler.NewReportHandler(reportService, emailService, mailConfigService, cfg)
 	documentHandler := handler.NewDocumentHandler(documentService)
-	expenseHandler := handler.NewExpenseHandler(expenseService)
+	expenseHandler := handler.NewExpenseHandler(expenseService, employeeService, emailService, mailConfigService)
 	jobHandler := handler.NewJobHandler(jobService, scheduler)
 	eventHandler := handler.NewEventHandler(eventService)
 	faqHandler := handler.NewFAQHandler(faqService)
 	otherRequestHandler := handler.NewOtherRequestHandler(otherRequestService)
+	emailHandler := handler.NewEmailHandler(emailService, mailConfigService, cfg)
+	mailConfigHandler := handler.NewMailConfigHandler(mailConfigService)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -360,46 +364,46 @@ func main() {
 		}
 
 		// FAQ (Sıkça Sorulan Sorular) management routes
-        faqRoutes := protected.Group("/faqs")
-        {
-            // Tüm personelin görebileceği kısımlar
-            faqRoutes.GET("", faqHandler.GetAll)
-            faqRoutes.GET("/:id", faqHandler.GetByID)
+		faqRoutes := protected.Group("/faqs")
+		{
+			// Tüm personelin görebileceği kısımlar
+			faqRoutes.GET("", faqHandler.GetAll)
+			faqRoutes.GET("/:id", faqHandler.GetByID)
 
-            // Sadece Admin'in değiştirebileceği kısımlar
-            faqRoutes.POST("", authMiddleware.RequireAdmin(), faqHandler.Create)
-            faqRoutes.PUT("/:id", authMiddleware.RequireAdmin(), faqHandler.Update)
-            faqRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), faqHandler.Delete)
-        }
+			// Sadece Admin'in değiştirebileceği kısımlar
+			faqRoutes.POST("", authMiddleware.RequireAdmin(), faqHandler.Create)
+			faqRoutes.PUT("/:id", authMiddleware.RequireAdmin(), faqHandler.Update)
+			faqRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), faqHandler.Delete)
+		}
 
 		// Other Requests management routes
-        otherReqRoutes := protected.Group("/other-requests")
-        {
-            otherReqRoutes.POST("", otherRequestHandler.CreateRequest)
-            otherReqRoutes.GET("/me", otherRequestHandler.GetMyRequests)
+		otherReqRoutes := protected.Group("/other-requests")
+		{
+			otherReqRoutes.POST("", otherRequestHandler.CreateRequest)
+			otherReqRoutes.GET("/me", otherRequestHandler.GetMyRequests)
 			otherReqRoutes.GET("/:id", otherRequestHandler.GetRequestByID)
-            otherReqRoutes.PUT("/:id", otherRequestHandler.UpdateRequest)
-            otherReqRoutes.PATCH("/:id/cancel", otherRequestHandler.CancelRequest)
-            
-            otherReqRoutes.POST("/:id/documents", otherRequestHandler.UploadDocument)
-            otherReqRoutes.GET("/:id/documents", otherRequestHandler.GetDocuments)
-            otherReqRoutes.DELETE("/documents/:docId", otherRequestHandler.DeleteDocument)
-            otherReqRoutes.GET("/documents/:docId/download", otherRequestHandler.DownloadDocument)       
+			otherReqRoutes.PUT("/:id", otherRequestHandler.UpdateRequest)
+			otherReqRoutes.PATCH("/:id/cancel", otherRequestHandler.CancelRequest)
 
-            otherReqRoutes.GET("", authMiddleware.RequireAdmin(), otherRequestHandler.GetAllRequests) 
-            otherReqRoutes.PATCH("/:id/complete", authMiddleware.RequireAdmin(), otherRequestHandler.CompleteRequest)
-            otherReqRoutes.PATCH("/:id/rollback", authMiddleware.RequireAdmin(), otherRequestHandler.RollbackRequest)
-        }
+			otherReqRoutes.POST("/:id/documents", otherRequestHandler.UploadDocument)
+			otherReqRoutes.GET("/:id/documents", otherRequestHandler.GetDocuments)
+			otherReqRoutes.DELETE("/documents/:docId", otherRequestHandler.DeleteDocument)
+			otherReqRoutes.GET("/documents/:docId/download", otherRequestHandler.DownloadDocument)
 
-        // Request Types management routes
-        requestTypeRoutes := protected.Group("/request-types")
-        {
-            requestTypeRoutes.GET("", otherRequestHandler.GetAllRequestTypes)
-            
-            requestTypeRoutes.POST("", authMiddleware.RequireAdmin(), otherRequestHandler.CreateRequestType)
-            requestTypeRoutes.PUT("/:id", authMiddleware.RequireAdmin(), otherRequestHandler.UpdateRequestType)
-            requestTypeRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), otherRequestHandler.DeleteRequestType)
-        }
+			otherReqRoutes.GET("", authMiddleware.RequireAdmin(), otherRequestHandler.GetAllRequests)
+			otherReqRoutes.PATCH("/:id/complete", authMiddleware.RequireAdmin(), otherRequestHandler.CompleteRequest)
+			otherReqRoutes.PATCH("/:id/rollback", authMiddleware.RequireAdmin(), otherRequestHandler.RollbackRequest)
+		}
+
+		// Request Types management routes
+		requestTypeRoutes := protected.Group("/request-types")
+		{
+			requestTypeRoutes.GET("", otherRequestHandler.GetAllRequestTypes)
+
+			requestTypeRoutes.POST("", authMiddleware.RequireAdmin(), otherRequestHandler.CreateRequestType)
+			requestTypeRoutes.PUT("/:id", authMiddleware.RequireAdmin(), otherRequestHandler.UpdateRequestType)
+			requestTypeRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), otherRequestHandler.DeleteRequestType)
+		}
 
 		// Job Position management routes
 		jobPositionRoutes := protected.Group("/job-positions")
@@ -503,6 +507,23 @@ func main() {
 
 			// Link documents to a record (used internally by other services)
 			documentRoutes.POST("/link", documentHandler.LinkDocuments)
+		}
+
+		// Dynamic Email routes (ADMIN only)
+		emailRoutes := protected.Group("/emails")
+		{
+			emailRoutes.GET("/templates", emailHandler.ListResendTemplates)
+			emailRoutes.POST("/send-template", emailHandler.SendDynamicTemplateEmail)
+		}
+
+		// Mail Configuration routes (ADMIN only)
+		mailConfigRoutes := protected.Group("/mail-configs")
+		{
+			mailConfigRoutes.GET("", mailConfigHandler.GetAll)
+			mailConfigRoutes.GET("/:id", mailConfigHandler.GetByID)
+			mailConfigRoutes.POST("", mailConfigHandler.Create)
+			mailConfigRoutes.PUT("/:id", mailConfigHandler.Update)
+			mailConfigRoutes.DELETE("/:id", mailConfigHandler.Delete)
 		}
 
 		// Expense Management routes

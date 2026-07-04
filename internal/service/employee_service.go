@@ -28,26 +28,28 @@ type EmployeeService interface {
 }
 
 type employeeService struct {
-	employeeRepo repository.EmployeeRepository
-	userRepo     repository.UserRepository
-	userRoleRepo repository.UserRoleRepository
-	roleRepo     repository.RoleRepository
-	authService  AuthService
-	auditService AuditService
-	workInfoRepo repository.WorkInformationRepository
-	emailService EmailService
+	employeeRepo      repository.EmployeeRepository
+	userRepo          repository.UserRepository
+	userRoleRepo      repository.UserRoleRepository
+	roleRepo          repository.RoleRepository
+	authService       AuthService
+	auditService      AuditService
+	workInfoRepo      repository.WorkInformationRepository
+	emailService      EmailService
+	mailConfigService MailConfigService
 }
 
-func NewEmployeeService(employeeRepo repository.EmployeeRepository, userRepo repository.UserRepository, userRoleRepo repository.UserRoleRepository, roleRepo repository.RoleRepository, authService AuthService, auditService AuditService, workInfoRepo repository.WorkInformationRepository, emailService EmailService) EmployeeService {
+func NewEmployeeService(employeeRepo repository.EmployeeRepository, userRepo repository.UserRepository, userRoleRepo repository.UserRoleRepository, roleRepo repository.RoleRepository, authService AuthService, auditService AuditService, workInfoRepo repository.WorkInformationRepository, emailService EmailService, mailConfigService MailConfigService) EmployeeService {
 	return &employeeService{
-		employeeRepo: employeeRepo,
-		userRepo:     userRepo,
-		userRoleRepo: userRoleRepo,
-		roleRepo:     roleRepo,
-		authService:  authService,
-		auditService: auditService,
-		workInfoRepo: workInfoRepo,
-		emailService: emailService,
+		employeeRepo:      employeeRepo,
+		userRepo:          userRepo,
+		userRoleRepo:      userRoleRepo,
+		roleRepo:          roleRepo,
+		authService:       authService,
+		auditService:      auditService,
+		workInfoRepo:      workInfoRepo,
+		emailService:      emailService,
+		mailConfigService: mailConfigService,
 	}
 }
 
@@ -157,13 +159,36 @@ func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastNam
 		fmt.Printf("No roles provided for user %d\n", user.ID)
 	}
 
-	// Send welcome email to the newly created user
+	// Send welcome email — CC resolved from PERSONEL_INFO_EMAIL_WELCOME config if defined
 	fmt.Printf("Sending welcome email to: %s\n", companyEmail)
-	if err := s.emailService.SendWelcomeEmail(user.ID, user.Email, firstName, lastName); err != nil {
+	var welcomeCC []string
+	ctx := map[string]string{"TRIGGER_USER": user.Email}
+	_, ccAddrs, _, _, _ := s.mailConfigService.ResolveRecipientsWithContext("PERSONEL_INFO_EMAIL_WELCOME", ctx)
+	if len(ccAddrs) > 0 {
+		welcomeCC = ccAddrs
+	}
+	if err := s.emailService.SendWelcomeEmail(user.ID, user.Email, firstName, lastName, welcomeCC); err != nil {
 		fmt.Printf("WARNING: failed to send welcome email to %s: %v\n", companyEmail, err)
 	} else {
-		fmt.Printf("Welcome email sent successfully to: %s\n", companyEmail)
+		fmt.Printf("Welcome email sent successfully to: %s (cc: %v)\n", companyEmail, welcomeCC)
 	}
+
+	// Send onboard email — config key: PERSONEL_INFO_EMAIL_ONBOARD, template: onboard-mail
+	go func(empEmail, empFirstName, empLastName string) {
+		ctxOnboard := map[string]string{"TRIGGER_USER": empEmail}
+		toOnboard, ccOnboard, bccOnboard, _, notifErr := s.mailConfigService.ResolveRecipientsWithContext("PERSONEL_INFO_EMAIL_ONBOARD", ctxOnboard)
+		if notifErr != nil || len(toOnboard) == 0 {
+			return
+		}
+		vars := map[string]interface{}{
+			"fullname": fmt.Sprintf("%s %s", empFirstName, empLastName),
+		}
+		if err := s.emailService.SendTemplateEmailWithCC(toOnboard, ccOnboard, bccOnboard, "Hoş Geldiniz — Onboarding", "onboard-mail", vars); err != nil {
+			fmt.Printf("WARNING: PERSONEL_INFO_EMAIL_ONBOARD error: %v\n", err)
+		} else {
+			fmt.Printf("Onboard email sent to %v (cc: %v)\n", toOnboard, ccOnboard)
+		}
+	}(user.Email, firstName, lastName)
 
 	// Audit the creation
 	if err := s.auditService.CreateAuditLog("Employee", employee.ID, domain.AuditActionCreate, nil, employee, createdBy); err != nil {

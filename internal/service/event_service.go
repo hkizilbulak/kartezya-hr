@@ -37,6 +37,7 @@ type eventService struct {
 	userRepo             repository.UserRepository
 	employeeRepo         repository.EmployeeRepository
 	emailService         EmailService
+	mailConfigService    MailConfigService
 	config               *config.Config
 }
 
@@ -46,6 +47,7 @@ func NewEventService(
 	userRepo repository.UserRepository,
 	employeeRepo repository.EmployeeRepository,
 	emailService EmailService,
+	mailConfigService MailConfigService,
 	cfg *config.Config,
 ) EventService {
 	return &eventService{
@@ -54,6 +56,7 @@ func NewEventService(
 		userRepo:             userRepo,
 		employeeRepo:         employeeRepo,
 		emailService:         emailService,
+		mailConfigService:    mailConfigService,
 		config:               cfg,
 	}
 }
@@ -111,10 +114,16 @@ func (s *eventService) PublishEvent(id uint, modifiedBy string) error {
 
 		// Get target audience emails
 		if event.AudienceFilter == domain.EventAudienceAllCompany {
-			// Use configured mail group addresses to avoid Resend BCC limit (max 50)
-			groupEmails := s.config.Email.EventAllCompanyGroup
+			// Resolve group emails from DB config; fall back to env if not set
+			groupEmails, groupCCEmails, groupBCCEmails, _, dbErr := s.mailConfigService.ResolveRecipients("EVENT_EMAIL_ALL_COMPANY")
+			if dbErr != nil || len(groupEmails) == 0 {
+				log.Printf("[EVENT] DB config not found / empty for EVENT_EMAIL_ALL_COMPANY, falling back to env: %v", dbErr)
+				groupEmails = s.config.Email.EventAllCompanyGroup
+				groupCCEmails = nil
+				groupBCCEmails = nil
+			}
 			if len(groupEmails) == 0 {
-				log.Printf("[EVENT] WARNING: EVENT_EMAIL_ALL_COMPANY is not configured, skipping ALL_COMPANY email for event %d", event.ID)
+				log.Printf("[EVENT] WARNING: EVENT_EMAIL_ALL_COMPANY has no recipients configured, skipping ALL_COMPANY email for event %d", event.ID)
 			} else {
 				variables := map[string]interface{}{
 					"eventTitle":       event.Name,
@@ -124,11 +133,11 @@ func (s *eventService) PublishEvent(id uint, modifiedBy string) error {
 					"eventUrl":         eventUrl,
 					"importantNote":    importantNote,
 				}
-				err := s.emailService.SendTemplateEmail(groupEmails, "", event.ResendTemplateId, variables)
+				err := s.emailService.SendTemplateEmailWithCC(groupEmails, groupCCEmails, groupBCCEmails, "", event.ResendTemplateId, variables)
 				if err != nil {
 					log.Printf("[EVENT] ERROR: Failed to send event email to group %v: %v", groupEmails, err)
 				} else {
-					log.Printf("[EVENT] Successfully sent event email to all-company groups: %v", groupEmails)
+					log.Printf("[EVENT] Successfully sent event email to all-company groups: %v (cc: %v, bcc: %v)", groupEmails, groupCCEmails, groupBCCEmails)
 				}
 			}
 		} else {
@@ -148,6 +157,9 @@ func (s *eventService) PublishEvent(id uint, modifiedBy string) error {
 				}
 
 				if len(emails) > 0 {
+					// Resolve CC/BCC from EVENT_EMAIL_TARGETED config (TO ignored, comes from participants)
+					_, targetedCC, targetedBCC, _, _ := s.mailConfigService.ResolveRecipients("EVENT_EMAIL_TARGETED")
+
 					variables := map[string]interface{}{
 						"eventTitle":       event.Name,
 						"eventDate":        eventDate,
@@ -156,11 +168,11 @@ func (s *eventService) PublishEvent(id uint, modifiedBy string) error {
 						"eventUrl":         eventUrl,
 						"importantNote":    importantNote,
 					}
-					err := s.emailService.SendTemplateEmail(emails, "", event.ResendTemplateId, variables)
+					err := s.emailService.SendTemplateEmailWithCC(emails, targetedCC, targetedBCC, "", event.ResendTemplateId, variables)
 					if err != nil {
-						log.Printf("[EVENT] ERROR: Failed to send event email: %v", err)
+						log.Printf("[EVENT] ERROR: Failed to send targeted event email: %v", err)
 					} else {
-						log.Printf("[EVENT] Successfully sent event email to %d recipients: %v", len(emails), emails)
+						log.Printf("[EVENT] Successfully sent targeted event email to %d recipients: %v (cc: %v, bcc: %v)", len(emails), emails, targetedCC, targetedBCC)
 					}
 				}
 			}
@@ -168,6 +180,45 @@ func (s *eventService) PublishEvent(id uint, modifiedBy string) error {
 	} else {
 		log.Println("WARN: Event published but no ResendTemplateId provided. Emails not sent for event:", event.Name)
 	}
+
+	// ── INFO notification: INFO_EMAIL_NEW_EVENT_PUBLISHED ─────────────────
+	go func() {
+		toNotif, ccNotif, bccNotif, templateCode, notifErr := s.mailConfigService.ResolveRecipients("INFO_EMAIL_NEW_EVENT_PUBLISHED")
+		if notifErr != nil || len(toNotif) == 0 {
+			return
+		}
+		istanbul, _ := time.LoadLocation("Europe/Istanbul")
+		dateStr := event.StartDate.In(istanbul).Format("02.01.2006 15:04") +
+			" - " + event.EndDate.In(istanbul).Format("02.01.2006 15:04")
+		audienceLabel := map[domain.EventAudience]string{
+			domain.EventAudienceAllCompany: "Tüm Şirket",
+			domain.EventAudienceDepartment: "Departman",
+			domain.EventAudienceLocation:   "Konum",
+		}[event.AudienceFilter]
+		if audienceLabel == "" {
+			audienceLabel = string(event.AudienceFilter)
+		}
+		body := fmt.Sprintf(
+			"<p>Yeni bir etkinlik yayınlandı.</p>"+
+				"<table>"+
+				"<tr><td><strong>Etkinlik Adı</strong></td><td>%s</td></tr>"+
+				"<tr><td><strong>Tarih</strong></td><td>%s</td></tr>"+
+				"<tr><td><strong>Konum</strong></td><td>%s</td></tr>"+
+				"<tr><td><strong>Kitle</strong></td><td>%s</td></tr>"+
+				"<tr><td><strong>Açıklama</strong></td><td>%s</td></tr>"+
+				"</table>",
+			event.Name, dateStr, event.Location, audienceLabel, event.Description,
+		)
+		if event.AllowCompanion && event.MaxCompanion > 0 {
+			body += fmt.Sprintf("<p><strong>Misafir:</strong> +%d kişiye izin veriliyor</p>", event.MaxCompanion)
+		}
+		vars := map[string]interface{}{"body": body}
+		if err := s.emailService.SendTemplateEmailWithCC(toNotif, ccNotif, bccNotif, "Yeni Etkinlik Yayınlandı", templateCode, vars); err != nil {
+			log.Printf("[EVENT] INFO notification error (INFO_EMAIL_NEW_EVENT_PUBLISHED): %v", err)
+		} else {
+			log.Printf("[EVENT] INFO notification sent for event %d to %v", event.ID, toNotif)
+		}
+	}()
 
 	return nil
 }

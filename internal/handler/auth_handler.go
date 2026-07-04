@@ -13,18 +13,20 @@ import (
 )
 
 type AuthHandler struct {
-	authService  service.AuthService
-	emailService service.EmailService
-	userRepo     repository.UserRepository
-	employeeRepo repository.EmployeeRepository
+	authService       service.AuthService
+	emailService      service.EmailService
+	mailConfigService service.MailConfigService
+	userRepo          repository.UserRepository
+	employeeRepo      repository.EmployeeRepository
 }
 
-func NewAuthHandler(authService service.AuthService, emailService service.EmailService, userRepo repository.UserRepository, employeeRepo repository.EmployeeRepository) *AuthHandler {
+func NewAuthHandler(authService service.AuthService, emailService service.EmailService, userRepo repository.UserRepository, employeeRepo repository.EmployeeRepository, mailConfigService service.MailConfigService) *AuthHandler {
 	return &AuthHandler{
-		authService:  authService,
-		emailService: emailService,
-		userRepo:     userRepo,
-		employeeRepo: employeeRepo,
+		authService:       authService,
+		emailService:      emailService,
+		mailConfigService: mailConfigService,
+		userRepo:          userRepo,
+		employeeRepo:      employeeRepo,
 	}
 }
 
@@ -145,7 +147,11 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 		lastName = employee.LastName
 	}
 
-	if err := h.emailService.SendPasswordResetEmail(user.ID, user.Email, firstName, lastName); err != nil {
+	var resetCC []string
+	if _, ccAddrs, _, _, err := h.mailConfigService.ResolveRecipientsWithContext("PERSONEL_INFO_EMAIL_RESET_PASSWORD", map[string]string{"TRIGGER_USER": user.Email}); err == nil {
+		resetCC = ccAddrs
+	}
+	if err := h.emailService.SendPasswordResetEmail(user.ID, user.Email, firstName, lastName, resetCC); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   "Failed to send password reset email: " + err.Error(),
@@ -426,7 +432,11 @@ func (h *AuthHandler) SendPasswordResetEmail(c *gin.Context) {
 	}
 
 	// Send password reset email
-	if err := h.emailService.SendPasswordResetEmail(user.ID, user.Email, firstName, lastName); err != nil {
+	var resetCC []string
+	if _, ccAddrs, _, _, err := h.mailConfigService.ResolveRecipientsWithContext("PERSONEL_INFO_EMAIL_RESET_PASSWORD", map[string]string{"TRIGGER_USER": user.Email}); err == nil {
+		resetCC = ccAddrs
+	}
+	if err := h.emailService.SendPasswordResetEmail(user.ID, user.Email, firstName, lastName, resetCC); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   "Failed to send password reset email: " + err.Error(),

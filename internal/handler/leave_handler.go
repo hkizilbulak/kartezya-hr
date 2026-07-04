@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -16,14 +17,23 @@ import (
 )
 
 type LeaveHandler struct {
-	leaveService    service.LeaveService
-	employeeService service.EmployeeService
+	leaveService      service.LeaveService
+	employeeService   service.EmployeeService
+	emailService      service.EmailService
+	mailConfigService service.MailConfigService
 }
 
-func NewLeaveHandler(leaveService service.LeaveService, employeeService service.EmployeeService) *LeaveHandler {
+func NewLeaveHandler(
+	leaveService service.LeaveService,
+	employeeService service.EmployeeService,
+	emailService service.EmailService,
+	mailConfigService service.MailConfigService,
+) *LeaveHandler {
 	return &LeaveHandler{
-		leaveService:    leaveService,
-		employeeService: employeeService,
+		leaveService:      leaveService,
+		employeeService:   employeeService,
+		emailService:      emailService,
+		mailConfigService: mailConfigService,
 	}
 }
 
@@ -471,6 +481,54 @@ func (h *LeaveHandler) CreateLeaveRequest(c *gin.Context) {
 		})
 		return
 	}
+
+	// ── INFO notification: INFO_EMAIL_NEW_LEAVE_REQUEST ────────────────────
+	go func(empID uint, startDate, endDate time.Time, reason, leaveTypeName string, days float64, isPaid bool) {
+		to, cc, bcc, templateCode, notifErr := h.mailConfigService.ResolveRecipients("INFO_EMAIL_NEW_LEAVE_REQUEST")
+		if notifErr != nil || len(to) == 0 {
+			log.Printf("[LEAVE] INFO_EMAIL_NEW_LEAVE_REQUEST not configured or inactive, skipping notification: %v", notifErr)
+			return
+		}
+		empName := fmt.Sprintf("Çalışan #%d", empID)
+		if emp, err := h.employeeService.GetEmployeeByID(empID); err == nil {
+			empName = emp.FirstName + " " + emp.LastName
+		}
+		paidLabel := "Hayır"
+		if isPaid {
+			paidLabel = "Evet"
+		}
+		// Kalan yıllık izin bakiyesi
+		balanceRow := ""
+		if balance, err := h.leaveService.GetAnnualLeaveBalance(empID); err == nil && balance != nil {
+			balanceRow = fmt.Sprintf(
+				"<tr><td><strong>Yıllık İzin Bakiyesi</strong></td><td>%.1f gün kalan (Toplam: %.1f / Kullanılan: %.1f)</td></tr>",
+				balance.RemainingDays, balance.TotalDays, balance.UsedDays,
+			)
+		}
+		body := fmt.Sprintf(
+			"<p>Yeni bir izin talebi oluşturuldu.</p>"+
+				"<table>"+
+				"<tr><td><strong>Çalışan</strong></td><td>%s</td></tr>"+
+				"<tr><td><strong>İzin Türü</strong></td><td>%s</td></tr>"+
+				"<tr><td><strong>Başlangıç</strong></td><td>%s</td></tr>"+
+				"<tr><td><strong>Bitiş</strong></td><td>%s</td></tr>"+
+				"<tr><td><strong>Gün Sayısı</strong></td><td>%.1f iş günü</td></tr>"+
+				"<tr><td><strong>Ücretli İzin</strong></td><td>%s</td></tr>"+
+				"%s"+
+				"<tr><td><strong>Açıklama</strong></td><td>%s</td></tr>"+
+				"</table>",
+			empName, leaveTypeName,
+			startDate.Format("02.01.2006"),
+			endDate.Format("02.01.2006"),
+			days, paidLabel, balanceRow, reason,
+		)
+		vars := map[string]interface{}{"body": body}
+		if err := h.emailService.SendTemplateEmailWithCC(to, cc, bcc, "Yeni İzin Talebi", templateCode, vars); err != nil {
+			log.Printf("[LEAVE] INFO notification error (INFO_EMAIL_NEW_LEAVE_REQUEST): %v", err)
+		} else {
+			log.Printf("[LEAVE] INFO notification sent for new leave request (employee %d)", empID)
+		}
+	}(*req.EmployeeID, req.StartDate, req.EndDate, req.Reason, leaveType.Name, workingDays, leave.IsPaid)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true,
