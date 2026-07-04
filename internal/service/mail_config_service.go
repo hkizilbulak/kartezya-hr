@@ -17,6 +17,9 @@ type MailConfigService interface {
 	// ResolveRecipients returns (to, cc, bcc, templateCode) for a mail key.
 	// Only STATIC recipients are returned; DYNAMIC placeholders need caller-side context.
 	ResolveRecipients(mailKey string) (to []string, cc []string, bcc []string, templateCode string, err error)
+	// ResolveRecipientsWithContext resolves both STATIC and DYNAMIC recipients.
+	// ctx should contain placeholder keys without braces, e.g. {"TRIGGER_USER": "user@example.com"}
+	ResolveRecipientsWithContext(mailKey string, ctx map[string]string) (to []string, cc []string, bcc []string, templateCode string, err error)
 }
 
 type mailConfigService struct {
@@ -112,6 +115,55 @@ func (s *mailConfigService) ResolveRecipients(mailKey string) (to []string, cc [
 					bcc = append(bcc, trimmed)
 				}
 			}
+		}
+	}
+	return to, cc, bcc, templateCode, nil
+}
+
+// ResolveRecipientsWithContext resolves STATIC recipients and also resolves DYNAMIC
+// placeholders (e.g. {{TRIGGER_USER}}) using the provided context map.
+// ctx keys must match the placeholder name without braces: {"TRIGGER_USER": "email@example.com"}
+func (s *mailConfigService) ResolveRecipientsWithContext(mailKey string, ctx map[string]string) (to []string, cc []string, bcc []string, templateCode string, err error) {
+	cfg, err := s.repo.GetByKey(mailKey)
+	if err != nil {
+		return nil, nil, nil, "", fmt.Errorf("mail config not found for key %q: %w", mailKey, err)
+	}
+	if !cfg.IsActive {
+		return nil, nil, nil, "", fmt.Errorf("mail config %q is inactive", mailKey)
+	}
+	templateCode = cfg.ResendTemplateCode
+
+	resolvePlaceholder := func(value string) string {
+		// value like "{{TRIGGER_USER}}" → look up ctx["TRIGGER_USER"]
+		key := strings.TrimPrefix(strings.TrimSuffix(strings.TrimSpace(value), "}}"), "{{")
+		if email, ok := ctx[key]; ok {
+			return strings.TrimSpace(email)
+		}
+		return ""
+	}
+
+	appendAddrs := func(slice *[]string, raw string, valueType domain.MailValueType) {
+		if valueType == domain.ValueTypeStatic {
+			for _, addr := range strings.FieldsFunc(raw, func(c rune) bool { return c == ',' || c == ';' }) {
+				if trimmed := strings.TrimSpace(addr); trimmed != "" {
+					*slice = append(*slice, trimmed)
+				}
+			}
+		} else if valueType == domain.ValueTypeDynamic {
+			if resolved := resolvePlaceholder(raw); resolved != "" {
+				*slice = append(*slice, resolved)
+			}
+		}
+	}
+
+	for _, r := range cfg.Recipients {
+		switch r.RecipientType {
+		case domain.RecipientTypeTo:
+			appendAddrs(&to, r.RecipientValue, r.ValueType)
+		case domain.RecipientTypeCC:
+			appendAddrs(&cc, r.RecipientValue, r.ValueType)
+		case domain.RecipientTypeBCC:
+			appendAddrs(&bcc, r.RecipientValue, r.ValueType)
 		}
 	}
 	return to, cc, bcc, templateCode, nil

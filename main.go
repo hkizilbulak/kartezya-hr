@@ -130,7 +130,8 @@ func main() {
 	authService := service.NewAuthService(userRepo, userRoleRepo, roleRepo, auditService, cfg)
 	emailService := service.NewEmailService(cfg, userRepo)
 	documentService := service.NewDocumentService(attachmentRepo, storageProvider, cfg)
-	employeeService := service.NewEmployeeService(employeeRepo, userRepo, userRoleRepo, roleRepo, authService, auditService, workInfoRepo, emailService)
+	mailConfigService := service.NewMailConfigService(mailConfigRepo)
+	employeeService := service.NewEmployeeService(employeeRepo, userRepo, userRoleRepo, roleRepo, authService, auditService, workInfoRepo, emailService, mailConfigService)
 	leaveService := service.NewLeaveService(leaveRepo, leaveTypeRepo, leaveBalanceRepo, employeeRepo, holidayRepo, attachmentRepo, storageProvider, auditService)
 	departmentService := service.NewDepartmentService(departmentRepo, companyRepo, auditService)
 	companyService := service.NewCompanyService(companyRepo, departmentRepo, departmentService, auditService)
@@ -144,7 +145,6 @@ func main() {
 	expenseService := service.NewExpenseService(expenseRepo, expenseTypeRepo, attachmentRepo, employeeRepo, storageProvider, auditService)
 	reportService := service.NewReportService(employeeRepo, workInfoRepo, leaveRepo, holidayRepo, leaveService)
 	jobService := service.NewJobService(jobRepo, auditService)
-	mailConfigService := service.NewMailConfigService(mailConfigRepo)
 	eventService := service.NewEventService(eventRepo, eventParticipantRepo, userRepo, employeeRepo, emailService, mailConfigService, cfg)
 	faqService := service.NewFAQService(faqRepo, auditService)
 	otherRequestService := service.NewOtherRequestService(otherRequestRepo, attachmentRepo, auditService, emailService, storageProvider, employeeRepo)
@@ -155,7 +155,7 @@ func main() {
 	defer scheduler.Stop()
 
 	// Initialize handlers
-	authHandler := handler.NewAuthHandler(authService, emailService, userRepo, employeeRepo)
+	authHandler := handler.NewAuthHandler(authService, emailService, userRepo, employeeRepo, mailConfigService)
 	employeeHandler := handler.NewEmployeeHandler(employeeService)
 	leaveHandler := handler.NewLeaveHandler(leaveService, employeeService, emailService, mailConfigService)
 	companyHandler := handler.NewCompanyHandler(companyService)
@@ -175,7 +175,7 @@ func main() {
 	eventHandler := handler.NewEventHandler(eventService)
 	faqHandler := handler.NewFAQHandler(faqService)
 	otherRequestHandler := handler.NewOtherRequestHandler(otherRequestService)
-	emailHandler := handler.NewEmailHandler(emailService, cfg)
+	emailHandler := handler.NewEmailHandler(emailService, mailConfigService, cfg)
 	mailConfigHandler := handler.NewMailConfigHandler(mailConfigService)
 
 	// Initialize middleware

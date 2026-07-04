@@ -20,8 +20,8 @@ import (
 
 // EmailService interface for sending emails
 type EmailService interface {
-	SendWelcomeEmail(userId uint, email string, firstName string, lastName string) error
-	SendPasswordResetEmail(userId uint, email string, firstName string, lastName string) error
+	SendWelcomeEmail(userId uint, email string, firstName string, lastName string, cc []string) error
+	SendPasswordResetEmail(userId uint, email string, firstName string, lastName string, cc []string) error
 	GeneratePasswordResetToken(userID uint) (string, error)
 	ResetPassword(token string, newPassword string, authService AuthService) error
 	ValidatePasswordResetToken(token string) (*domain.User, error)
@@ -147,7 +147,7 @@ func (s *emailService) ResetPassword(token string, newPassword string, authServi
 	return nil
 }
 
-func (s *emailService) SendWelcomeEmail(userId uint, email string, firstName string, lastName string) error {
+func (s *emailService) SendWelcomeEmail(userId uint, email string, firstName string, lastName string, cc []string) error {
 	resetToken, err := s.GeneratePasswordResetToken(userId)
 	if err != nil {
 		return fmt.Errorf("failed to generate reset token: %w", err)
@@ -160,14 +160,14 @@ func (s *emailService) SendWelcomeEmail(userId uint, email string, firstName str
 		"resetUrl": resetURL,
 	}
 
-	if err := s.SendTemplateEmail([]string{email}, "", "welcome-email", variables); err != nil {
+	if err := s.sendViaResendTemplate([]string{email}, cc, nil, "Hoş Geldiniz", "welcome-email", variables, nil, ""); err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
 	return nil
 }
 
-func (s *emailService) SendPasswordResetEmail(userId uint, email string, firstName string, lastName string) error {
+func (s *emailService) SendPasswordResetEmail(userId uint, email string, firstName string, lastName string, cc []string) error {
 	resetToken, err := s.GeneratePasswordResetToken(userId)
 	if err != nil {
 		return fmt.Errorf("failed to generate reset token: %w", err)
@@ -180,7 +180,7 @@ func (s *emailService) SendPasswordResetEmail(userId uint, email string, firstNa
 		"resetUrl": resetURL,
 	}
 
-	if err := s.SendTemplateEmail([]string{email}, "", "reset-password", variables); err != nil {
+	if err := s.sendViaResendTemplate([]string{email}, cc, nil, "Şifre Sıfırlama", "reset-password", variables, nil, ""); err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 

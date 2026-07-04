@@ -14,12 +14,13 @@ import (
 )
 
 type EmailHandler struct {
-	emailService service.EmailService
-	cfg          *config.Config
+	emailService      service.EmailService
+	mailConfigService service.MailConfigService
+	cfg               *config.Config
 }
 
-func NewEmailHandler(emailService service.EmailService, cfg *config.Config) *EmailHandler {
-	return &EmailHandler{emailService: emailService, cfg: cfg}
+func NewEmailHandler(emailService service.EmailService, mailConfigService service.MailConfigService, cfg *config.Config) *EmailHandler {
+	return &EmailHandler{emailService: emailService, mailConfigService: mailConfigService, cfg: cfg}
 }
 
 // SendDynamicTemplateEmail godoc
@@ -52,25 +53,22 @@ func (h *EmailHandler) SendDynamicTemplateEmail(c *gin.Context) {
 		req.TemplateData = make(map[string]interface{})
 	}
 
-	// kartezya_manager is mandatory in template_data
-	if _, ok := req.TemplateData["kartezya_manager"]; !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "kartezya_manager is required in template_data"})
-		return
-	}
-	if km, ok := req.TemplateData["kartezya_manager"].(string); !ok || km == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "kartezya_manager cannot be empty"})
-		return
-	}
-
 	subject := req.Subject
 	if subject == "" {
 		subject = "Bilgilendirme"
 	}
 
+	// Resolve CC/BCC from mail config if mail_key provided
+	var cc, bcc []string
+	if req.MailKey != "" {
+		ctx := map[string]string{"TRIGGER_USER": req.To}
+		_, cc, bcc, _, _ = h.mailConfigService.ResolveRecipientsWithContext(req.MailKey, ctx)
+	}
+
 	err := h.emailService.SendTemplateEmailWithCC(
 		[]string{req.To},
-		[]string{"hr@kartezya.com"},
-		nil,
+		cc,
+		bcc,
 		subject,
 		req.TemplateCode,
 		req.TemplateData,
@@ -90,6 +88,7 @@ func (h *EmailHandler) SendDynamicTemplateEmail(c *gin.Context) {
 type SendDynamicEmailRequest struct {
 	To           string                 `json:"to" binding:"required,email"`
 	TemplateCode string                 `json:"template_code" binding:"required"`
+	MailKey      string                 `json:"mail_key"`
 	Subject      string                 `json:"subject"`
 	TemplateData map[string]interface{} `json:"template_data" binding:"required"`
 }
