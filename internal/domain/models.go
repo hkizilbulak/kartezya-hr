@@ -45,7 +45,7 @@ type User struct {
 
 	// Relationships
 	UserRoles []UserRole `json:"user_roles,omitempty"`
-	Employee  *Employee  `json:"employee,omitempty"`
+	Employee  *Employee  `json:"employee,omitempty" gorm:"foreignKey:UserID"`
 }
 
 // Role represents system roles

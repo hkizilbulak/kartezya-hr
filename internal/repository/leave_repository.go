@@ -56,7 +56,7 @@ func (r *leaveRepository) Create(leave *domain.LeaveRequest) error {
 
 func (r *leaveRepository) GetByID(id uint) (*domain.LeaveRequest, error) {
 	var leave domain.LeaveRequest
-	err := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").First(&leave, id).Error
+	err := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Preload("Approver.Employee").First(&leave, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func (r *leaveRepository) GetAll(limit, offset int, sortParams types.SortParams)
 	}
 
 	// Build main query with preloads
-	query := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Where("deleted = ?", false)
+	query := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Preload("Approver.Employee").Where("deleted = ?", false)
 
 	// Apply sorting
 	if sortParams.Sort != "" {
@@ -112,7 +112,7 @@ func (r *leaveRepository) GetByEmployeeIDWithLeaveType(employeeID uint, limit, o
 	}
 
 	// Build main query with preloads
-	query := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Where("employee_id = ? AND deleted = ?", employeeID, false)
+	query := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Preload("Approver.Employee").Where("employee_id = ? AND deleted = ?", employeeID, false)
 
 	// Apply sorting
 	if sortParams.Sort != "" {
@@ -150,7 +150,7 @@ func (r *leaveRepository) GetByEmployeeIDWithLeaveTypeAndStatus(employeeID uint,
 	}
 
 	// Build main query with preloads
-	query := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Where("employee_id = ? AND status = ? AND deleted = ?", employeeID, status, false)
+	query := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Preload("Approver.Employee").Where("employee_id = ? AND status = ? AND deleted = ?", employeeID, status, false)
 
 	// Apply sorting
 	if sortParams.Sort != "" {
@@ -187,7 +187,7 @@ func (r *leaveRepository) Delete(id uint) error {
 
 func (r *leaveRepository) GetByEmployeeID(employeeID uint, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error) {
 	var leaves []*domain.LeaveRequest
-	query := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Where("employee_id = ? AND deleted = ?", employeeID, false)
+	query := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Preload("Approver.Employee").Where("employee_id = ? AND deleted = ?", employeeID, false)
 
 	if sortBy != "" {
 		orderClause := sortBy
@@ -205,7 +205,7 @@ func (r *leaveRepository) GetByEmployeeID(employeeID uint, sortBy string, sortDi
 
 func (r *leaveRepository) GetByStatus(status string, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error) {
 	var leaves []*domain.LeaveRequest
-	query := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Where("status = ? AND deleted = ?", status, false)
+	query := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Preload("Approver.Employee").Where("status = ? AND deleted = ?", status, false)
 
 	if sortBy != "" {
 		orderClause := sortBy
@@ -223,7 +223,7 @@ func (r *leaveRepository) GetByStatus(status string, sortBy string, sortDir type
 
 func (r *leaveRepository) GetByDateRange(startDate, endDate string) ([]*domain.LeaveRequest, error) {
 	var leaves []*domain.LeaveRequest
-	err := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").
+	err := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Preload("Approver.Employee").
 		Where("start_date >= ? AND end_date <= ? AND deleted = ?", startDate, endDate, false).
 		Find(&leaves).Error
 	return leaves, err
@@ -258,7 +258,7 @@ func (r *leaveRepository) GetAllWithStatus(employeeID *uint, limit, offset int, 
 	}
 
 	// Build main query with preloads
-	mainQuery := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Where("deleted = ?", false)
+	mainQuery := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Preload("Approver.Employee").Where("deleted = ?", false)
 	if status != "" {
 		mainQuery = mainQuery.Where("status = ?", status)
 	}
@@ -304,7 +304,7 @@ func (r *leaveRepository) GetAllWithStatus(employeeID *uint, limit, offset int, 
 func (r *leaveRepository) GetApprovedBirthdayLeaveInYear(employeeID uint, leaveTypeID uint, year int) ([]*domain.LeaveRequest, error) {
 	var leaves []*domain.LeaveRequest
 	// Get all approved birthday leaves for the employee in the given year
-	err := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").
+	err := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Preload("Approver.Employee").
 		Where("employee_id = ? AND leave_type_id = ? AND status = ? AND EXTRACT(YEAR FROM start_date) = ? AND deleted = ?",
 			employeeID, leaveTypeID, "APPROVED", year, false).
 		Find(&leaves).Error
@@ -334,7 +334,7 @@ func (r *leaveRepository) GetPendingLeaveByEmployeeAndLeaveType(employeeID uint,
 // A leave overlaps if: leave.start_date <= endDate AND leave.end_date >= startDate
 func (r *leaveRepository) GetPendingLeavesByEmployeeIDAndDateRange(employeeID uint, leaveTypeID uint, startDate, endDate time.Time) ([]*domain.LeaveRequest, error) {
 	var leaves []*domain.LeaveRequest
-	err := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").
+	err := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Preload("Approver.Employee").
 		Where("employee_id = ? AND leave_type_id = ? AND status IN (?, ?) AND deleted = ?",
 			employeeID, leaveTypeID, "PENDING", "APPROVED", false).
 		Where("start_date <= ? AND end_date >= ?", endDate, startDate).
