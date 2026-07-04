@@ -2,6 +2,8 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -14,7 +16,10 @@ import (
 )
 
 type ExpenseHandler struct {
-	expenseService service.ExpenseService
+	expenseService    service.ExpenseService
+	employeeService   service.EmployeeService
+	emailService      service.EmailService
+	mailConfigService service.MailConfigService
 }
 
 // CreateExpenseRequestDTO represents the DTO for creating expense requests
@@ -55,9 +60,17 @@ type UpdateExpenseTypeRequestDTO struct {
 	RoleID          json.RawMessage `json:"role_id" swaggertype:"integer" example:"1"` // Use null to clear, omit to keep existing
 }
 
-func NewExpenseHandler(expenseService service.ExpenseService) *ExpenseHandler {
+func NewExpenseHandler(
+	expenseService service.ExpenseService,
+	employeeService service.EmployeeService,
+	emailService service.EmailService,
+	mailConfigService service.MailConfigService,
+) *ExpenseHandler {
 	return &ExpenseHandler{
-		expenseService: expenseService,
+		expenseService:    expenseService,
+		employeeService:   employeeService,
+		emailService:      emailService,
+		mailConfigService: mailConfigService,
 	}
 }
 
@@ -118,6 +131,44 @@ func (h *ExpenseHandler) CreateExpenseRequest(c *gin.Context) {
 		})
 		return
 	}
+
+	// ── INFO notification: INFO_EMAIL_NEW_EXPENSE_REQUEST ─────────────────
+	go func(expID uint, empID uint, expTypeID uint, amount float64, currency, description string, expDate time.Time) {
+		to, cc, bcc, templateCode, notifErr := h.mailConfigService.ResolveRecipients("INFO_EMAIL_NEW_EXPENSE_REQUEST")
+		if notifErr != nil || len(to) == 0 {
+			log.Printf("[EXPENSE] INFO_EMAIL_NEW_EXPENSE_REQUEST not configured or inactive, skipping notification: %v", notifErr)
+			return
+		}
+		empName := fmt.Sprintf("Çalışan #%d", empID)
+		if emp, err := h.employeeService.GetEmployeeByID(empID); err == nil {
+			empName = emp.FirstName + " " + emp.LastName
+		}
+		expTypeName := fmt.Sprintf("#%d", expTypeID)
+		if et, err := h.expenseService.GetExpenseTypeByID(expTypeID); err == nil {
+			expTypeName = et.Name
+		}
+		body := fmt.Sprintf(
+			"<p>Yeni bir masraf talebi oluşturuldu.</p>"+
+				"<table>"+
+				"<tr><td><strong>Masraf No</strong></td><td>#%d</td></tr>"+
+				"<tr><td><strong>Çalışan</strong></td><td>%s</td></tr>"+
+				"<tr><td><strong>Masraf Türü</strong></td><td>%s</td></tr>"+
+				"<tr><td><strong>Tutar</strong></td><td>%.2f %s</td></tr>"+
+				"<tr><td><strong>Tarih</strong></td><td>%s</td></tr>"+
+				"<tr><td><strong>Açıklama</strong></td><td>%s</td></tr>"+
+				"</table>",
+			expID, empName, expTypeName,
+			amount, currency,
+			expDate.Format("02.01.2006"),
+			description,
+		)
+		vars := map[string]interface{}{"body": body}
+		if err := h.emailService.SendTemplateEmailWithCC(to, cc, bcc, "Yeni Masraf Talebi", templateCode, vars); err != nil {
+			log.Printf("[EXPENSE] INFO notification error (INFO_EMAIL_NEW_EXPENSE_REQUEST): %v", err)
+		} else {
+			log.Printf("[EXPENSE] INFO notification sent for new expense request #%d", expID)
+		}
+	}(expense.ID, expense.EmployeeID, expense.ExpenseTypeID, expense.Amount, expense.Currency, expense.Description, expense.ExpenseDate)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true,
@@ -517,6 +568,61 @@ func (h *ExpenseHandler) ApproveExpenseRequest(c *gin.Context) {
 		})
 		return
 	}
+
+	// ── INFO notification: INFO_EMAIL_EXPENSE_APPROVED ────────────────────
+	go func(expID uint) {
+		to, cc, bcc, templateCode, notifErr := h.mailConfigService.ResolveRecipients("INFO_EMAIL_EXPENSE_APPROVED")
+		if notifErr != nil || len(to) == 0 {
+			log.Printf("[EXPENSE] INFO_EMAIL_EXPENSE_APPROVED not configured or inactive, skipping notification: %v", notifErr)
+			return
+		}
+		exp, err := h.expenseService.GetExpenseRequestByID(expID)
+		if err != nil {
+			log.Printf("[EXPENSE] Could not fetch expense #%d for INFO_EMAIL_EXPENSE_APPROVED: %v", expID, err)
+			return
+		}
+		empName := fmt.Sprintf("Çalışan #%d", exp.EmployeeID)
+		if exp.Employee != nil {
+			empName = exp.Employee.FirstName + " " + exp.Employee.LastName
+		}
+		expTypeName := fmt.Sprintf("#%d", exp.ExpenseTypeID)
+		if exp.ExpenseType != nil {
+			expTypeName = exp.ExpenseType.Name
+		}
+		approverRow := ""
+		if exp.Approver != nil {
+			approverName := exp.Approver.Email
+			approverRow = fmt.Sprintf("<tr><td><strong>Onaylayan</strong></td><td>%s</td></tr>", approverName)
+		}
+		approvedAtRow := ""
+		if exp.ApprovedAt != nil {
+			approvedAtRow = fmt.Sprintf("<tr><td><strong>Onay Tarihi</strong></td><td>%s</td></tr>", exp.ApprovedAt.Format("02.01.2006 15:04"))
+		}
+		body := fmt.Sprintf(
+			"<p>Bir masraf talebi onaylandı.</p>"+
+				"<table>"+
+				"<tr><td><strong>Masraf No</strong></td><td>#%d</td></tr>"+
+				"<tr><td><strong>Çalışan</strong></td><td>%s</td></tr>"+
+				"<tr><td><strong>Masraf Türü</strong></td><td>%s</td></tr>"+
+				"<tr><td><strong>Tutar</strong></td><td>%.2f %s</td></tr>"+
+				"<tr><td><strong>Masraf Tarihi</strong></td><td>%s</td></tr>"+
+				"<tr><td><strong>Açıklama</strong></td><td>%s</td></tr>"+
+				"%s%s"+
+				"<tr><td><strong>Durum</strong></td><td><strong style=\"color:#16a34a\">ONAYLANDI</strong></td></tr>"+
+				"</table>",
+			exp.ID, empName, expTypeName,
+			exp.Amount, exp.Currency,
+			exp.ExpenseDate.Format("02.01.2006"),
+			exp.Description,
+			approverRow, approvedAtRow,
+		)
+		vars := map[string]interface{}{"body": body}
+		if err := h.emailService.SendTemplateEmailWithCC(to, cc, bcc, "Masraf Talebiniz Onaylandı", templateCode, vars); err != nil {
+			log.Printf("[EXPENSE] INFO notification error (INFO_EMAIL_EXPENSE_APPROVED): %v", err)
+		} else {
+			log.Printf("[EXPENSE] INFO notification sent for approved expense #%d", expID)
+		}
+	}(id)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,

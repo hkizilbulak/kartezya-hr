@@ -52,6 +52,8 @@ type LeaveService interface {
 	DeductLeaveBalance(employeeID, leaveTypeID uint, requestedDays float64, userID uint) error
 	GetMyLeaveBalances(userID uint, page, limit int, sortParams types.SortParams) (*PaginatedResponse, error)
 	GetEmployeeLeaveBalances(employeeID uint, page, limit int, sortParams types.SortParams) (*PaginatedResponse, error)
+	GetLeaveBalanceForType(employeeID, leaveTypeID uint) (*domain.LeaveBalance, error)
+	GetAnnualLeaveBalance(employeeID uint) (*domain.LeaveBalance, error)
 
 	// Leave Type methods
 	CreateLeaveType(leaveType *domain.LeaveType, userID uint) error
@@ -1503,4 +1505,29 @@ func (s *leaveService) DownloadLeaveDocument(documentID string, userID uint, isA
 	}
 
 	return url, nil
+}
+
+// GetLeaveBalanceForType returns the leave balance for a specific employee and leave type.
+func (s *leaveService) GetLeaveBalanceForType(employeeID, leaveTypeID uint) (*domain.LeaveBalance, error) {
+	balances, err := s.leaveBalanceRepo.GetByEmployeeAndLeaveType(employeeID, leaveTypeID)
+	if err != nil {
+		return nil, err
+	}
+	if len(balances) == 0 {
+		return nil, nil
+	}
+	return balances[0], nil
+}
+
+// GetAnnualLeaveBalance returns the first (annual) leave balance for the employee.
+// Since the system only has one leave type, this returns whichever balance exists.
+func (s *leaveService) GetAnnualLeaveBalance(employeeID uint) (*domain.LeaveBalance, error) {
+	balances, _, err := s.leaveBalanceRepo.GetByEmployeeIDPaginated(employeeID, 1, 0, types.SortParams{Sort: "leave_type_id", Direction: "ASC"})
+	if err != nil {
+		return nil, err
+	}
+	if len(balances) == 0 {
+		return nil, nil
+	}
+	return balances[0], nil
 }

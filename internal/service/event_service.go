@@ -178,6 +178,45 @@ func (s *eventService) PublishEvent(id uint, modifiedBy string) error {
 		log.Println("WARN: Event published but no ResendTemplateId provided. Emails not sent for event:", event.Name)
 	}
 
+	// ── INFO notification: INFO_EMAIL_NEW_EVENT_PUBLISHED ─────────────────
+	go func() {
+		toNotif, ccNotif, bccNotif, templateCode, notifErr := s.mailConfigService.ResolveRecipients("INFO_EMAIL_NEW_EVENT_PUBLISHED")
+		if notifErr != nil || len(toNotif) == 0 {
+			return
+		}
+		istanbul, _ := time.LoadLocation("Europe/Istanbul")
+		dateStr := event.StartDate.In(istanbul).Format("02.01.2006 15:04") +
+			" - " + event.EndDate.In(istanbul).Format("02.01.2006 15:04")
+		audienceLabel := map[domain.EventAudience]string{
+			domain.EventAudienceAllCompany: "Tüm Şirket",
+			domain.EventAudienceDepartment: "Departman",
+			domain.EventAudienceLocation:   "Konum",
+		}[event.AudienceFilter]
+		if audienceLabel == "" {
+			audienceLabel = string(event.AudienceFilter)
+		}
+		body := fmt.Sprintf(
+			"<p>Yeni bir etkinlik yayınlandı.</p>"+
+				"<table>"+
+				"<tr><td><strong>Etkinlik Adı</strong></td><td>%s</td></tr>"+
+				"<tr><td><strong>Tarih</strong></td><td>%s</td></tr>"+
+				"<tr><td><strong>Konum</strong></td><td>%s</td></tr>"+
+				"<tr><td><strong>Kitle</strong></td><td>%s</td></tr>"+
+				"<tr><td><strong>Açıklama</strong></td><td>%s</td></tr>"+
+				"</table>",
+			event.Name, dateStr, event.Location, audienceLabel, event.Description,
+		)
+		if event.AllowCompanion && event.MaxCompanion > 0 {
+			body += fmt.Sprintf("<p><strong>Misafir:</strong> +%d kişiye izin veriliyor</p>", event.MaxCompanion)
+		}
+		vars := map[string]interface{}{"body": body}
+		if err := s.emailService.SendTemplateEmailWithCC(toNotif, ccNotif, bccNotif, "Yeni Etkinlik Yayınlandı", templateCode, vars); err != nil {
+			log.Printf("[EVENT] INFO notification error (INFO_EMAIL_NEW_EVENT_PUBLISHED): %v", err)
+		} else {
+			log.Printf("[EVENT] INFO notification sent for event %d to %v", event.ID, toNotif)
+		}
+	}()
+
 	return nil
 }
 

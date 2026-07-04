@@ -157,7 +157,7 @@ func main() {
 	// Initialize handlers
 	authHandler := handler.NewAuthHandler(authService, emailService, userRepo, employeeRepo)
 	employeeHandler := handler.NewEmployeeHandler(employeeService)
-	leaveHandler := handler.NewLeaveHandler(leaveService, employeeService)
+	leaveHandler := handler.NewLeaveHandler(leaveService, employeeService, emailService, mailConfigService)
 	companyHandler := handler.NewCompanyHandler(companyService)
 	departmentHandler := handler.NewDepartmentHandler(departmentService)
 	jobPositionHandler := handler.NewJobPositionHandler(jobPositionService)
@@ -170,7 +170,7 @@ func main() {
 	contractHandler := handler.NewContractHandler(contractService)
 	reportHandler := handler.NewReportHandler(reportService, emailService, mailConfigService, cfg)
 	documentHandler := handler.NewDocumentHandler(documentService)
-	expenseHandler := handler.NewExpenseHandler(expenseService)
+	expenseHandler := handler.NewExpenseHandler(expenseService, employeeService, emailService, mailConfigService)
 	jobHandler := handler.NewJobHandler(jobService, scheduler)
 	eventHandler := handler.NewEventHandler(eventService)
 	faqHandler := handler.NewFAQHandler(faqService)
