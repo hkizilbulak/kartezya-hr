@@ -157,6 +157,9 @@ func (s *eventService) PublishEvent(id uint, modifiedBy string) error {
 				}
 
 				if len(emails) > 0 {
+					// Resolve CC/BCC from EVENT_EMAIL_TARGETED config (TO ignored, comes from participants)
+					_, targetedCC, targetedBCC, _, _ := s.mailConfigService.ResolveRecipients("EVENT_EMAIL_TARGETED")
+
 					variables := map[string]interface{}{
 						"eventTitle":       event.Name,
 						"eventDate":        eventDate,
@@ -165,11 +168,11 @@ func (s *eventService) PublishEvent(id uint, modifiedBy string) error {
 						"eventUrl":         eventUrl,
 						"importantNote":    importantNote,
 					}
-					err := s.emailService.SendTemplateEmail(emails, "", event.ResendTemplateId, variables)
+					err := s.emailService.SendTemplateEmailWithCC(emails, targetedCC, targetedBCC, "", event.ResendTemplateId, variables)
 					if err != nil {
-						log.Printf("[EVENT] ERROR: Failed to send event email: %v", err)
+						log.Printf("[EVENT] ERROR: Failed to send targeted event email: %v", err)
 					} else {
-						log.Printf("[EVENT] Successfully sent event email to %d recipients: %v", len(emails), emails)
+						log.Printf("[EVENT] Successfully sent targeted event email to %d recipients: %v (cc: %v, bcc: %v)", len(emails), emails, targetedCC, targetedBCC)
 					}
 				}
 			}
