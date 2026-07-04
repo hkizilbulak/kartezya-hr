@@ -37,6 +37,7 @@ type eventService struct {
 	userRepo             repository.UserRepository
 	employeeRepo         repository.EmployeeRepository
 	emailService         EmailService
+	mailConfigService    MailConfigService
 	config               *config.Config
 }
 
@@ -46,6 +47,7 @@ func NewEventService(
 	userRepo repository.UserRepository,
 	employeeRepo repository.EmployeeRepository,
 	emailService EmailService,
+	mailConfigService MailConfigService,
 	cfg *config.Config,
 ) EventService {
 	return &eventService{
@@ -54,6 +56,7 @@ func NewEventService(
 		userRepo:             userRepo,
 		employeeRepo:         employeeRepo,
 		emailService:         emailService,
+		mailConfigService:    mailConfigService,
 		config:               cfg,
 	}
 }
@@ -111,10 +114,16 @@ func (s *eventService) PublishEvent(id uint, modifiedBy string) error {
 
 		// Get target audience emails
 		if event.AudienceFilter == domain.EventAudienceAllCompany {
-			// Use configured mail group addresses to avoid Resend BCC limit (max 50)
-			groupEmails := s.config.Email.EventAllCompanyGroup
+			// Resolve group emails from DB config; fall back to env if not set
+			groupEmails, groupCCEmails, groupBCCEmails, _, dbErr := s.mailConfigService.ResolveRecipients("EVENT_EMAIL_ALL_COMPANY")
+			if dbErr != nil || len(groupEmails) == 0 {
+				log.Printf("[EVENT] DB config not found / empty for EVENT_EMAIL_ALL_COMPANY, falling back to env: %v", dbErr)
+				groupEmails = s.config.Email.EventAllCompanyGroup
+				groupCCEmails = nil
+				groupBCCEmails = nil
+			}
 			if len(groupEmails) == 0 {
-				log.Printf("[EVENT] WARNING: EVENT_EMAIL_ALL_COMPANY is not configured, skipping ALL_COMPANY email for event %d", event.ID)
+				log.Printf("[EVENT] WARNING: EVENT_EMAIL_ALL_COMPANY has no recipients configured, skipping ALL_COMPANY email for event %d", event.ID)
 			} else {
 				variables := map[string]interface{}{
 					"eventTitle":       event.Name,
@@ -124,11 +133,11 @@ func (s *eventService) PublishEvent(id uint, modifiedBy string) error {
 					"eventUrl":         eventUrl,
 					"importantNote":    importantNote,
 				}
-				err := s.emailService.SendTemplateEmail(groupEmails, "", event.ResendTemplateId, variables)
+				err := s.emailService.SendTemplateEmailWithCC(groupEmails, groupCCEmails, groupBCCEmails, "", event.ResendTemplateId, variables)
 				if err != nil {
 					log.Printf("[EVENT] ERROR: Failed to send event email to group %v: %v", groupEmails, err)
 				} else {
-					log.Printf("[EVENT] Successfully sent event email to all-company groups: %v", groupEmails)
+					log.Printf("[EVENT] Successfully sent event email to all-company groups: %v (cc: %v, bcc: %v)", groupEmails, groupCCEmails, groupBCCEmails)
 				}
 			}
 		} else {

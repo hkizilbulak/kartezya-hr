@@ -99,6 +99,7 @@ func main() {
 	eventParticipantRepo := repository.NewEventParticipantRepository(db.DB)
 	faqRepo := repository.NewFAQRepository(db.DB)
 	otherRequestRepo := repository.NewOtherRequestRepository(db.DB)
+	mailConfigRepo := repository.NewMailConfigRepository(db.DB)
 
 	// Initialize storage provider
 	var storageProvider service.StorageProvider
@@ -143,7 +144,8 @@ func main() {
 	expenseService := service.NewExpenseService(expenseRepo, expenseTypeRepo, attachmentRepo, employeeRepo, storageProvider, auditService)
 	reportService := service.NewReportService(employeeRepo, workInfoRepo, leaveRepo, holidayRepo, leaveService)
 	jobService := service.NewJobService(jobRepo, auditService)
-	eventService := service.NewEventService(eventRepo, eventParticipantRepo, userRepo, employeeRepo, emailService, cfg)
+	mailConfigService := service.NewMailConfigService(mailConfigRepo)
+	eventService := service.NewEventService(eventRepo, eventParticipantRepo, userRepo, employeeRepo, emailService, mailConfigService, cfg)
 	faqService := service.NewFAQService(faqRepo, auditService)
 	otherRequestService := service.NewOtherRequestService(otherRequestRepo, attachmentRepo, auditService, emailService, storageProvider, employeeRepo)
 
@@ -166,7 +168,7 @@ func main() {
 	employeeGradeHandler := handler.NewEmployeeGradeHandler(employeeGradeService, employeeService)
 	employeeContractHandler := handler.NewEmployeeContractHandler(employeeContractService, employeeService)
 	contractHandler := handler.NewContractHandler(contractService)
-	reportHandler := handler.NewReportHandler(reportService, emailService, cfg)
+	reportHandler := handler.NewReportHandler(reportService, emailService, mailConfigService, cfg)
 	documentHandler := handler.NewDocumentHandler(documentService)
 	expenseHandler := handler.NewExpenseHandler(expenseService)
 	jobHandler := handler.NewJobHandler(jobService, scheduler)
@@ -174,6 +176,7 @@ func main() {
 	faqHandler := handler.NewFAQHandler(faqService)
 	otherRequestHandler := handler.NewOtherRequestHandler(otherRequestService)
 	emailHandler := handler.NewEmailHandler(emailService, cfg)
+	mailConfigHandler := handler.NewMailConfigHandler(mailConfigService)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -511,6 +514,16 @@ func main() {
 		{
 			emailRoutes.GET("/templates", emailHandler.ListResendTemplates)
 			emailRoutes.POST("/send-template", emailHandler.SendDynamicTemplateEmail)
+		}
+
+		// Mail Configuration routes (ADMIN only)
+		mailConfigRoutes := protected.Group("/mail-configs")
+		{
+			mailConfigRoutes.GET("", mailConfigHandler.GetAll)
+			mailConfigRoutes.GET("/:id", mailConfigHandler.GetByID)
+			mailConfigRoutes.POST("", mailConfigHandler.Create)
+			mailConfigRoutes.PUT("/:id", mailConfigHandler.Update)
+			mailConfigRoutes.DELETE("/:id", mailConfigHandler.Delete)
 		}
 
 		// Expense Management routes

@@ -26,8 +26,8 @@ type EmailService interface {
 	ResetPassword(token string, newPassword string, authService AuthService) error
 	ValidatePasswordResetToken(token string) (*domain.User, error)
 	SendTemplateEmail(to []string, subject string, templateId string, variables map[string]interface{}) error
-	SendTemplateEmailWithCC(to []string, cc []string, subject string, templateId string, variables map[string]interface{}) error
-	SendReportEmail(to []string, subject string, variables map[string]interface{}, attachment io.Reader, filename string) error
+	SendTemplateEmailWithCC(to []string, cc []string, bcc []string, subject string, templateId string, variables map[string]interface{}) error
+	SendReportEmail(to []string, cc []string, bcc []string, subject string, variables map[string]interface{}, attachment io.Reader, filename string) error
 	// Diğer talep bildirimleri
 	SendNewRequestEmail(req *domain.OtherRequest) error
 	SendRequestCompletedEmail(req *domain.OtherRequest) error
@@ -196,13 +196,13 @@ func (s *emailService) SendTemplateEmail(to []string, subject string, templateId
 	}
 
 	if s.config.Email.Provider == "resend" {
-		return s.sendViaResendTemplate(to, nil, subject, templateId, variables, nil, "")
+		return s.sendViaResendTemplate(to, nil, nil, subject, templateId, variables, nil, "")
 	}
 
 	return fmt.Errorf("template emails are currently only supported with the resend provider")
 }
 
-func (s *emailService) SendTemplateEmailWithCC(to []string, cc []string, subject string, templateId string, variables map[string]interface{}) error {
+func (s *emailService) SendTemplateEmailWithCC(to []string, cc []string, bcc []string, subject string, templateId string, variables map[string]interface{}) error {
 	if len(to) == 0 {
 		return fmt.Errorf("at least one recipient is required")
 	}
@@ -211,13 +211,13 @@ func (s *emailService) SendTemplateEmailWithCC(to []string, cc []string, subject
 	}
 
 	if s.config.Email.Provider == "resend" {
-		return s.sendViaResendTemplate(to, cc, subject, templateId, variables, nil, "")
+		return s.sendViaResendTemplate(to, cc, bcc, subject, templateId, variables, nil, "")
 	}
 
 	return fmt.Errorf("template emails are currently only supported with the resend provider")
 }
 
-func (s *emailService) sendViaResendTemplate(to []string, cc []string, subject string, templateId string, variables map[string]interface{}, attachment io.Reader, attachmentFilename string) error {
+func (s *emailService) sendViaResendTemplate(to []string, cc []string, bcc []string, subject string, templateId string, variables map[string]interface{}, attachment io.Reader, attachmentFilename string) error {
 	if s.config.Email.ResendAPIKey == "" {
 		return fmt.Errorf("RESEND_API_KEY is not configured")
 	}
@@ -250,6 +250,10 @@ func (s *emailService) sendViaResendTemplate(to []string, cc []string, subject s
 
 	if len(cc) > 0 {
 		payload["cc"] = cc
+	}
+
+	if len(bcc) > 0 {
+		payload["bcc"] = bcc
 	}
 
 	if subject != "" {
@@ -298,7 +302,7 @@ func (s *emailService) sendViaResendTemplate(to []string, cc []string, subject s
 	return nil
 }
 
-func (s *emailService) SendReportEmail(to []string, subject string, variables map[string]interface{}, attachment io.Reader, filename string) error {
+func (s *emailService) SendReportEmail(to []string, cc []string, bcc []string, subject string, variables map[string]interface{}, attachment io.Reader, filename string) error {
 	if len(to) == 0 {
 		return fmt.Errorf("at least one recipient is required")
 	}
@@ -310,5 +314,5 @@ func (s *emailService) SendReportEmail(to []string, subject string, variables ma
 		return fmt.Errorf("report email is only supported with the resend provider")
 	}
 
-	return s.sendViaResendTemplate(to, nil, subject, "report-mail", variables, attachment, filename)
+	return s.sendViaResendTemplate(to, cc, bcc, subject, "report-mail", variables, attachment, filename)
 }

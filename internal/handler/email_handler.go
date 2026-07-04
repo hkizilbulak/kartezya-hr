@@ -70,6 +70,7 @@ func (h *EmailHandler) SendDynamicTemplateEmail(c *gin.Context) {
 	err := h.emailService.SendTemplateEmailWithCC(
 		[]string{req.To},
 		[]string{"hr@kartezya.com"},
+		nil,
 		subject,
 		req.TemplateCode,
 		req.TemplateData,

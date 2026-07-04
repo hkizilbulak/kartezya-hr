@@ -104,16 +104,18 @@ func (d *Database) Migrate() error {
 		&domain.LeaveBalance{},
 		&domain.LeaveRequest{},
 		&domain.LeaveDocument{},
-		&domain.ExpenseType{},    // Expense Management
-		&domain.ExpenseRequest{}, // Expense Management
-		&domain.Attachment{},     // Document Management System (for all modules)
-		&domain.Job{},            // Job Scheduler
-		&domain.JobHistory{},     // Job Scheduler
-		&domain.Event{},          // Event Management
+		&domain.ExpenseType{},      // Expense Management
+		&domain.ExpenseRequest{},   // Expense Management
+		&domain.Attachment{},       // Document Management System (for all modules)
+		&domain.Job{},              // Job Scheduler
+		&domain.JobHistory{},       // Job Scheduler
+		&domain.Event{},            // Event Management
 		&domain.EventParticipant{}, // Event Management
-		&domain.FAQ{},            // FAQ Management
+		&domain.FAQ{},              // FAQ Management
 		&domain.RequestType{},
 		&domain.OtherRequest{},
+		&domain.MailConfiguration{}, // Mail Configuration Module
+		&domain.MailRecipient{},     // Mail Configuration Module
 		// Note: AuditLog is excluded - it's created by schema.sql
 	)
 

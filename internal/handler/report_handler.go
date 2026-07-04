@@ -15,16 +15,18 @@ import (
 )
 
 type ReportHandler struct {
-	reportService service.ReportService
-	emailService  service.EmailService
-	config        *config.Config
+	reportService     service.ReportService
+	emailService      service.EmailService
+	mailConfigService service.MailConfigService
+	config            *config.Config
 }
 
-func NewReportHandler(reportService service.ReportService, emailService service.EmailService, cfg *config.Config) *ReportHandler {
+func NewReportHandler(reportService service.ReportService, emailService service.EmailService, mailConfigService service.MailConfigService, cfg *config.Config) *ReportHandler {
 	return &ReportHandler{
-		reportService: reportService,
-		emailService:  emailService,
-		config:        cfg,
+		reportService:     reportService,
+		emailService:      emailService,
+		mailConfigService: mailConfigService,
+		config:            cfg,
 	}
 }
 
@@ -506,9 +508,30 @@ func (h *ReportHandler) SendReportEmail(c *gin.Context) {
 		return
 	}
 
-	// Get recipients from config based on report type
-	recipients := h.config.ReportEmail.GetRecipients(reportType)
-	if len(recipients) == 0 {
+	// Map report_type → mail key
+	mailKeyMap := map[string]string{
+		"work-day": "REPORT_EMAIL_WORK_DAY",
+		"effort":   "REPORT_EMAIL_EFFORT",
+		"contract": "REPORT_EMAIL_CONTRACT",
+		"grade":    "REPORT_EMAIL_GRADE",
+	}
+	mailKey, ok := mailKeyMap[reportType]
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "unknown report_type: " + reportType})
+		return
+	}
+
+	// Resolve recipients from DB
+	toRecipients, ccRecipients, bccRecipients, _, err := h.mailConfigService.ResolveRecipients(mailKey)
+	if err != nil {
+		log.Printf("[REPORT-EMAIL] DB config not found for %s, falling back to env: %v", mailKey, err)
+		// Graceful fallback to env config
+		toRecipients = h.config.ReportEmail.GetRecipients(reportType)
+		ccRecipients = nil
+		bccRecipients = nil
+	}
+
+	if len(toRecipients) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   "No recipients configured for report type: " + reportType,
@@ -527,14 +550,13 @@ func (h *ReportHandler) SendReportEmail(c *gin.Context) {
 	}
 	defer file.Close()
 
-	log.Printf("[REPORT-EMAIL] Sending report email. Type: %s, Subject: %s, Recipients: %v, File: %s", reportType, subject, recipients, header.Filename)
+	log.Printf("[REPORT-EMAIL] Sending report email. Type: %s, Key: %s, Subject: %s, TO: %v, CC: %v, File: %s", reportType, mailKey, subject, toRecipients, ccRecipients, header.Filename)
 
-	// Send email with attachment via Resend
 	variables := map[string]interface{}{
 		"subject": subject,
 		"body":    body,
 	}
-	err = h.emailService.SendReportEmail(recipients, subject, variables, file, header.Filename)
+	err = h.emailService.SendReportEmail(toRecipients, ccRecipients, bccRecipients, subject, variables, file, header.Filename)
 	if err != nil {
 		log.Printf("[REPORT-EMAIL] ERROR: Failed to send report email: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -544,7 +566,7 @@ func (h *ReportHandler) SendReportEmail(c *gin.Context) {
 		return
 	}
 
-	log.Printf("[REPORT-EMAIL] Successfully sent report email to %v", recipients)
+	log.Printf("[REPORT-EMAIL] Successfully sent report email to %v (cc: %v, bcc: %v)", toRecipients, ccRecipients, bccRecipients)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "Report email sent successfully",

@@ -464,36 +464,38 @@ func (AuditLog) TableName() string {
 type AttachmentRelatedType int
 
 const (
-    AttachmentRelatedTypeExpense      AttachmentRelatedType = 1 // Masraf
-    AttachmentRelatedTypeLeave        AttachmentRelatedType = 2 // İzin
-    AttachmentRelatedTypeUser         AttachmentRelatedType = 3 // Kullanıcı/Profil
-    AttachmentRelatedTypeEmployee     AttachmentRelatedType = 4 // Çalışan Özlük Dosyası
-    AttachmentRelatedTypeContract     AttachmentRelatedType = 5 // Sözleşme
-    AttachmentRelatedTypeOtherRequest AttachmentRelatedType = 6 // Diğer Talepler
+	AttachmentRelatedTypeExpense      AttachmentRelatedType = 1 // Masraf
+	AttachmentRelatedTypeLeave        AttachmentRelatedType = 2 // İzin
+	AttachmentRelatedTypeUser         AttachmentRelatedType = 3 // Kullanıcı/Profil
+	AttachmentRelatedTypeEmployee     AttachmentRelatedType = 4 // Çalışan Özlük Dosyası
+	AttachmentRelatedTypeContract     AttachmentRelatedType = 5 // Sözleşme
+	AttachmentRelatedTypeOtherRequest AttachmentRelatedType = 6 // Diğer Talepler
 )
 
 // AttachmentType Enum - Defines document category
 type AttachmentType int
+
 const (
-    AttachmentTypeInvoice       AttachmentType = 1  // Fatura
-    AttachmentTypeMedicalReport AttachmentType = 2  // Sağlık Raporu
-    AttachmentTypeAvatar        AttachmentType = 3  // Profil Resmi
-    AttachmentTypeReceipt       AttachmentType = 4  // Makbuz
-    AttachmentTypeContract      AttachmentType = 5  // Sözleşme
-    AttachmentTypeIdentity      AttachmentType = 6  // Kimlik
-    AttachmentTypeDiploma       AttachmentType = 7  // Diploma
-    AttachmentTypeCertificate   AttachmentType = 8  // Sertifika
-    AttachmentTypeResume        AttachmentType = 9  // CV / Özgeçmiş
-    AttachmentTypeDocument      AttachmentType = 99 // Döküman
-    AttachmentTypeOther         AttachmentType = 99 // Diğer
+	AttachmentTypeInvoice       AttachmentType = 1  // Fatura
+	AttachmentTypeMedicalReport AttachmentType = 2  // Sağlık Raporu
+	AttachmentTypeAvatar        AttachmentType = 3  // Profil Resmi
+	AttachmentTypeReceipt       AttachmentType = 4  // Makbuz
+	AttachmentTypeContract      AttachmentType = 5  // Sözleşme
+	AttachmentTypeIdentity      AttachmentType = 6  // Kimlik
+	AttachmentTypeDiploma       AttachmentType = 7  // Diploma
+	AttachmentTypeCertificate   AttachmentType = 8  // Sertifika
+	AttachmentTypeResume        AttachmentType = 9  // CV / Özgeçmiş
+	AttachmentTypeDocument      AttachmentType = 99 // Döküman
+	AttachmentTypeOther         AttachmentType = 99 // Diğer
 )
 
 // AttachmentStatus Enum - Defines attachment lifecycle status
 type AttachmentStatus int
+
 const (
-    AttachmentStatusTemporary AttachmentStatus = 1 // Geçici
-    AttachmentStatusLinked    AttachmentStatus = 2 // İlişkilendirilmiş
-    AttachmentStatusArchived  AttachmentStatus = 3 // Arşivlenmiş
+	AttachmentStatusTemporary AttachmentStatus = 1 // Geçici
+	AttachmentStatusLinked    AttachmentStatus = 2 // İlişkilendirilmiş
+	AttachmentStatusArchived  AttachmentStatus = 3 // Arşivlenmiş
 )
 
 // Attachment represents a generic document/file in the system
@@ -621,4 +623,56 @@ type JobHistory struct {
 
 func (JobHistory) TableName() string {
 	return GetTableName("hr_job_history")
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Mail Configuration Module
+// ──────────────────────────────────────────────────────────────────────────────
+
+type MailProvider string
+type MailRecipientType string
+type MailValueType string
+
+const (
+	MailProviderResend MailProvider = "RESEND"
+	MailProviderSMTP   MailProvider = "SMTP"
+
+	RecipientTypeTo  MailRecipientType = "TO"
+	RecipientTypeCC  MailRecipientType = "CC"
+	RecipientTypeBCC MailRecipientType = "BCC"
+
+	ValueTypeStatic  MailValueType = "STATIC"
+	ValueTypeDynamic MailValueType = "DYNAMIC"
+)
+
+// MailConfiguration stores runtime email settings for each system event key
+type MailConfiguration struct {
+	ID                 uint            `json:"id" gorm:"primaryKey"`
+	MailKey            string          `json:"mail_key" gorm:"uniqueIndex;size:100;not null"`
+	Description        string          `json:"description" gorm:"size:255"`
+	Provider           MailProvider    `json:"provider" gorm:"size:20;not null;default:'RESEND'"`
+	ResendTemplateCode string          `json:"resend_template_code" gorm:"size:100"`
+	IsActive           bool            `json:"is_active" gorm:"not null;default:true"`
+	CreatedAt          time.Time       `json:"created_at"`
+	UpdatedAt          time.Time       `json:"updated_at"`
+	Recipients         []MailRecipient `json:"recipients,omitempty" gorm:"foreignKey:MailConfigID;constraint:OnDelete:CASCADE"`
+}
+
+func (MailConfiguration) TableName() string {
+	return GetTableName("hr_mail_configurations")
+}
+
+// MailRecipient stores normalized TO / CC / BCC entries for a configuration
+type MailRecipient struct {
+	ID             uint              `json:"id" gorm:"primaryKey"`
+	MailConfigID   uint              `json:"mail_config_id" gorm:"not null;index"`
+	RecipientType  MailRecipientType `json:"recipient_type" gorm:"size:10;not null"`
+	ValueType      MailValueType     `json:"value_type" gorm:"size:20;not null"`
+	RecipientValue string            `json:"recipient_value" gorm:"size:255;not null"`
+	CreatedAt      time.Time         `json:"created_at"`
+	UpdatedAt      time.Time         `json:"updated_at"`
+}
+
+func (MailRecipient) TableName() string {
+	return GetTableName("hr_mail_recipients")
 }
