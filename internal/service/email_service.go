@@ -48,24 +48,22 @@ func NewEmailService(config *config.Config, userRepo repository.UserRepository) 
 // ==================== TALEP BİLDİRİMLERİ ====================
 
 func (s *emailService) SendNewRequestEmail(req *domain.OtherRequest) error {
-    if req.Employee == nil {
-        return fmt.Errorf("employee info is missing for request email")
-    }
+	if req.Employee == nil {
+		return fmt.Errorf("employee info is missing for request email")
+	}
 
-    variables := map[string]interface{}{
-        "fullname":    fmt.Sprintf("%s %s", req.Employee.FirstName, req.Employee.LastName),
-        "requestType": req.RequestType.Name,
-        "description": req.Description,
-        "date":        req.CreatedAt.Format("02.01.2006 15:04"),
-    }
+	variables := map[string]interface{}{
+		"fullname":    fmt.Sprintf("%s %s", req.Employee.FirstName, req.Employee.LastName),
+		"requestType": req.RequestType.Name,
+	}
 
-    // Config'deki İK listesini al, boşsa fallback olarak hr@kartezya.com kullan
-    recipients := s.config.Email.HREmails
-    if len(recipients) == 0 {
-        recipients = []string{"hr@kartezya.com"}
-    }
+	// Config'deki İK listesini al, boşsa fallback olarak hr@kartezya.com kullan
+	recipients := s.config.Email.HREmails
+	if len(recipients) == 0 {
+		recipients = []string{"hr@kartezya.com"}
+	}
 
-    return s.SendTemplateEmail(recipients, "Yeni Talep Oluşturuldu", "new-request-email", variables)
+	return s.SendTemplateEmail(recipients, "Yeni Talep Oluşturuldu", "new-request-email", variables)
 }
 
 func (s *emailService) SendRequestCompletedEmail(req *domain.OtherRequest) error {
@@ -78,10 +76,8 @@ func (s *emailService) SendRequestCompletedEmail(req *domain.OtherRequest) error
 	}
 
 	variables := map[string]interface{}{
-		"fullname":      fmt.Sprintf("%s %s", req.Employee.FirstName, req.Employee.LastName),
-		"requestType":   req.RequestType.Name,
-		"completedDate": req.CompletedAt.Format("02.01.2006 15:04"),
-		"description":   req.Description,
+		"fullname":    fmt.Sprintf("%s %s", req.Employee.FirstName, req.Employee.LastName),
+		"requestType": req.RequestType.Name,
 	}
 	return s.SendTemplateEmail([]string{email}, "Talebiniz Tamamlandı", "request-completed-email", variables)
 }
