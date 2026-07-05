@@ -55,7 +55,7 @@ type UpdateExpenseTypeRequestDTO struct {
 	Name            *string         `json:"name"`
 	Description     *string         `json:"description"`
 	RequiresReceipt *bool           `json:"requires_receipt"`
-	MaxAmount       *float64        `json:"max_amount"`
+	MaxAmount       json.RawMessage `json:"max_amount" swaggertype:"number" example:"100.0"` // Use null to clear, omit to keep existing
 	Active          *bool           `json:"active"`
 	RoleID          json.RawMessage `json:"role_id" swaggertype:"integer" example:"1"` // Use null to clear, omit to keep existing
 }
@@ -997,8 +997,22 @@ func (h *ExpenseHandler) UpdateExpenseType(c *gin.Context) {
 	if dto.RequiresReceipt != nil {
 		expenseType.RequiresReceipt = *dto.RequiresReceipt
 	}
-	if dto.MaxAmount != nil {
-		expenseType.MaxAmount = dto.MaxAmount // Keep pointer logic
+	// MaxAmount: nil json.RawMessage = field absent (no change)
+	// "null" = explicitly clear max_amount
+	// number = set to that value
+	if len(dto.MaxAmount) > 0 {
+		if string(dto.MaxAmount) == "null" {
+			expenseType.MaxAmount = nil
+		} else {
+			var maxAmt float64
+			if err := json.Unmarshal(dto.MaxAmount, &maxAmt); err == nil {
+				if maxAmt <= 0 {
+					expenseType.MaxAmount = nil
+				} else {
+					expenseType.MaxAmount = &maxAmt
+				}
+			}
+		}
 	}
 	if dto.Active != nil {
 		expenseType.Active = *dto.Active
