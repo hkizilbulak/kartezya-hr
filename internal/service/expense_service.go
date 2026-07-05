@@ -1,15 +1,89 @@
 package service
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"mime/multipart"
+	"net/http"
+	"sync"
 	"time"
 
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/repository"
 	"kartezya-hr/internal/types"
 )
+
+// ── Exchange rate cache ──────────────────────────────────────────────────────
+type exchangeRateCache struct {
+	mu        sync.RWMutex
+	rates     map[string]float64 // key: "USD", "EUR" etc → TRY per 1 unit
+	fetchedAt time.Time
+	ttl       time.Duration
+}
+
+var erCache = &exchangeRateCache{ttl: 1 * time.Hour}
+
+// fetchTRYRates fetches rates from open.er-api.com (base: TRY).
+// Response: { "rates": { "USD": 0.0277, "EUR": 0.0256, ... } }
+// We invert to get "how many TRY per 1 USD/EUR".
+func fetchTRYRates() (map[string]float64, error) {
+	resp, err := http.Get("https://open.er-api.com/v6/latest/TRY")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Result string             `json:"result"`
+		Rates  map[string]float64 `json:"rates"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	if result.Result != "success" {
+		return nil, fmt.Errorf("exchange rate API returned non-success: %s", result.Result)
+	}
+
+	// Invert: rates["USD"] = 0.0277 means 1 TRY = 0.0277 USD → 1 USD = 1/0.0277 TRY
+	inverted := make(map[string]float64)
+	for currency, ratePerTRY := range result.Rates {
+		if ratePerTRY > 0 {
+			inverted[currency] = 1.0 / ratePerTRY
+		}
+	}
+	inverted["TRY"] = 1.0
+	return inverted, nil
+}
+
+// convertToTRY converts amount in given currency to TRY using cached rates.
+// Falls back to returning the original amount (no conversion) on error.
+func convertToTRY(amount float64, currency string) float64 {
+	if currency == "" || currency == "TRY" {
+		return amount
+	}
+
+	erCache.mu.RLock()
+	fresh := time.Since(erCache.fetchedAt) < erCache.ttl
+	rates := erCache.rates
+	erCache.mu.RUnlock()
+
+	if !fresh {
+		erCache.mu.Lock()
+		newRates, err := fetchTRYRates()
+		if err == nil {
+			erCache.rates = newRates
+			erCache.fetchedAt = time.Now()
+			rates = newRates
+		}
+		erCache.mu.Unlock()
+	}
+
+	if rate, ok := rates[currency]; ok {
+		return amount * rate
+	}
+	return amount // fallback: no conversion
+}
 
 // Define expense status constants
 const (
@@ -92,9 +166,12 @@ func (s *expenseService) CreateExpenseRequest(expense *domain.ExpenseRequest, us
 		return errors.New("this expense type is not active")
 	}
 
-	// Validate max amount if set
-	if expenseType.MaxAmount != nil && expense.Amount > *expenseType.MaxAmount {
-		return fmt.Errorf("expense amount exceeds maximum allowed amount of %.2f %s", *expenseType.MaxAmount, expense.Currency)
+	// Validate max amount if set — convert to TRY for fair comparison
+	if expenseType.MaxAmount != nil {
+		amountInTRY := convertToTRY(expense.Amount, expense.Currency)
+		if amountInTRY > *expenseType.MaxAmount {
+			return fmt.Errorf("expense amount exceeds maximum allowed amount of %.2f TRY", *expenseType.MaxAmount)
+		}
 	}
 
 	// Set employee ID and default status
@@ -210,9 +287,12 @@ func (s *expenseService) UpdateExpenseRequest(expense *domain.ExpenseRequest, us
 		return errors.New("this expense type is not active")
 	}
 
-	// Validate max amount if set
-	if expenseType.MaxAmount != nil && expense.Amount > *expenseType.MaxAmount {
-		return fmt.Errorf("expense amount exceeds maximum allowed amount of %.2f %s", *expenseType.MaxAmount, expense.Currency)
+	// Validate max amount if set — convert to TRY for fair comparison
+	if expenseType.MaxAmount != nil {
+		amountInTRY := convertToTRY(expense.Amount, expense.Currency)
+		if amountInTRY > *expenseType.MaxAmount {
+			return fmt.Errorf("expense amount exceeds maximum allowed amount of %.2f TRY", *expenseType.MaxAmount)
+		}
 	}
 
 	expense.ModifiedBy = fmt.Sprintf("%d", userID)
