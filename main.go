@@ -150,7 +150,7 @@ func main() {
 	otherRequestService := service.NewOtherRequestService(otherRequestRepo, attachmentRepo, auditService, emailService, storageProvider, employeeRepo)
 
 	// Initialize and start scheduled jobs
-	scheduler := jobs.NewScheduler(db.DB, documentService, jobService)
+	scheduler := jobs.NewScheduler(db.DB, documentService, jobService, emailService, mailConfigService)
 	scheduler.Start()
 	defer scheduler.Stop()
 

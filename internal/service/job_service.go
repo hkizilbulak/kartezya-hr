@@ -50,6 +50,13 @@ func (s *jobService) SeedJobs() error {
 			IsActive:       true,
 			TimeoutSecond:  3600,
 		},
+		{
+			JobKey:         "contract_status_info_job",
+			Name:           "Contract Status Report",
+			CronExpression: "0 0 14 * * 1", // Every Monday at 14:00:00
+			IsActive:       true,
+			TimeoutSecond:  3600,
+		},
 	}
 
 	for _, defaultJob := range defaultJobs {
@@ -133,7 +140,7 @@ func (s *jobService) LogJobEnd(history *domain.JobHistory, status string, proces
 	history.EndTime = &now
 	history.Status = status
 	history.ProcessedCount = processedCount
-	
+
 	// Truncate error summary if it's too long
 	if len(errSummary) > 500 {
 		errSummary = errSummary[:500] + "..."

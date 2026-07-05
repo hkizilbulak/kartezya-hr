@@ -19,20 +19,24 @@ type Scheduler struct {
 	jobService         service.JobService
 	leaveBalanceJob    *LeaveBalanceJob
 	documentCleanupJob *DocumentCleanupJob
+	contractInfoJob    *ContractStatusInfoJob
 	registry           map[string]JobFunc
 	entryIDs           map[string]cron.EntryID
 }
 
 // NewScheduler creates a new job scheduler
-func NewScheduler(db *gorm.DB, documentService service.DocumentService, jobService service.JobService) *Scheduler {
+func NewScheduler(db *gorm.DB, documentService service.DocumentService, jobService service.JobService,
+	emailService service.EmailService, mailConfigService service.MailConfigService) *Scheduler {
 	c := cron.New(cron.WithSeconds())
 
 	leaveBalanceJob := NewLeaveBalanceJob(db)
 	documentCleanupJob := NewDocumentCleanupJob(documentService, 24)
+	contractInfoJob := NewContractStatusInfoJob(db, emailService, mailConfigService)
 
 	registry := map[string]JobFunc{
-		"leave_balance_job":    leaveBalanceJob.Run,
-		"document_cleanup_job": documentCleanupJob.Run,
+		"leave_balance_job":        leaveBalanceJob.Run,
+		"document_cleanup_job":     documentCleanupJob.Run,
+		"contract_status_info_job": contractInfoJob.Run,
 	}
 
 	return &Scheduler{
@@ -40,6 +44,7 @@ func NewScheduler(db *gorm.DB, documentService service.DocumentService, jobServi
 		jobService:         jobService,
 		leaveBalanceJob:    leaveBalanceJob,
 		documentCleanupJob: documentCleanupJob,
+		contractInfoJob:    contractInfoJob,
 		registry:           registry,
 		entryIDs:           make(map[string]cron.EntryID),
 	}
@@ -118,7 +123,7 @@ func (s *Scheduler) executeJob(jobID uint, jobKey string, jobFunc JobFunc) {
 	if updateErr := s.jobService.LogJobEnd(history, status, processedCount, errSummary); updateErr != nil {
 		log.Printf("[Scheduler] Failed to log job end for %s: %v", jobKey, updateErr)
 	}
-	
+
 	log.Printf("[Scheduler] Finished job: %s, Status: %s", jobKey, status)
 }
 
@@ -164,9 +169,9 @@ func (s *Scheduler) TriggerJobNow(jobKey string) error {
 	}
 
 	log.Printf("[Scheduler] Manually triggering job: %s", jobKey)
-	
+
 	// Run in background
 	go s.executeJob(job.ID, jobKey, jobFunc)
-	
+
 	return nil
 }
