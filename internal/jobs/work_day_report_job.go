@@ -78,8 +78,7 @@ func (j *WorkDayReportJob) Run() (int, error) {
 
 	// ── 5. Build HTML body ──────────────────────────────────────────────────
 	body := fmt.Sprintf(
-		"<p>Merhaba,</p>"+
-			"<p><strong>%s</strong> dönemine ait aylık çalışma günü raporu ektedir.</p>"+
+		"<p>Merhaba <strong>%s</strong> dönemine ait aylık çalışma günü raporu ektedir.</p>"+
 			"<table border='1' cellpadding='6' cellspacing='0' style='border-collapse:collapse;'>"+
 			"<tr><th>Toplam İş Günü</th><th>Toplam Kullanılan İzin</th><th>Çalışan Sayısı</th></tr>"+
 			"<tr><td>%.1f</td><td>%.1f</td><td>%d</td></tr>"+

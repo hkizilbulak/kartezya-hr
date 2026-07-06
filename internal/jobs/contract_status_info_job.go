@@ -90,8 +90,7 @@ func (j *ContractStatusInfoJob) Run() (int, error) {
 	// ── 4. Build HTML mail body ────────────────────────────────────────────
 	now := time.Now()
 	body := fmt.Sprintf(
-		"<p>Merhaba,</p>"+
-			"<p><strong>%s</strong> tarihli haftalık sözleşme durum raporu ektedir.</p>"+
+		"<p>Merhaba <strong>%s</strong> tarihli haftalık sözleşme durum raporu ektedir.</p>"+
 			"<table border='1' cellpadding='6' cellspacing='0' style='border-collapse:collapse;'>"+
 			"<tr><th>Durum</th><th>Adet</th></tr>",
 		now.Format("02.01.2006"),
