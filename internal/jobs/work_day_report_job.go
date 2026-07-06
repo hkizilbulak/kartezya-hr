@@ -64,27 +64,33 @@ func (j *WorkDayReportJob) Run() (int, error) {
 		return 0, nil
 	}
 
-	// ── 3. Build Excel ──────────────────────────────────────────────────────
-	excelBytes, err := j.buildExcel(report, monthLabel)
+	// ── 3. Calculate totals ─────────────────────────────────────────────────
+	var totalUsedLeave float64
+	for _, row := range report.Rows {
+		totalUsedLeave += row.UsedLeaveDays
+	}
+
+	// ── 4. Build Excel ──────────────────────────────────────────────────────
+	excelBytes, err := j.buildExcel(report, monthLabel, totalUsedLeave)
 	if err != nil {
 		return 0, fmt.Errorf("failed to build excel: %w", err)
 	}
 
-	// ── 4. Build HTML body ──────────────────────────────────────────────────
+	// ── 5. Build HTML body ──────────────────────────────────────────────────
 	body := fmt.Sprintf(
 		"<p>Merhaba,</p>"+
 			"<p><strong>%s</strong> dönemine ait aylık çalışma günü raporu ektedir.</p>"+
 			"<table border='1' cellpadding='6' cellspacing='0' style='border-collapse:collapse;'>"+
-			"<tr><th>Toplam İş Günü</th><th>Toplam Tatil</th><th>Çalışan Sayısı</th></tr>"+
+			"<tr><th>Toplam İş Günü</th><th>Toplam Kullanılan İzin</th><th>Çalışan Sayısı</th></tr>"+
 			"<tr><td>%.1f</td><td>%.1f</td><td>%d</td></tr>"+
 			"</table>",
 		monthLabel,
 		report.TotalWorkDays,
-		report.TotalHolidayDays,
+		totalUsedLeave,
 		len(report.Rows),
 	)
 
-	// ── 5. Resolve recipients ───────────────────────────────────────────────
+	// ── 6. Resolve recipients ───────────────────────────────────────────────
 	toList, ccList, bccList, templateCode, cfgErr := j.mailConfigService.ResolveRecipients("REPORT_EMAIL_WORK_DAY")
 	if cfgErr != nil || len(toList) == 0 {
 		log.Printf("[WorkDayReportJob] REPORT_EMAIL_WORK_DAY config not found or empty, skipping email: %v", cfgErr)
@@ -119,7 +125,7 @@ func (j *WorkDayReportJob) Run() (int, error) {
 }
 
 // buildExcel creates an Excel workbook with the work day report data.
-func (j *WorkDayReportJob) buildExcel(report *types.WorkDayReportResponse, monthLabel string) ([]byte, error) {
+func (j *WorkDayReportJob) buildExcel(report *types.WorkDayReportResponse, monthLabel string, totalUsedLeave float64) ([]byte, error) {
 	f := excelize.NewFile()
 	defer f.Close()
 
@@ -133,10 +139,8 @@ func (j *WorkDayReportJob) buildExcel(report *types.WorkDayReportResponse, month
 	})
 
 	headers := []string{
-		"Ad", "Soyad", "TC Kimlik No",
-		"Şirket", "Departman", "Yönetici",
-		"İş Günü", "Kullanılan İzin", "Çalışılan Gün",
-		"Derece",
+		"AD SOYAD", "İŞ GÜNÜ", "KULLANILAN İZİN", "ÇALIŞILAN GÜN",
+		"ŞİRKET", "DEPARTMAN", "YÖNETİCİ",
 	}
 
 	for i, h := range headers {
@@ -148,16 +152,13 @@ func (j *WorkDayReportJob) buildExcel(report *types.WorkDayReportResponse, month
 	for ri, row := range report.Rows {
 		rowNum := ri + 2
 		vals := []interface{}{
-			row.FirstName,
-			row.LastName,
-			row.IdentityNo,
-			row.CompanyName,
-			row.DepartmentName,
-			row.Manager,
+			row.FirstName + " " + row.LastName,
 			row.WorkDays,
 			row.UsedLeaveDays,
 			row.WorkedDays,
-			row.CurrentGrade,
+			row.CompanyName,
+			row.DepartmentName,
+			row.Manager,
 		}
 		for ci, v := range vals {
 			cell, _ := excelize.CoordinatesToCellName(ci+1, rowNum)
@@ -165,8 +166,8 @@ func (j *WorkDayReportJob) buildExcel(report *types.WorkDayReportResponse, month
 		}
 	}
 
-	// Auto-fit columns
-	colWidths := []float64{14, 14, 16, 20, 20, 20, 10, 14, 14, 12}
+	// Column widths
+	colWidths := []float64{28, 12, 16, 14, 22, 22, 22}
 	for i, w := range colWidths {
 		col, _ := excelize.ColumnNumberToName(i + 1)
 		f.SetColWidth(sheet, col, col, w)
@@ -181,7 +182,7 @@ func (j *WorkDayReportJob) buildExcel(report *types.WorkDayReportResponse, month
 		Fill: excelize.Fill{Type: "pattern", Color: []string{"4F81BD"}, Pattern: 1},
 	})
 
-	summaryHeaders := []string{"Dönem", "Toplam İş Günü", "Toplam Tatil", "Çalışan Sayısı"}
+	summaryHeaders := []string{"Dönem", "Toplam İş Günü", "Toplam Kullanılan İzin", "Çalışan Sayısı"}
 	for i, h := range summaryHeaders {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 		f.SetCellValue(sumSheet, cell, h)
@@ -191,7 +192,7 @@ func (j *WorkDayReportJob) buildExcel(report *types.WorkDayReportResponse, month
 	summaryVals := []interface{}{
 		monthLabel,
 		report.TotalWorkDays,
-		report.TotalHolidayDays,
+		totalUsedLeave,
 		len(report.Rows),
 	}
 	for i, v := range summaryVals {
