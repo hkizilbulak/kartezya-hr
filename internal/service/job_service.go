@@ -7,11 +7,12 @@ import (
 
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/repository"
+	"kartezya-hr/internal/types"
 )
 
 type JobService interface {
 	SeedJobs() error
-	GetAllJobs() ([]domain.Job, error)
+	GetAllJobs(sortParams types.SortParams) ([]domain.Job, error)
 	GetActiveJobs() ([]domain.Job, error)
 	GetJobByID(id uint) (*domain.Job, error)
 	GetJobByKey(key string) (*domain.Job, error)
@@ -82,8 +83,8 @@ func (s *jobService) SeedJobs() error {
 	return nil
 }
 
-func (s *jobService) GetAllJobs() ([]domain.Job, error) {
-	return s.jobRepo.GetAll()
+func (s *jobService) GetAllJobs(sortParams types.SortParams) ([]domain.Job, error) {
+	return s.jobRepo.GetAll(sortParams)
 }
 
 func (s *jobService) GetActiveJobs() ([]domain.Job, error) {
