@@ -20,23 +20,27 @@ type Scheduler struct {
 	leaveBalanceJob    *LeaveBalanceJob
 	documentCleanupJob *DocumentCleanupJob
 	contractInfoJob    *ContractStatusInfoJob
+	workDayReportJob   *WorkDayReportJob
 	registry           map[string]JobFunc
 	entryIDs           map[string]cron.EntryID
 }
 
 // NewScheduler creates a new job scheduler
 func NewScheduler(db *gorm.DB, documentService service.DocumentService, jobService service.JobService,
-	emailService service.EmailService, mailConfigService service.MailConfigService) *Scheduler {
+	emailService service.EmailService, mailConfigService service.MailConfigService,
+	reportService service.ReportService) *Scheduler {
 	c := cron.New(cron.WithSeconds())
 
 	leaveBalanceJob := NewLeaveBalanceJob(db)
 	documentCleanupJob := NewDocumentCleanupJob(documentService, 24)
 	contractInfoJob := NewContractStatusInfoJob(db, emailService, mailConfigService)
+	workDayReportJob := NewWorkDayReportJob(reportService, emailService, mailConfigService)
 
 	registry := map[string]JobFunc{
 		"leave_balance_job":        leaveBalanceJob.Run,
 		"document_cleanup_job":     documentCleanupJob.Run,
 		"contract_status_info_job": contractInfoJob.Run,
+		"work_day_report_job":      workDayReportJob.Run,
 	}
 
 	return &Scheduler{
@@ -45,6 +49,7 @@ func NewScheduler(db *gorm.DB, documentService service.DocumentService, jobServi
 		leaveBalanceJob:    leaveBalanceJob,
 		documentCleanupJob: documentCleanupJob,
 		contractInfoJob:    contractInfoJob,
+		workDayReportJob:   workDayReportJob,
 		registry:           registry,
 		entryIDs:           make(map[string]cron.EntryID),
 	}

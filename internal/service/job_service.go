@@ -57,6 +57,13 @@ func (s *jobService) SeedJobs() error {
 			IsActive:       true,
 			TimeoutSecond:  3600,
 		},
+		{
+			JobKey:         "work_day_report_job",
+			Name:           "Monthly Work Day Report",
+			CronExpression: "0 0 0 10 * *", // 10th of every month at 00:00:00
+			IsActive:       true,
+			TimeoutSecond:  3600,
+		},
 	}
 
 	for _, defaultJob := range defaultJobs {
