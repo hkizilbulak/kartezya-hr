@@ -35,12 +35,13 @@ type OtherRequestService interface {
 }
 
 type otherRequestService struct {
-	repo           repository.OtherRequestRepository
-	attachmentRepo repository.AttachmentRepository
-	auditService   AuditService
-	emailService   EmailService
-	storage        StorageProvider
-	employeeRepo   repository.EmployeeRepository
+	repo              repository.OtherRequestRepository
+	attachmentRepo    repository.AttachmentRepository
+	auditService      AuditService
+	emailService      EmailService
+	mailConfigService MailConfigService
+	storage           StorageProvider
+	employeeRepo      repository.EmployeeRepository
 }
 
 func NewOtherRequestService(
@@ -50,14 +51,16 @@ func NewOtherRequestService(
 	emailService EmailService,
 	storage StorageProvider,
 	employeeRepo repository.EmployeeRepository,
+	mailConfigService MailConfigService,
 ) OtherRequestService {
 	return &otherRequestService{
-		repo:           repo,
-		attachmentRepo: attachmentRepo,
-		auditService:   auditService,
-		emailService:   emailService,
-		storage:        storage,
-		employeeRepo:   employeeRepo,
+		repo:              repo,
+		attachmentRepo:    attachmentRepo,
+		auditService:      auditService,
+		emailService:      emailService,
+		mailConfigService: mailConfigService,
+		storage:           storage,
+		employeeRepo:      employeeRepo,
 	}
 }
 
@@ -86,19 +89,42 @@ func (s *otherRequestService) DeleteRequestType(id uint, userID uint) error {
 // ==================== TALEP İŞLEMLERİ ====================
 
 func (s *otherRequestService) CreateRequest(req *domain.OtherRequest, userID uint) error {
-    req.Status = domain.RequestStatusActive
-    err := s.repo.CreateRequest(req, userID, fmt.Sprintf("%d", userID))
-    
-    if err == nil {
-        s.auditService.CreateAuditLog("OtherRequest", req.ID, "CREATE", nil, req, fmt.Sprintf("%d", userID))
-        
-        go func(r *domain.OtherRequest) {
-            if emailErr := s.emailService.SendNewRequestEmail(r); emailErr != nil {
-                log.Printf("E-POSTA GÖNDERİM HATASI (Create): %v", emailErr)
-            }
-        }(req) 
-    }
-    return err
+	req.Status = domain.RequestStatusActive
+	err := s.repo.CreateRequest(req, userID, fmt.Sprintf("%d", userID))
+
+	if err == nil {
+		s.auditService.CreateAuditLog("OtherRequest", req.ID, "CREATE", nil, req, fmt.Sprintf("%d", userID))
+
+		go func(r *domain.OtherRequest) {
+			if r.Employee == nil {
+				log.Printf("[OtherRequest] employee info missing, skipping email")
+				return
+			}
+
+			variables := map[string]interface{}{
+				"fullname":    fmt.Sprintf("%s %s", r.Employee.FirstName, r.Employee.LastName),
+				"requestType": r.RequestType.Name,
+			}
+
+			to, cc, bcc, templateCode, cfgErr := s.mailConfigService.ResolveRecipients("INFO_EMAIL_NEW_OTHER_DEMAND")
+			if cfgErr != nil || len(to) == 0 {
+				log.Printf("[OtherRequest] INFO_EMAIL_NEW_OTHER_DEMAND config not found, falling back to SendNewRequestEmail: %v", cfgErr)
+				if emailErr := s.emailService.SendNewRequestEmail(r); emailErr != nil {
+					log.Printf("[OtherRequest] E-POSTA GÖNDERİM HATASI (fallback): %v", emailErr)
+				}
+				return
+			}
+
+			if templateCode == "" {
+				templateCode = "new-request-email"
+			}
+
+			if emailErr := s.emailService.SendTemplateEmailWithCC(to, cc, bcc, "Yeni Talep Oluşturuldu", templateCode, variables); emailErr != nil {
+				log.Printf("[OtherRequest] E-POSTA GÖNDERİM HATASI: %v", emailErr)
+			}
+		}(req)
+	}
+	return err
 }
 
 func (s *otherRequestService) GetRequestByID(id uint) (*domain.OtherRequest, error) {
@@ -153,28 +179,55 @@ func (s *otherRequestService) CancelRequest(id uint, userID uint, isAdmin bool) 
 }
 
 func (s *otherRequestService) CompleteRequest(id uint, completerID uint) error {
-    req, err := s.repo.GetRequestByID(id)
-    if err != nil {
-        return err
-    }
-    
-    req.Status = domain.RequestStatusCompleted
-    req.CompletedBy = &completerID
-    now := time.Now()
-    req.CompletedAt = &now
-    
-    err = s.repo.UpdateRequest(req, fmt.Sprintf("%d", completerID))
-    
-    if err == nil {
-        s.auditService.CreateAuditLog("OtherRequest", id, "COMPLETE", nil, req, fmt.Sprintf("%d", completerID))
-        
-        go func(r *domain.OtherRequest) {
-            if emailErr := s.emailService.SendRequestCompletedEmail(r); emailErr != nil {
-                log.Printf("E-POSTA GÖNDERİM HATASI (Complete): %v", emailErr)
-            }
-        }(req)
-    }
-    return err
+	req, err := s.repo.GetRequestByID(id)
+	if err != nil {
+		return err
+	}
+
+	req.Status = domain.RequestStatusCompleted
+	req.CompletedBy = &completerID
+	now := time.Now()
+	req.CompletedAt = &now
+
+	err = s.repo.UpdateRequest(req, fmt.Sprintf("%d", completerID))
+
+	if err == nil {
+		s.auditService.CreateAuditLog("OtherRequest", id, "COMPLETE", nil, req, fmt.Sprintf("%d", completerID))
+
+		go func(r *domain.OtherRequest) {
+			if r.Employee == nil {
+				log.Printf("[OtherRequest] employee info missing, skipping completed email")
+				return
+			}
+
+			employeeEmail := r.Employee.CompanyEmail
+			if employeeEmail == "" {
+				employeeEmail = r.Employee.Email
+			}
+
+			variables := map[string]interface{}{
+				"fullname":    fmt.Sprintf("%s %s", r.Employee.FirstName, r.Employee.LastName),
+				"requestType": r.RequestType.Name,
+			}
+
+			// INFO_EMAIL_OTHER_DEMAND_COMPLETED config'inden CC/BCC çöz
+			_, cc, bcc, templateCode, cfgErr := s.mailConfigService.ResolveRecipients("INFO_EMAIL_OTHER_DEMAND_COMPLETED")
+			if cfgErr != nil {
+				log.Printf("[OtherRequest] INFO_EMAIL_OTHER_DEMAND_COMPLETED config not found, sending without CC/BCC: %v", cfgErr)
+			}
+			if templateCode == "" {
+				templateCode = "request-completed-email"
+			}
+
+			if emailErr := s.emailService.SendTemplateEmailWithCC(
+				[]string{employeeEmail}, cc, bcc,
+				"Talebiniz Tamamlandı", templateCode, variables,
+			); emailErr != nil {
+				log.Printf("[OtherRequest] E-POSTA GÖNDERİM HATASI (Complete): %v", emailErr)
+			}
+		}(req)
+	}
+	return err
 }
 
 func (s *otherRequestService) RollbackRequest(id uint, userID uint) error {
