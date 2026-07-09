@@ -513,6 +513,7 @@ func main() {
 		emailRoutes := protected.Group("/emails")
 		{
 			emailRoutes.GET("/templates", emailHandler.ListResendTemplates)
+			emailRoutes.GET("/templates/:id/variables", emailHandler.GetTemplateVariables)
 			emailRoutes.POST("/send-template", emailHandler.SendDynamicTemplateEmail)
 		}
 
