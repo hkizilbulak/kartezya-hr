@@ -90,6 +90,8 @@ func (d *Database) Migrate() error {
 	// Auto-migrate all models except AuditLog (handled by schema.sql)
 	err := d.DB.AutoMigrate(
 		&domain.User{},
+		&domain.UserSetting{},
+		&domain.KvkkLog{},
 		&domain.Role{},
 		&domain.UserRole{},
 		&domain.Company{},
