@@ -143,15 +143,21 @@ func (s *mailConfigService) ResolveRecipientsWithContext(mailKey string, ctx map
 	}
 
 	appendAddrs := func(slice *[]string, raw string, valueType domain.MailValueType) {
-		if valueType == domain.ValueTypeStatic {
-			for _, addr := range strings.FieldsFunc(raw, func(c rune) bool { return c == ',' || c == ';' }) {
+		addFromString := func(s string) {
+			for _, addr := range strings.FieldsFunc(s, func(c rune) bool { return c == ',' || c == ';' }) {
 				if trimmed := strings.TrimSpace(addr); trimmed != "" {
 					*slice = append(*slice, trimmed)
 				}
 			}
+		}
+
+		if valueType == domain.ValueTypeStatic {
+			addFromString(raw)
 		} else if valueType == domain.ValueTypeDynamic {
 			if resolved := resolvePlaceholder(raw); resolved != "" {
-				*slice = append(*slice, resolved)
+				// If the resolved value contains multiple addresses separated by
+				// commas or semicolons, split them like static values.
+				addFromString(resolved)
 			}
 		}
 	}
