@@ -3,6 +3,7 @@ package repository
 import (
 	"errors"
 	"kartezya-hr/internal/domain"
+	"kartezya-hr/internal/types"
 
 	"gorm.io/gorm"
 )
@@ -13,7 +14,7 @@ type JobRepository interface {
 	Update(job *domain.Job) error
 	GetByID(id uint) (*domain.Job, error)
 	GetByKey(key string) (*domain.Job, error)
-	GetAll() ([]domain.Job, error)
+	GetAll(sortParams types.SortParams) ([]domain.Job, error)
 	GetActiveJobs() ([]domain.Job, error)
 
 	// JobHistory methods
@@ -60,9 +61,23 @@ func (r *jobRepository) GetByKey(key string) (*domain.Job, error) {
 	return &job, nil
 }
 
-func (r *jobRepository) GetAll() ([]domain.Job, error) {
+func (r *jobRepository) GetAll(sortParams types.SortParams) ([]domain.Job, error) {
 	var jobs []domain.Job
-	if err := r.db.Order("id asc").Find(&jobs).Error; err != nil {
+	query := r.db.Model(&domain.Job{})
+
+	if sortParams.Sort != "" {
+		orderClause := sortParams.Sort
+		if sortParams.Direction == "DESC" {
+			orderClause += " DESC"
+		} else {
+			orderClause += " ASC"
+		}
+		query = query.Order(orderClause)
+	} else {
+		query = query.Order("id ASC")
+	}
+
+	if err := query.Find(&jobs).Error; err != nil {
 		return nil, err
 	}
 	return jobs, nil

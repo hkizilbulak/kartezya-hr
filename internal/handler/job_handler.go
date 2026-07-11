@@ -7,6 +7,7 @@ import (
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/jobs"
 	"kartezya-hr/internal/service"
+	"kartezya-hr/internal/types"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,12 +25,17 @@ func NewJobHandler(jobService service.JobService, scheduler *jobs.Scheduler) *Jo
 }
 
 func (h *JobHandler) GetJobs(c *gin.Context) {
-	allJobs, err := h.jobService.GetAllJobs()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get jobs"})
-		return
-	}
-	c.JSON(http.StatusOK, allJobs)
+    sortParams := types.SortParams{
+        Sort:      c.DefaultQuery("sort", "id"),
+        Direction: c.DefaultQuery("direction", "ASC"), 
+    }
+
+    allJobs, err := h.jobService.GetAllJobs(sortParams)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get jobs"})
+        return
+    }
+    c.JSON(http.StatusOK, allJobs)
 }
 
 func (h *JobHandler) GetJobByID(c *gin.Context) {

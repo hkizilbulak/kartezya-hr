@@ -55,7 +55,7 @@ func (r *otherRequestRepository) GetAllRequestTypes(limit, offset int, sortParam
 	query := r.db.Model(&domain.RequestType{}).Where("deleted = ?", false)
 	query.Count(&total)
 
-	allowedSort := []string{"created_at", "name", "id"}
+	allowedSort := []string{"created_at", "name", "id", "status"}
 	safeSort := sanitizeSort(sortParams.Sort, allowedSort)
 	
 	orderDir := "ASC"
@@ -71,6 +71,7 @@ func (r *otherRequestRepository) GetAllRequestTypes(limit, offset int, sortParam
 	err := query.Find(&reqTypes).Error
 	return reqTypes, total, err
 }
+
 
 func (r *otherRequestRepository) UpdateRequestType(reqType *domain.RequestType, modifiedBy string) error {
 	return r.db.Model(reqType).Updates(map[string]interface{}{
