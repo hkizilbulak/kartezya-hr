@@ -100,6 +100,7 @@ func main() {
 	faqRepo := repository.NewFAQRepository(db.DB)
 	otherRequestRepo := repository.NewOtherRequestRepository(db.DB)
 	mailConfigRepo := repository.NewMailConfigRepository(db.DB)
+	settingsRepo := repository.NewSettingsRepository(db.DB)
 
 	// Initialize storage provider
 	var storageProvider service.StorageProvider
@@ -148,6 +149,7 @@ func main() {
 	eventService := service.NewEventService(eventRepo, eventParticipantRepo, userRepo, employeeRepo, emailService, mailConfigService, cfg)
 	faqService := service.NewFAQService(faqRepo, auditService)
 	otherRequestService := service.NewOtherRequestService(otherRequestRepo, attachmentRepo, auditService, emailService, storageProvider, employeeRepo, mailConfigService)
+	settingsService := service.NewSettingsService(settingsRepo, auditService)
 
 	// Initialize and start scheduled jobs
 	scheduler := jobs.NewScheduler(db.DB, documentService, jobService, emailService, mailConfigService, reportService)
@@ -177,6 +179,7 @@ func main() {
 	otherRequestHandler := handler.NewOtherRequestHandler(otherRequestService)
 	emailHandler := handler.NewEmailHandler(emailService, mailConfigService, cfg)
 	mailConfigHandler := handler.NewMailConfigHandler(mailConfigService)
+	settingsHandler := handler.NewSettingsHandler(settingsService)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -278,6 +281,8 @@ func main() {
 			authRoutes.POST("/logout", authHandler.Logout)
 			authRoutes.POST("/change-password", authHandler.ChangePassword)
 			authRoutes.POST("/send-password-reset-email", authMiddleware.RequireAdmin(), authHandler.SendPasswordResetEmail)
+			authRoutes.GET("/settings", settingsHandler.GetSettings)
+			authRoutes.POST("/kvkk", settingsHandler.SaveKvkkConsent)
 		}
 
 		// Employee routes
