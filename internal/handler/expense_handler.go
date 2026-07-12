@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"kartezya-hr/internal/authz"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/service"
 	"kartezya-hr/internal/types"
@@ -272,7 +273,7 @@ func (h *ExpenseHandler) GetAllExpenseRequests(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanViewExpenseManagement) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Admin access required",
@@ -344,7 +345,7 @@ func (h *ExpenseHandler) GetAllExpenseRequests(c *gin.Context) {
 // @Failure 404 {object} APIResponse
 // @Router /expense/requests/{id} [get]
 func (h *ExpenseHandler) GetExpenseRequestByID(c *gin.Context) {
-	_, _, _, ok := getUserContext(c)
+	userID, _, roles, ok := getUserContext(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -362,11 +363,16 @@ func (h *ExpenseHandler) GetExpenseRequestByID(c *gin.Context) {
 		return
 	}
 
-	expense, err := h.expenseService.GetExpenseRequestByID(id)
+	canViewManagement := hasCapability(roles, authz.CanViewExpenseManagement)
+	expense, err := h.expenseService.GetExpenseRequestByIDForCaller(id, userID, canViewManagement)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
+		status := http.StatusNotFound
+		if err.Error() == "access denied" {
+			status = http.StatusForbidden
+		}
+		c.JSON(status, gin.H{
 			"success": false,
-			"error":   "Expense request not found",
+			"error":   err.Error(),
 		})
 		return
 	}
@@ -544,7 +550,7 @@ func (h *ExpenseHandler) ApproveExpenseRequest(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanApproveExpense) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Admin access required",
@@ -653,7 +659,7 @@ func (h *ExpenseHandler) RejectExpenseRequest(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanApproveExpense) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Admin access required",
@@ -719,7 +725,7 @@ func (h *ExpenseHandler) MarkExpenseAsPaid(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanPayExpense) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Admin access required",
@@ -1200,7 +1206,7 @@ func (h *ExpenseHandler) GetExpenseDocuments(c *gin.Context) {
 	}
 
 	// Get documents
-	documents, err := h.expenseService.GetExpenseDocuments(uint(expenseRequestID), userID, isAdmin(roles))
+	documents, err := h.expenseService.GetExpenseDocuments(uint(expenseRequestID), userID, hasCapability(roles, authz.CanViewExpenseManagement))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -1295,7 +1301,7 @@ func (h *ExpenseHandler) DownloadExpenseDocument(c *gin.Context) {
 	}
 
 	// Get download URL
-	url, err := h.expenseService.DownloadExpenseDocument(documentID, userID, isAdmin(roles))
+	url, err := h.expenseService.DownloadExpenseDocument(documentID, userID, hasCapability(roles, authz.CanViewExpenseManagement))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,

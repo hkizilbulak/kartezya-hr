@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"kartezya-hr/internal/authz"
 	"kartezya-hr/internal/service"
 	"kartezya-hr/internal/types"
 
@@ -55,7 +56,7 @@ func (h *EmployeeContractHandler) CreateEmployeeContract(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageEmployees) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Admin access required",
@@ -240,7 +241,7 @@ func (h *EmployeeContractHandler) UpdateEmployeeContract(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageEmployees) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Admin access required",
@@ -267,7 +268,7 @@ func (h *EmployeeContractHandler) UpdateEmployeeContract(c *gin.Context) {
 		return
 	}
 
-	if err := h.employeeContractService.UpdateContract(id, req.EmployeeID, req.ContractID, email, requestingUserID, isAdmin(roles)); err != nil {
+	if err := h.employeeContractService.UpdateContract(id, req.EmployeeID, req.ContractID, email, requestingUserID, hasCapability(roles, authz.CanManageEmployees)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   err.Error(),
@@ -314,7 +315,7 @@ func (h *EmployeeContractHandler) DeleteEmployeeContract(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageEmployees) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Admin access required",

@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"kartezya-hr/internal/authz"
 	"kartezya-hr/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -121,7 +122,7 @@ func (h *EmployeeHandler) CreateEmployee(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageEmployees) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Admin access required",
@@ -139,9 +140,25 @@ func (h *EmployeeHandler) CreateEmployee(c *gin.Context) {
 		return
 	}
 
-	employee, err := h.employeeService.CreateEmployee(req.Email, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalGap, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.GradeID, req.ContractNo, req.ProfessionStartDate, req.Note, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo, email, req.Roles)
+	creationRole, err := service.ValidateEmployeeCreationRoles(req.Roles)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	employee, err := h.employeeService.CreateEmployee(req.Email, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalGap, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.GradeID, req.ContractNo, req.ProfessionStartDate, req.Note, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo, email, []string{creationRole})
+	if err != nil {
+		status := http.StatusInternalServerError
+		if err.Error() == "role is required" ||
+			err.Error() == "exactly one role must be provided" ||
+			err.Error() == "unsupported role" ||
+			err.Error() == "ADMIN role cannot be assigned during employee creation" {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{
 			"success": false,
 			"error":   err.Error(),
 		})
@@ -179,7 +196,7 @@ func (h *EmployeeHandler) GetEmployeeByID(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanViewEmployees) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Admin access required",
@@ -267,7 +284,7 @@ func (h *EmployeeHandler) UpdateEmployee(c *gin.Context) {
 		req.CompanyEmail = email
 	}
 
-	if err := h.employeeService.UpdateEmployee(id, req.Email, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalGap, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.GradeID, req.ContractNo, req.ProfessionStartDate, req.Note, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo, req.Status, email, requestingUserID, isAdmin(roles), req.Roles); err != nil {
+	if err := h.employeeService.UpdateEmployee(id, req.Email, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalGap, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.GradeID, req.ContractNo, req.ProfessionStartDate, req.Note, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo, req.Status, email, requestingUserID, hasCapability(roles, authz.CanManageEmployees), req.Roles); err != nil {
 		status := http.StatusInternalServerError
 		if err.Error() == "unauthorized to update this employee profile" {
 			status = http.StatusForbidden
@@ -319,7 +336,7 @@ func (h *EmployeeHandler) DeleteEmployee(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageEmployees) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Admin access required",
@@ -336,7 +353,7 @@ func (h *EmployeeHandler) DeleteEmployee(c *gin.Context) {
 		return
 	}
 
-	if err := h.employeeService.DeleteEmployee(id, email, isAdmin(roles)); err != nil {
+	if err := h.employeeService.DeleteEmployee(id, email, hasCapability(roles, authz.CanManageEmployees)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   err.Error(),
@@ -387,7 +404,7 @@ func (h *EmployeeHandler) ListEmployees(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanViewEmployees) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Admin access required",
@@ -513,7 +530,7 @@ func (h *EmployeeHandler) ListEmployees(c *gin.Context) {
 
 	offset := (page - 1) * limit
 
-	employees, err := h.employeeService.ListEmployeesWithFilters(limit, offset, sortField, sortDirection, filters, isAdmin(roles))
+	employees, err := h.employeeService.ListEmployeesWithFilters(limit, offset, sortField, sortDirection, filters, hasCapability(roles, authz.CanViewEmployees))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"kartezya-hr/internal/authz"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/service"
 	"kartezya-hr/internal/types"
@@ -52,7 +53,7 @@ func (h *OtherRequestHandler) CreateRequestType(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageRequestTypes) {
 		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Admin access required"})
 		return
 	}
@@ -98,7 +99,7 @@ func (h *OtherRequestHandler) UpdateRequestType(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageRequestTypes) {
 		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Admin access required"})
 		return
 	}
@@ -140,7 +141,7 @@ func (h *OtherRequestHandler) DeleteRequestType(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageRequestTypes) {
 		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Admin access required"})
 		return
 	}
@@ -194,8 +195,8 @@ func (h *OtherRequestHandler) GetAllRequests(c *gin.Context) {
 		return
 	}
 
-	// YETKİ KISITLAMASI: Personel Talepleri Yönetimi (İK/Admin) ekranı
-	if !isAdmin(roles) && !isHR(roles) {
+	// Management screen for other requests (ADMIN, HR)
+	if !hasCapability(roles, authz.CanManageOtherRequests) {
 		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Admin or HR access required"})
 		return
 	}
@@ -204,7 +205,7 @@ func (h *OtherRequestHandler) GetAllRequests(c *gin.Context) {
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	sortParams := types.SortParams{Sort: c.Query("sort"), Direction: c.Query("direction")}
 
-	// Admin veya HR tüm talepleri görür (filterEmployeeID = nil)
+	// Callers with CanManageOtherRequests see all requests (filterEmployeeID = nil)
 	reqs, total, err := h.reqService.GetAllRequests(nil, limit, offset, sortParams)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
@@ -231,15 +232,25 @@ func (h *OtherRequestHandler) GetMyRequests(c *gin.Context) {
 }
 
 func (h *OtherRequestHandler) GetRequestByID(c *gin.Context) {
+	userID, _, roles, ok := getUserContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Authentication required"})
+		return
+	}
+
 	id, err := parseUintParam(c, "id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Geçersiz ID"})
 		return
 	}
 
-	req, err := h.reqService.GetRequestByID(id)
+	req, err := h.reqService.GetRequestByIDForCaller(id, userID, hasCapability(roles, authz.CanManageOtherRequests))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Talep bulunamadı"})
+		status := http.StatusNotFound
+		if err.Error() == "access denied" {
+			status = http.StatusForbidden
+		}
+		c.JSON(status, gin.H{"success": false, "error": err.Error()})
 		return
 	}
 
@@ -274,7 +285,7 @@ func (h *OtherRequestHandler) UpdateRequest(c *gin.Context) {
 	existingReq.RequestTypeID = req.RequestTypeID
 	existingReq.Description = req.Description
 
-	if err := h.reqService.UpdateRequest(existingReq, userID, isAdmin(roles)); err != nil {
+	if err := h.reqService.UpdateRequest(existingReq, userID, hasCapability(roles, authz.CanManageOtherRequests)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
@@ -295,7 +306,7 @@ func (h *OtherRequestHandler) CancelRequest(c *gin.Context) {
 		return
 	}
 
-	if err := h.reqService.CancelRequest(id, userID, isAdmin(roles)); err != nil {
+	if err := h.reqService.CancelRequest(id, userID, hasCapability(roles, authz.CanManageOtherRequests)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
@@ -310,7 +321,7 @@ func (h *OtherRequestHandler) CompleteRequest(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageOtherRequests) {
 		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Admin access required"})
 		return
 	}
@@ -336,7 +347,7 @@ func (h *OtherRequestHandler) RollbackRequest(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageOtherRequests) {
 		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Admin access required"})
 		return
 	}
@@ -376,7 +387,8 @@ func (h *OtherRequestHandler) UploadDocument(c *gin.Context) {
 		return
 	}
 
-	document, err := h.reqService.UploadRequestDocument(requestID, file, userID, isAdmin(roles), isHR(roles))
+	canManage := hasCapability(roles, authz.CanManageOtherRequests)
+	document, err := h.reqService.UploadRequestDocument(requestID, file, userID, canManage)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		return
@@ -402,7 +414,7 @@ func (h *OtherRequestHandler) GetDocuments(c *gin.Context) {
 		return
 	}
 
-	documents, err := h.reqService.GetRequestDocuments(requestID, userID, isAdmin(roles), isHR(roles))
+	documents, err := h.reqService.GetRequestDocuments(requestID, userID, hasCapability(roles, authz.CanManageOtherRequests))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		return
@@ -424,7 +436,7 @@ func (h *OtherRequestHandler) DeleteDocument(c *gin.Context) {
 		return
 	}
 
-	if err := h.reqService.DeleteRequestDocument(documentID, userID, isAdmin(roles), isHR(roles)); err != nil {
+	if err := h.reqService.DeleteRequestDocument(documentID, userID, hasCapability(roles, authz.CanManageOtherRequests)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		return
 	}
@@ -445,7 +457,7 @@ func (h *OtherRequestHandler) DownloadDocument(c *gin.Context) {
 		return
 	}
 
-	url, err := h.reqService.DownloadRequestDocument(documentID, userID, isAdmin(roles), isHR(roles))
+	url, err := h.reqService.DownloadRequestDocument(documentID, userID, hasCapability(roles, authz.CanManageOtherRequests))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		return
@@ -457,17 +469,4 @@ func (h *OtherRequestHandler) DownloadDocument(c *gin.Context) {
 			"url": url,
 		},
 	})
-}
-
-func isHR(roles interface{}) bool {
-	userRoles, ok := roles.([]string)
-	if !ok {
-		return false
-	}
-	for _, r := range userRoles {
-		if r == "HR" {
-			return true
-		}
-	}
-	return false
 }

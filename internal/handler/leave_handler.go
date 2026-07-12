@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"kartezya-hr/internal/authz"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/service"
 	"kartezya-hr/internal/types"
@@ -814,7 +815,7 @@ func (h *LeaveHandler) GetAllLeaveRequests(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanViewLeaveManagement) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Only administrators can view all leave requests",
@@ -934,7 +935,7 @@ func (h *LeaveHandler) ApproveLeaveRequest(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanApproveLeave) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Only administrators can approve leave requests",
@@ -989,7 +990,7 @@ func (h *LeaveHandler) RejectLeaveRequest(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanApproveLeave) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Only administrators can reject leave requests",
@@ -1063,7 +1064,7 @@ func (h *LeaveHandler) CancelLeaveRequest(c *gin.Context) {
 		return
 	}
 
-	if err := h.leaveService.CancelLeave(id, "İptal", userID, isAdmin(roles)); err != nil {
+	if err := h.leaveService.CancelLeave(id, "İptal", userID, hasCapability(roles, authz.CanApproveLeave)); err != nil {
 		status := http.StatusInternalServerError
 		if err.Error() == "you can only cancel your own leave requests" ||
 			err.Error() == "only pending leave requests can be cancelled, current status: PENDING" ||
@@ -1163,7 +1164,7 @@ func (h *LeaveHandler) GetLeaveBalances(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageLeaveTypes) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Only administrators can view other employees' leave balances",
@@ -1397,7 +1398,7 @@ func (h *LeaveHandler) GetLeaveDocuments(c *gin.Context) {
 	}
 
 	// Get documents
-	documents, err := h.leaveService.GetLeaveDocuments(uint(leaveRequestID), userID, isAdmin(roles))
+	documents, err := h.leaveService.GetLeaveDocuments(uint(leaveRequestID), userID, hasCapability(roles, authz.CanViewLeaveManagement))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -1445,7 +1446,7 @@ func (h *LeaveHandler) DeleteLeaveDocument(c *gin.Context) {
 	}
 
 	// Delete document
-	if err := h.leaveService.DeleteLeaveDocument(documentID, userID, isAdmin(roles)); err != nil {
+	if err := h.leaveService.DeleteLeaveDocument(documentID, userID, hasCapability(roles, authz.CanViewLeaveManagement)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   err.Error(),
@@ -1492,7 +1493,7 @@ func (h *LeaveHandler) DownloadLeaveDocument(c *gin.Context) {
 	}
 
 	// Get download URL
-	url, err := h.leaveService.DownloadLeaveDocument(documentID, userID, isAdmin(roles))
+	url, err := h.leaveService.DownloadLeaveDocument(documentID, userID, hasCapability(roles, authz.CanViewLeaveManagement))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,

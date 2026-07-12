@@ -345,6 +345,8 @@ type AuditLog struct {
 const (
 	RoleAdmin    = "ADMIN"
 	RoleEmployee = "EMPLOYEE"
+	RoleHR       = "HR"
+	RoleFinance  = "FINANCE"
 )
 
 // Constants for leave request status

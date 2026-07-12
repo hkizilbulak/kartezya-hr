@@ -54,6 +54,11 @@ func NewEmployeeService(employeeRepo repository.EmployeeRepository, userRepo rep
 }
 
 func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalGap float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, createdBy string, roles []string) (*domain.Employee, error) {
+	creationRole, err := ValidateEmployeeCreationRoles(roles)
+	if err != nil {
+		return nil, err
+	}
+
 	// Delegate user creation to AuthService (respecting domain boundaries)
 	// companyEmail is used as the user's email in the user table
 	user, err := s.authService.CreateUserForEmployee(companyEmail, createdBy)
@@ -148,15 +153,8 @@ func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastNam
 
 	fmt.Printf("Employee created successfully. User ID: %d, Employee ID: %d\n", user.ID, employee.ID)
 
-	// Assign roles to user if provided
-	if len(roles) > 0 {
-		fmt.Printf("Attempting to assign %d roles to user %d\n", len(roles), user.ID)
-		if err := s.assignRolesToUser(user.ID, roles, createdBy); err != nil {
-			// Log error but don't fail the operation - employee is already created
-			fmt.Printf("ERROR: failed to assign roles to user %d: %v\n", user.ID, err)
-		}
-	} else {
-		fmt.Printf("No roles provided for user %d\n", user.ID)
+	if err := s.assignRolesToUser(user.ID, []string{creationRole}, createdBy); err != nil {
+		return nil, fmt.Errorf("failed to assign role: %w", err)
 	}
 
 	// Send welcome email — CC resolved from PERSONEL_INFO_EMAIL_WELCOME config if defined

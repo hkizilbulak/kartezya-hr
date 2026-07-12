@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"kartezya-hr/internal/authz"
 	"kartezya-hr/internal/service"
 	"kartezya-hr/internal/types"
 
@@ -67,7 +68,7 @@ func (h *WorkInformationHandler) CreateWorkInformation(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageEmployees) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Admin access required",
@@ -258,7 +259,7 @@ func (h *WorkInformationHandler) UpdateWorkInformation(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageEmployees) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Admin access required",
@@ -285,7 +286,7 @@ func (h *WorkInformationHandler) UpdateWorkInformation(c *gin.Context) {
 		return
 	}
 
-	if err := h.workInfoService.UpdateWorkInformation(id, req.EmployeeID, req.CompanyID, req.DepartmentID, req.JobPositionID, req.StartDate, req.EndDate, req.PersonnelNo, req.WorkEmail, email, requestingUserID, isAdmin(roles)); err != nil {
+	if err := h.workInfoService.UpdateWorkInformation(id, req.EmployeeID, req.CompanyID, req.DepartmentID, req.JobPositionID, req.StartDate, req.EndDate, req.PersonnelNo, req.WorkEmail, email, requestingUserID, hasCapability(roles, authz.CanManageEmployees)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   err.Error(),
@@ -333,7 +334,7 @@ func (h *WorkInformationHandler) DeleteWorkInformation(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageEmployees) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Admin access required",

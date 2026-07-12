@@ -98,6 +98,7 @@ type ExpenseService interface {
 	// Expense Request methods
 	CreateExpenseRequest(expense *domain.ExpenseRequest, userID uint) error
 	GetExpenseRequestByID(id uint) (*domain.ExpenseRequest, error)
+	GetExpenseRequestByIDForCaller(id uint, userID uint, canViewManagement bool) (*domain.ExpenseRequest, error)
 	GetMyExpenseRequests(userID uint, sortBy string, sortDir types.SortDirection) ([]*domain.ExpenseRequest, error)
 	GetMyExpenseRequestsPaginated(userID uint, page, limit int, sortParams types.SortParams, status string, expenseTypeID *uint, startDate *string, endDate *string) (*PaginatedResponse, error)
 	GetAllExpenseRequestsPaginated(employeeID *uint, page, limit int, sortParams types.SortParams, status string, expenseTypeID *uint, startDate *string, endDate *string) (*PaginatedResponse, error)
@@ -193,6 +194,39 @@ func (s *expenseService) CreateExpenseRequest(expense *domain.ExpenseRequest, us
 // GetExpenseRequestByID retrieves an expense request by ID
 func (s *expenseService) GetExpenseRequestByID(id uint) (*domain.ExpenseRequest, error) {
 	return s.expenseRepo.FindByID(id)
+}
+
+// GetExpenseRequestByIDForCaller retrieves an expense for the owner or a management viewer.
+func (s *expenseService) GetExpenseRequestByIDForCaller(id uint, userID uint, canViewManagement bool) (*domain.ExpenseRequest, error) {
+	expense, err := s.expenseRepo.FindByID(id)
+	if err != nil {
+		return nil, errors.New("expense request not found")
+	}
+
+	if canViewManagement {
+		return expense, nil
+	}
+
+	employee, err := s.employeeRepo.GetByUserID(userID)
+	if err != nil {
+		return nil, errors.New("access denied")
+	}
+	if err := authorizeExpenseAccess(expense.EmployeeID, employee.ID, false); err != nil {
+		return nil, err
+	}
+
+	return expense, nil
+}
+
+// authorizeExpenseAccess separates data-scope checks from role capabilities.
+func authorizeExpenseAccess(expenseEmployeeID, callerEmployeeID uint, canViewManagement bool) error {
+	if canViewManagement {
+		return nil
+	}
+	if expenseEmployeeID != callerEmployeeID {
+		return errors.New("access denied")
+	}
+	return nil
 }
 
 // GetMyExpenseRequests retrieves expense requests for a specific user

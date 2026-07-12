@@ -21,17 +21,18 @@ type OtherRequestService interface {
 
 	CreateRequest(req *domain.OtherRequest, userID uint) error
 	GetRequestByID(id uint) (*domain.OtherRequest, error)
+	GetRequestByIDForCaller(id uint, userID uint, canManageOtherRequests bool) (*domain.OtherRequest, error)
 	GetRequestsByUserID(userID uint) ([]*domain.OtherRequest, error)
 	GetAllRequests(filterEmployeeID *uint, limit, offset int, sortParams types.SortParams) ([]*domain.OtherRequest, int64, error)
-	UpdateRequest(req *domain.OtherRequest, userID uint, isAdmin bool) error
-	CancelRequest(id uint, userID uint, isAdmin bool) error
+	UpdateRequest(req *domain.OtherRequest, userID uint, canManageOtherRequests bool) error
+	CancelRequest(id uint, userID uint, canManageOtherRequests bool) error
 	CompleteRequest(id uint, completerID uint) error
 	RollbackRequest(id uint, userID uint) error
 
-	UploadRequestDocument(requestID uint, file *multipart.FileHeader, userID uint, isAdmin bool, isHR bool) (*domain.Attachment, error)
-	GetRequestDocuments(requestID uint, userID uint, isAdmin bool, isHR bool) ([]domain.Attachment, error)
-	DeleteRequestDocument(documentID string, userID uint, isAdmin bool, isHR bool) error
-	DownloadRequestDocument(documentID string, userID uint, isAdmin bool, isHR bool) (string, error)
+	UploadRequestDocument(requestID uint, file *multipart.FileHeader, userID uint, canManageOtherRequests bool) (*domain.Attachment, error)
+	GetRequestDocuments(requestID uint, userID uint, canManageOtherRequests bool) ([]domain.Attachment, error)
+	DeleteRequestDocument(documentID string, userID uint, canManageOtherRequests bool) error
+	DownloadRequestDocument(documentID string, userID uint, canManageOtherRequests bool) (string, error)
 }
 
 type otherRequestService struct {
@@ -131,6 +132,21 @@ func (s *otherRequestService) GetRequestByID(id uint) (*domain.OtherRequest, err
 	return s.repo.GetRequestByID(id)
 }
 
+func (s *otherRequestService) GetRequestByIDForCaller(id uint, userID uint, canManageOtherRequests bool) (*domain.OtherRequest, error) {
+	req, err := s.repo.GetRequestByID(id)
+	if err != nil {
+		return nil, errors.New("Talep bulunamadı")
+	}
+	if canManageOtherRequests {
+		return req, nil
+	}
+	employee, err := s.employeeRepo.GetByUserID(userID)
+	if err != nil || req.EmployeeID != employee.ID {
+		return nil, errors.New("access denied")
+	}
+	return req, nil
+}
+
 func (s *otherRequestService) GetRequestsByUserID(userID uint) ([]*domain.OtherRequest, error) {
 	return s.repo.GetRequestsByUserID(userID)
 }
@@ -139,7 +155,7 @@ func (s *otherRequestService) GetAllRequests(filterEmployeeID *uint, limit, offs
 	return s.repo.GetAllRequests(filterEmployeeID, limit, offset, sortParams)
 }
 
-func (s *otherRequestService) UpdateRequest(req *domain.OtherRequest, userID uint, isAdmin bool) error {
+func (s *otherRequestService) UpdateRequest(req *domain.OtherRequest, userID uint, canManageOtherRequests bool) error {
 	existing, err := s.repo.GetRequestByID(req.ID)
 	if err != nil {
 		return err
@@ -148,7 +164,7 @@ func (s *otherRequestService) UpdateRequest(req *domain.OtherRequest, userID uin
 	if err != nil {
 		return errors.New("çalışan kaydı bulunamadı")
 	}
-	if !isAdmin && existing.EmployeeID != employee.ID {
+	if !canManageOtherRequests && existing.EmployeeID != employee.ID {
 		return errors.New("sadece kendi taleplerinizi güncelleyebilirsiniz")
 	}
 	if existing.Status == domain.RequestStatusCompleted {
@@ -162,12 +178,18 @@ func (s *otherRequestService) UpdateRequest(req *domain.OtherRequest, userID uin
 	return err
 }
 
-func (s *otherRequestService) CancelRequest(id uint, userID uint, isAdmin bool) error {
+func (s *otherRequestService) CancelRequest(id uint, userID uint, canManageOtherRequests bool) error {
 	req, err := s.repo.GetRequestByID(id)
 	if err != nil {
 		return err
 	}
-	if req.Status == domain.RequestStatusCompleted && !isAdmin {
+	if !canManageOtherRequests {
+		employee, err := s.employeeRepo.GetByUserID(userID)
+		if err != nil || req.EmployeeID != employee.ID {
+			return errors.New("sadece kendi taleplerinizi iptal edebilirsiniz")
+		}
+	}
+	if req.Status == domain.RequestStatusCompleted && !canManageOtherRequests {
 		return errors.New("tamamlanmış talepler silinemez")
 	}
 	req.Status = domain.RequestStatusCancelled
@@ -247,7 +269,7 @@ func (s *otherRequestService) RollbackRequest(id uint, userID uint) error {
 
 // ==================== DÖKÜMAN YÖNETİMİ ====================
 
-func (s *otherRequestService) UploadRequestDocument(requestID uint, file *multipart.FileHeader, userID uint, isAdmin bool, isHR bool) (*domain.Attachment, error) {
+func (s *otherRequestService) UploadRequestDocument(requestID uint, file *multipart.FileHeader, userID uint, canManageOtherRequests bool) (*domain.Attachment, error) {
 	request, err := s.repo.GetRequestByID(requestID)
 	if err != nil {
 		return nil, errors.New("talep bulunamadı")
@@ -256,7 +278,7 @@ func (s *otherRequestService) UploadRequestDocument(requestID uint, file *multip
 		return nil, errors.New("tamamlanmış taleplere doküman yüklenemez")
 	}
 	employee, err := s.employeeRepo.GetByUserID(userID)
-	if !isAdmin && !isHR {
+	if !canManageOtherRequests {
 		if err != nil {
 			return nil, errors.New("çalışan kaydı bulunamadı")
 		}
@@ -295,8 +317,8 @@ func (s *otherRequestService) UploadRequestDocument(requestID uint, file *multip
 	return attachment, nil
 }
 
-func (s *otherRequestService) GetRequestDocuments(requestID uint, userID uint, isAdmin bool, isHR bool) ([]domain.Attachment, error) {
-	if !isAdmin && !isHR {
+func (s *otherRequestService) GetRequestDocuments(requestID uint, userID uint, canManageOtherRequests bool) ([]domain.Attachment, error) {
+	if !canManageOtherRequests {
 		req, err := s.repo.GetRequestByID(requestID)
 		if err != nil {
 			return nil, err
@@ -309,7 +331,7 @@ func (s *otherRequestService) GetRequestDocuments(requestID uint, userID uint, i
 	return s.attachmentRepo.FindByRelatedRecord(domain.AttachmentRelatedTypeOtherRequest, requestID)
 }
 
-func (s *otherRequestService) DeleteRequestDocument(documentID string, userID uint, isAdmin bool, isHR bool) error {
+func (s *otherRequestService) DeleteRequestDocument(documentID string, userID uint, canManageOtherRequests bool) error {
 	attachment, err := s.attachmentRepo.FindByID(documentID)
 	if err != nil {
 		return errors.New("döküman bulunamadı")
@@ -324,7 +346,7 @@ func (s *otherRequestService) DeleteRequestDocument(documentID string, userID ui
 	if request.Status == domain.RequestStatusCompleted {
 		return errors.New("tamamlanmış taleplerden doküman silinemez")
 	}
-	if !isAdmin && !isHR {
+	if !canManageOtherRequests {
 		employee, err := s.employeeRepo.GetByUserID(userID)
 		if err != nil {
 			return errors.New("çalışan kaydı bulunamadı")
@@ -343,12 +365,12 @@ func (s *otherRequestService) DeleteRequestDocument(documentID string, userID ui
 	return err
 }
 
-func (s *otherRequestService) DownloadRequestDocument(documentID string, userID uint, isAdmin bool, isHR bool) (string, error) {
+func (s *otherRequestService) DownloadRequestDocument(documentID string, userID uint, canManageOtherRequests bool) (string, error) {
 	attachment, err := s.attachmentRepo.FindByID(documentID)
 	if err != nil {
 		return "", errors.New("döküman bulunamadı")
 	}
-	if !isAdmin && !isHR {
+	if !canManageOtherRequests {
 		request, err := s.repo.GetRequestByID(*attachment.RelatedID)
 		if err != nil {
 			return "", err

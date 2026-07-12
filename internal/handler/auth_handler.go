@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"kartezya-hr/internal/authz"
+	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/repository"
 	"kartezya-hr/internal/service"
 
@@ -492,11 +494,16 @@ func getUserContext(c *gin.Context) (uint, string, []string, bool) {
 // Helper function to check if user has admin role
 func isAdmin(roles []string) bool {
 	for _, role := range roles {
-		if role == "ADMIN" {
+		if role == domain.RoleAdmin {
 			return true
 		}
 	}
 	return false
+}
+
+// hasCapability reports whether any of the caller's roles grants the capability.
+func hasCapability(roles []string, capability authz.Capability) bool {
+	return authz.HasCapability(roles, capability)
 }
 
 // Helper function to parse uint from string parameter

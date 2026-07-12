@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"kartezya-hr/internal/authz"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/service"
 
@@ -48,9 +49,9 @@ func (m *AuthMiddleware) JWTAuth() gin.HandlerFunc {
 
 		// Set user context
 		c.Set("userID", claims.UserID)
-c.Set("email", claims.Email)      
-c.Set("userEmail", claims.Email) 
-c.Set("roles", claims.Roles)
+		c.Set("email", claims.Email)
+		c.Set("userEmail", claims.Email)
+		c.Set("roles", claims.Roles)
 
 		c.Next()
 	}
@@ -94,6 +95,33 @@ func (m *AuthMiddleware) RequireRole(role string) gin.HandlerFunc {
 // RequireAdmin is a convenience method for admin role requirement
 func (m *AuthMiddleware) RequireAdmin() gin.HandlerFunc {
 	return m.RequireRole(domain.RoleAdmin)
+}
+
+// RequireCapability checks whether the authenticated user has the given capability
+func (m *AuthMiddleware) RequireCapability(capability authz.Capability) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		roles, exists := c.Get("roles")
+		if !exists {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			c.Abort()
+			return
+		}
+
+		userRoles, ok := roles.([]string)
+		if !ok {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			c.Abort()
+			return
+		}
+
+		if !authz.HasCapability(userRoles, capability) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions"})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
 }
 
 // IsAdmin checks if current user is admin

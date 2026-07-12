@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"kartezya-hr/internal/authz"
 	"kartezya-hr/internal/config"
 	"kartezya-hr/internal/database"
 	"kartezya-hr/internal/domain"
@@ -290,13 +291,13 @@ func main() {
 		{
 			employeeRoutes.GET("/me", employeeHandler.GetMyProfile)
 			employeeRoutes.PUT("/me", employeeHandler.UpdateMyProfile)
-			employeeRoutes.PUT("/:id", employeeHandler.UpdateEmployee)
+			employeeRoutes.PUT("/:id", authMiddleware.RequireCapability(authz.CanManageEmployees), employeeHandler.UpdateEmployee)
 
-			// Admin only routes
-			employeeRoutes.GET("/:id", authMiddleware.RequireAdmin(), employeeHandler.GetEmployeeByID)
-			employeeRoutes.POST("", authMiddleware.RequireAdmin(), employeeHandler.CreateEmployee)
-			employeeRoutes.GET("", authMiddleware.RequireAdmin(), employeeHandler.ListEmployees)
-			employeeRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), employeeHandler.DeleteEmployee)
+			// Employee read (ADMIN, HR, FINANCE) / manage (ADMIN, HR)
+			employeeRoutes.GET("/:id", authMiddleware.RequireCapability(authz.CanViewEmployees), employeeHandler.GetEmployeeByID)
+			employeeRoutes.POST("", authMiddleware.RequireCapability(authz.CanManageEmployees), employeeHandler.CreateEmployee)
+			employeeRoutes.GET("", authMiddleware.RequireCapability(authz.CanViewEmployees), employeeHandler.ListEmployees)
+			employeeRoutes.DELETE("/:id", authMiddleware.RequireCapability(authz.CanManageEmployees), employeeHandler.DeleteEmployee)
 		}
 
 		// Leave management routes
@@ -314,11 +315,11 @@ func main() {
 				requests.POST("/:id/documents", leaveHandler.UploadLeaveDocument)
 				requests.GET("/:id/documents", leaveHandler.GetLeaveDocuments)
 
-				// Admin only routes
-				requests.GET("/:id", authMiddleware.RequireAdmin(), leaveHandler.GetLeaveRequestByID)
-				requests.GET("", authMiddleware.RequireAdmin(), leaveHandler.GetAllLeaveRequests)
-				requests.POST("/:id/approve", authMiddleware.RequireAdmin(), leaveHandler.ApproveLeaveRequest)
-				requests.POST("/:id/reject", authMiddleware.RequireAdmin(), leaveHandler.RejectLeaveRequest)
+				// Leave management (ADMIN, HR)
+				requests.GET("/:id", authMiddleware.RequireCapability(authz.CanViewLeaveManagement), leaveHandler.GetLeaveRequestByID)
+				requests.GET("", authMiddleware.RequireCapability(authz.CanViewLeaveManagement), leaveHandler.GetAllLeaveRequests)
+				requests.POST("/:id/approve", authMiddleware.RequireCapability(authz.CanApproveLeave), leaveHandler.ApproveLeaveRequest)
+				requests.POST("/:id/reject", authMiddleware.RequireCapability(authz.CanApproveLeave), leaveHandler.RejectLeaveRequest)
 			}
 
 			// Leave document operations (by document ID)
@@ -329,17 +330,17 @@ func main() {
 			balances := leaveRoutes.Group("/balances")
 			{
 				balances.GET("/me", leaveHandler.GetMyLeaveBalances)
-				balances.GET("", authMiddleware.RequireAdmin(), leaveHandler.GetLeaveBalances)
+				balances.GET("", authMiddleware.RequireCapability(authz.CanManageLeaveTypes), leaveHandler.GetLeaveBalances)
 			}
 
-			// Leave types (Admin only)
+			// Leave types (ADMIN, HR)
 			typesRoutes := leaveRoutes.Group("/types")
 			{
-				typesRoutes.GET("", authMiddleware.RequireAdmin(), leaveHandler.ListLeaveTypes)
-				typesRoutes.POST("", authMiddleware.RequireAdmin(), leaveHandler.CreateLeaveType)
-				typesRoutes.GET("/:id", authMiddleware.RequireAdmin(), leaveHandler.GetLeaveTypeByID)
-				typesRoutes.PUT("/:id", authMiddleware.RequireAdmin(), leaveHandler.UpdateLeaveType)
-				typesRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), leaveHandler.DeleteLeaveType)
+				typesRoutes.GET("", authMiddleware.RequireCapability(authz.CanManageLeaveTypes), leaveHandler.ListLeaveTypes)
+				typesRoutes.POST("", authMiddleware.RequireCapability(authz.CanManageLeaveTypes), leaveHandler.CreateLeaveType)
+				typesRoutes.GET("/:id", authMiddleware.RequireCapability(authz.CanManageLeaveTypes), leaveHandler.GetLeaveTypeByID)
+				typesRoutes.PUT("/:id", authMiddleware.RequireCapability(authz.CanManageLeaveTypes), leaveHandler.UpdateLeaveType)
+				typesRoutes.DELETE("/:id", authMiddleware.RequireCapability(authz.CanManageLeaveTypes), leaveHandler.DeleteLeaveType)
 			}
 
 			// Calculate days endpoints
@@ -349,23 +350,21 @@ func main() {
 		// Company management routes
 		companyRoutes := protected.Group("/companies")
 		{
-			// Admin only routes
-			companyRoutes.GET("", authMiddleware.RequireAdmin(), companyHandler.GetCompanies)
-			companyRoutes.GET("/:id", authMiddleware.RequireAdmin(), companyHandler.GetCompany)
-			companyRoutes.POST("", authMiddleware.RequireAdmin(), companyHandler.CreateCompany)
-			companyRoutes.PUT("/:id", authMiddleware.RequireAdmin(), companyHandler.UpdateCompany)
-			companyRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), companyHandler.DeleteCompany)
+			companyRoutes.GET("", authMiddleware.RequireCapability(authz.CanManageOrgMaster), companyHandler.GetCompanies)
+			companyRoutes.GET("/:id", authMiddleware.RequireCapability(authz.CanManageOrgMaster), companyHandler.GetCompany)
+			companyRoutes.POST("", authMiddleware.RequireCapability(authz.CanManageOrgMaster), companyHandler.CreateCompany)
+			companyRoutes.PUT("/:id", authMiddleware.RequireCapability(authz.CanManageOrgMaster), companyHandler.UpdateCompany)
+			companyRoutes.DELETE("/:id", authMiddleware.RequireCapability(authz.CanManageOrgMaster), companyHandler.DeleteCompany)
 		}
 
 		// Department management routes
 		departmentRoutes := protected.Group("/departments")
 		{
-			// Admin only routes
-			departmentRoutes.GET("", authMiddleware.RequireAdmin(), departmentHandler.GetDepartments)
-			departmentRoutes.GET("/:id", authMiddleware.RequireAdmin(), departmentHandler.GetDepartment)
-			departmentRoutes.POST("", authMiddleware.RequireAdmin(), departmentHandler.CreateDepartment)
-			departmentRoutes.PUT("/:id", authMiddleware.RequireAdmin(), departmentHandler.UpdateDepartment)
-			departmentRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), departmentHandler.DeleteDepartment)
+			departmentRoutes.GET("", authMiddleware.RequireCapability(authz.CanManageOrgMaster), departmentHandler.GetDepartments)
+			departmentRoutes.GET("/:id", authMiddleware.RequireCapability(authz.CanManageOrgMaster), departmentHandler.GetDepartment)
+			departmentRoutes.POST("", authMiddleware.RequireCapability(authz.CanManageOrgMaster), departmentHandler.CreateDepartment)
+			departmentRoutes.PUT("/:id", authMiddleware.RequireCapability(authz.CanManageOrgMaster), departmentHandler.UpdateDepartment)
+			departmentRoutes.DELETE("/:id", authMiddleware.RequireCapability(authz.CanManageOrgMaster), departmentHandler.DeleteDepartment)
 		}
 
 		// FAQ (Sıkça Sorulan Sorular) management routes
@@ -395,9 +394,9 @@ func main() {
 			otherReqRoutes.DELETE("/documents/:docId", otherRequestHandler.DeleteDocument)
 			otherReqRoutes.GET("/documents/:docId/download", otherRequestHandler.DownloadDocument)
 
-			otherReqRoutes.GET("", authMiddleware.RequireAdmin(), otherRequestHandler.GetAllRequests)
-			otherReqRoutes.PATCH("/:id/complete", authMiddleware.RequireAdmin(), otherRequestHandler.CompleteRequest)
-			otherReqRoutes.PATCH("/:id/rollback", authMiddleware.RequireAdmin(), otherRequestHandler.RollbackRequest)
+			otherReqRoutes.GET("", authMiddleware.RequireCapability(authz.CanManageOtherRequests), otherRequestHandler.GetAllRequests)
+			otherReqRoutes.PATCH("/:id/complete", authMiddleware.RequireCapability(authz.CanManageOtherRequests), otherRequestHandler.CompleteRequest)
+			otherReqRoutes.PATCH("/:id/rollback", authMiddleware.RequireCapability(authz.CanManageOtherRequests), otherRequestHandler.RollbackRequest)
 		}
 
 		// Request Types management routes
@@ -405,20 +404,19 @@ func main() {
 		{
 			requestTypeRoutes.GET("", otherRequestHandler.GetAllRequestTypes)
 
-			requestTypeRoutes.POST("", authMiddleware.RequireAdmin(), otherRequestHandler.CreateRequestType)
-			requestTypeRoutes.PUT("/:id", authMiddleware.RequireAdmin(), otherRequestHandler.UpdateRequestType)
-			requestTypeRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), otherRequestHandler.DeleteRequestType)
+			requestTypeRoutes.POST("", authMiddleware.RequireCapability(authz.CanManageRequestTypes), otherRequestHandler.CreateRequestType)
+			requestTypeRoutes.PUT("/:id", authMiddleware.RequireCapability(authz.CanManageRequestTypes), otherRequestHandler.UpdateRequestType)
+			requestTypeRoutes.DELETE("/:id", authMiddleware.RequireCapability(authz.CanManageRequestTypes), otherRequestHandler.DeleteRequestType)
 		}
 
 		// Job Position management routes
 		jobPositionRoutes := protected.Group("/job-positions")
 		{
-			// Admin only routes
-			jobPositionRoutes.GET("", authMiddleware.RequireAdmin(), jobPositionHandler.GetJobPositions)
-			jobPositionRoutes.GET("/:id", authMiddleware.RequireAdmin(), jobPositionHandler.GetJobPosition)
-			jobPositionRoutes.POST("", authMiddleware.RequireAdmin(), jobPositionHandler.CreateJobPosition)
-			jobPositionRoutes.PUT("/:id", authMiddleware.RequireAdmin(), jobPositionHandler.UpdateJobPosition)
-			jobPositionRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), jobPositionHandler.DeleteJobPosition)
+			jobPositionRoutes.GET("", authMiddleware.RequireCapability(authz.CanManageOrgMaster), jobPositionHandler.GetJobPositions)
+			jobPositionRoutes.GET("/:id", authMiddleware.RequireCapability(authz.CanManageOrgMaster), jobPositionHandler.GetJobPosition)
+			jobPositionRoutes.POST("", authMiddleware.RequireCapability(authz.CanManageOrgMaster), jobPositionHandler.CreateJobPosition)
+			jobPositionRoutes.PUT("/:id", authMiddleware.RequireCapability(authz.CanManageOrgMaster), jobPositionHandler.UpdateJobPosition)
+			jobPositionRoutes.DELETE("/:id", authMiddleware.RequireCapability(authz.CanManageOrgMaster), jobPositionHandler.DeleteJobPosition)
 		}
 
 		// Grade management routes
@@ -438,12 +436,12 @@ func main() {
 			// Employee can view their own work information
 			workInfoRoutes.GET("/me", workInfoHandler.GetMyWorkInformation)
 
-			// Admin only routes
-			workInfoRoutes.GET("/:id", authMiddleware.RequireAdmin(), workInfoHandler.GetWorkInformationByID)
-			workInfoRoutes.GET("", authMiddleware.RequireAdmin(), workInfoHandler.ListWorkInformation)
-			workInfoRoutes.POST("", authMiddleware.RequireAdmin(), workInfoHandler.CreateWorkInformation)
-			workInfoRoutes.PUT("/:id", authMiddleware.RequireAdmin(), workInfoHandler.UpdateWorkInformation)
-			workInfoRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), workInfoHandler.DeleteWorkInformation)
+			// Employee management (ADMIN, HR)
+			workInfoRoutes.GET("/:id", authMiddleware.RequireCapability(authz.CanManageEmployees), workInfoHandler.GetWorkInformationByID)
+			workInfoRoutes.GET("", authMiddleware.RequireCapability(authz.CanManageEmployees), workInfoHandler.ListWorkInformation)
+			workInfoRoutes.POST("", authMiddleware.RequireCapability(authz.CanManageEmployees), workInfoHandler.CreateWorkInformation)
+			workInfoRoutes.PUT("/:id", authMiddleware.RequireCapability(authz.CanManageEmployees), workInfoHandler.UpdateWorkInformation)
+			workInfoRoutes.DELETE("/:id", authMiddleware.RequireCapability(authz.CanManageEmployees), workInfoHandler.DeleteWorkInformation)
 		}
 
 		// Employee Grade management routes
@@ -466,12 +464,12 @@ func main() {
 			// Employee can view their own contracts
 			employeeContractRoutes.GET("/me", employeeContractHandler.GetMyEmployeeContracts)
 
-			// Admin only routes
-			employeeContractRoutes.GET("/:id", authMiddleware.RequireAdmin(), employeeContractHandler.GetEmployeeContractByID)
-			employeeContractRoutes.GET("", authMiddleware.RequireAdmin(), employeeContractHandler.ListEmployeeContracts)
-			employeeContractRoutes.POST("", authMiddleware.RequireAdmin(), employeeContractHandler.CreateEmployeeContract)
-			employeeContractRoutes.PUT("/:id", authMiddleware.RequireAdmin(), employeeContractHandler.UpdateEmployeeContract)
-			employeeContractRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), employeeContractHandler.DeleteEmployeeContract)
+			// Employee management (ADMIN, HR)
+			employeeContractRoutes.GET("/:id", authMiddleware.RequireCapability(authz.CanManageEmployees), employeeContractHandler.GetEmployeeContractByID)
+			employeeContractRoutes.GET("", authMiddleware.RequireCapability(authz.CanManageEmployees), employeeContractHandler.ListEmployeeContracts)
+			employeeContractRoutes.POST("", authMiddleware.RequireCapability(authz.CanManageEmployees), employeeContractHandler.CreateEmployeeContract)
+			employeeContractRoutes.PUT("/:id", authMiddleware.RequireCapability(authz.CanManageEmployees), employeeContractHandler.UpdateEmployeeContract)
+			employeeContractRoutes.DELETE("/:id", authMiddleware.RequireCapability(authz.CanManageEmployees), employeeContractHandler.DeleteEmployeeContract)
 		}
 
 		// Contract routes
@@ -551,11 +549,11 @@ func main() {
 				requestRoutes.POST("/:id/documents", expenseHandler.UploadExpenseDocument)
 				requestRoutes.GET("/:id/documents", expenseHandler.GetExpenseDocuments)
 
-				// Admin only routes
-				requestRoutes.GET("", authMiddleware.RequireAdmin(), expenseHandler.GetAllExpenseRequests)
-				requestRoutes.POST("/:id/approve", authMiddleware.RequireAdmin(), expenseHandler.ApproveExpenseRequest)
-				requestRoutes.POST("/:id/reject", authMiddleware.RequireAdmin(), expenseHandler.RejectExpenseRequest)
-				requestRoutes.POST("/:id/pay", authMiddleware.RequireAdmin(), expenseHandler.MarkExpenseAsPaid)
+				// Expense management
+				requestRoutes.GET("", authMiddleware.RequireCapability(authz.CanViewExpenseManagement), expenseHandler.GetAllExpenseRequests)
+				requestRoutes.POST("/:id/approve", authMiddleware.RequireCapability(authz.CanApproveExpense), expenseHandler.ApproveExpenseRequest)
+				requestRoutes.POST("/:id/reject", authMiddleware.RequireCapability(authz.CanApproveExpense), expenseHandler.RejectExpenseRequest)
+				requestRoutes.POST("/:id/pay", authMiddleware.RequireCapability(authz.CanPayExpense), expenseHandler.MarkExpenseAsPaid)
 			}
 
 			// Expense Documents
@@ -570,11 +568,10 @@ func main() {
 			{
 				typeRoutes.GET("/active", expenseHandler.GetActiveExpenseTypes)
 
-				// Admin only routes
-				typeRoutes.GET("", authMiddleware.RequireAdmin(), expenseHandler.GetExpenseTypes)
-				typeRoutes.POST("", authMiddleware.RequireAdmin(), expenseHandler.CreateExpenseType)
-				typeRoutes.PUT("/:id", authMiddleware.RequireAdmin(), expenseHandler.UpdateExpenseType)
-				typeRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), expenseHandler.DeleteExpenseType)
+				typeRoutes.GET("", authMiddleware.RequireCapability(authz.CanManageExpenseTypes), expenseHandler.GetExpenseTypes)
+				typeRoutes.POST("", authMiddleware.RequireCapability(authz.CanManageExpenseTypes), expenseHandler.CreateExpenseType)
+				typeRoutes.PUT("/:id", authMiddleware.RequireCapability(authz.CanManageExpenseTypes), expenseHandler.UpdateExpenseType)
+				typeRoutes.DELETE("/:id", authMiddleware.RequireCapability(authz.CanManageExpenseTypes), expenseHandler.DeleteExpenseType)
 			}
 		}
 
@@ -645,6 +642,8 @@ func seedDatabase(db *database.Database) error {
 	roles := []domain.Role{
 		{Name: domain.RoleAdmin, Description: "Administrator with full system access"},
 		{Name: domain.RoleEmployee, Description: "Regular employee with limited access"},
+		{Name: domain.RoleHR, Description: "HR specialist with HR management access"},
+		{Name: domain.RoleFinance, Description: "Finance specialist with payment access"},
 	}
 
 	for _, role := range roles {
