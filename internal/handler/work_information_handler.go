@@ -86,6 +86,10 @@ func (h *WorkInformationHandler) CreateWorkInformation(c *gin.Context) {
 		return
 	}
 
+	if rejectIfHRMutatingAdminEmployee(c, h.employeeService, req.EmployeeID, roles) {
+		return
+	}
+
 	workInfo, err := h.workInfoService.CreateWorkInformation(req.EmployeeID, req.CompanyID, req.DepartmentID, req.JobPositionID, req.StartDate, req.EndDate, req.PersonnelNo, req.WorkEmail, email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -286,6 +290,10 @@ func (h *WorkInformationHandler) UpdateWorkInformation(c *gin.Context) {
 		return
 	}
 
+	if rejectIfHRMutatingAdminEmployee(c, h.employeeService, req.EmployeeID, roles) {
+		return
+	}
+
 	if err := h.workInfoService.UpdateWorkInformation(id, req.EmployeeID, req.CompanyID, req.DepartmentID, req.JobPositionID, req.StartDate, req.EndDate, req.PersonnelNo, req.WorkEmail, email, requestingUserID, hasCapability(roles, authz.CanManageEmployees)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -348,6 +356,18 @@ func (h *WorkInformationHandler) DeleteWorkInformation(c *gin.Context) {
 			"success": false,
 			"error":   "Invalid work information ID",
 		})
+		return
+	}
+
+	existing, err := h.workInfoService.GetWorkInformationByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+	if rejectIfHRMutatingAdminEmployee(c, h.employeeService, existing.Employee.ID, roles) {
 		return
 	}
 

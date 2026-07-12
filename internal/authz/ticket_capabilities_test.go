@@ -62,11 +62,29 @@ func TestExpenseTypeManagementCapabilities(t *testing.T) {
 	if !authz.HasCapability([]string{domain.RoleHR}, authz.CanManageExpenseTypes) {
 		t.Fatal("HR must be able to manage expense types")
 	}
-	if authz.HasCapability([]string{domain.RoleFinance}, authz.CanManageExpenseTypes) {
-		t.Fatal("FINANCE must not be able to manage expense types")
+	if !authz.HasCapability([]string{domain.RoleFinance}, authz.CanManageExpenseTypes) {
+		t.Fatal("FINANCE must be able to manage expense types")
 	}
 	if authz.HasCapability([]string{domain.RoleEmployee}, authz.CanManageExpenseTypes) {
 		t.Fatal("EMPLOYEE must not be able to manage expense types")
+	}
+}
+
+func TestAccessAdminModulesCapabilities(t *testing.T) {
+	if !authz.HasCapability([]string{domain.RoleAdmin}, authz.CanAccessAdminModules) {
+		t.Fatal("ADMIN must be able to access admin modules")
+	}
+	if !authz.HasCapability([]string{domain.RoleHR}, authz.CanAccessAdminModules) {
+		t.Fatal("HR must be able to access admin modules")
+	}
+	if authz.HasCapability([]string{domain.RoleFinance}, authz.CanAccessAdminModules) {
+		t.Fatal("FINANCE must not be able to access admin modules")
+	}
+	if authz.HasCapability([]string{domain.RoleEmployee}, authz.CanAccessAdminModules) {
+		t.Fatal("EMPLOYEE must not be able to access admin modules")
+	}
+	if authz.HasCapability([]string{domain.RoleHR}, authz.CanPayExpense) {
+		t.Fatal("HR CanAccessAdminModules must not imply CanPayExpense")
 	}
 }
 

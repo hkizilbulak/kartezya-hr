@@ -74,6 +74,10 @@ func (h *EmployeeContractHandler) CreateEmployeeContract(c *gin.Context) {
 		return
 	}
 
+	if rejectIfHRMutatingAdminEmployee(c, h.employeeService, req.EmployeeID, roles) {
+		return
+	}
+
 	employeeContract, err := h.employeeContractService.CreateContract(req.EmployeeID, req.ContractID, email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -268,6 +272,10 @@ func (h *EmployeeContractHandler) UpdateEmployeeContract(c *gin.Context) {
 		return
 	}
 
+	if rejectIfHRMutatingAdminEmployee(c, h.employeeService, req.EmployeeID, roles) {
+		return
+	}
+
 	if err := h.employeeContractService.UpdateContract(id, req.EmployeeID, req.ContractID, email, requestingUserID, hasCapability(roles, authz.CanManageEmployees)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -329,6 +337,18 @@ func (h *EmployeeContractHandler) DeleteEmployeeContract(c *gin.Context) {
 			"success": false,
 			"error":   "Invalid employee contract ID",
 		})
+		return
+	}
+
+	existing, err := h.employeeContractService.GetContractByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+	if rejectIfHRMutatingAdminEmployee(c, h.employeeService, existing.Employee.ID, roles) {
 		return
 	}
 

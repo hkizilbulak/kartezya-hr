@@ -158,7 +158,7 @@ func main() {
 	defer scheduler.Stop()
 
 	// Initialize handlers
-	authHandler := handler.NewAuthHandler(authService, emailService, userRepo, employeeRepo, mailConfigService)
+	authHandler := handler.NewAuthHandler(authService, emailService, userRepo, userRoleRepo, employeeRepo, mailConfigService)
 	employeeHandler := handler.NewEmployeeHandler(employeeService)
 	leaveHandler := handler.NewLeaveHandler(leaveService, employeeService, emailService, mailConfigService)
 	companyHandler := handler.NewCompanyHandler(companyService)
@@ -269,7 +269,7 @@ func main() {
 	protectedLookup := v1.Group("/lookup")
 	protectedLookup.Use(authMiddleware.JWTAuth())
 	{
-		protectedLookup.GET("/roles", authMiddleware.RequireAdmin(), lookupHandler.GetRolesLookup)
+		protectedLookup.GET("/roles", authMiddleware.RequireCapability(authz.CanAccessAdminModules), lookupHandler.GetRolesLookup)
 	}
 
 	// Protected routes (authentication required)
@@ -281,7 +281,7 @@ func main() {
 		{
 			authRoutes.POST("/logout", authHandler.Logout)
 			authRoutes.POST("/change-password", authHandler.ChangePassword)
-			authRoutes.POST("/send-password-reset-email", authMiddleware.RequireAdmin(), authHandler.SendPasswordResetEmail)
+			authRoutes.POST("/send-password-reset-email", authMiddleware.RequireCapability(authz.CanAccessAdminModules), authHandler.SendPasswordResetEmail)
 			authRoutes.GET("/settings", settingsHandler.GetSettings)
 			authRoutes.POST("/kvkk", settingsHandler.SaveKvkkConsent)
 		}
@@ -375,9 +375,9 @@ func main() {
 			faqRoutes.GET("/:id", faqHandler.GetByID)
 
 			// Sadece Admin'in değiştirebileceği kısımlar
-			faqRoutes.POST("", authMiddleware.RequireAdmin(), faqHandler.Create)
-			faqRoutes.PUT("/:id", authMiddleware.RequireAdmin(), faqHandler.Update)
-			faqRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), faqHandler.Delete)
+			faqRoutes.POST("", authMiddleware.RequireCapability(authz.CanAccessAdminModules), faqHandler.Create)
+			faqRoutes.PUT("/:id", authMiddleware.RequireCapability(authz.CanAccessAdminModules), faqHandler.Update)
+			faqRoutes.DELETE("/:id", authMiddleware.RequireCapability(authz.CanAccessAdminModules), faqHandler.Delete)
 		}
 
 		// Other Requests management routes
@@ -423,11 +423,11 @@ func main() {
 		gradeRoutes := protected.Group("/grades")
 		{
 			// Admin only routes
-			gradeRoutes.GET("", authMiddleware.RequireAdmin(), gradeHandler.GetGrades)
-			gradeRoutes.GET("/:id", authMiddleware.RequireAdmin(), gradeHandler.GetGrade)
-			gradeRoutes.POST("", authMiddleware.RequireAdmin(), gradeHandler.CreateGrade)
-			gradeRoutes.PUT("/:id", authMiddleware.RequireAdmin(), gradeHandler.UpdateGrade)
-			gradeRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), gradeHandler.DeleteGrade)
+			gradeRoutes.GET("", authMiddleware.RequireCapability(authz.CanAccessAdminModules), gradeHandler.GetGrades)
+			gradeRoutes.GET("/:id", authMiddleware.RequireCapability(authz.CanAccessAdminModules), gradeHandler.GetGrade)
+			gradeRoutes.POST("", authMiddleware.RequireCapability(authz.CanAccessAdminModules), gradeHandler.CreateGrade)
+			gradeRoutes.PUT("/:id", authMiddleware.RequireCapability(authz.CanAccessAdminModules), gradeHandler.UpdateGrade)
+			gradeRoutes.DELETE("/:id", authMiddleware.RequireCapability(authz.CanAccessAdminModules), gradeHandler.DeleteGrade)
 		}
 
 		// Work Information management routes
@@ -451,11 +451,11 @@ func main() {
 			employeeGradeRoutes.GET("/me", employeeGradeHandler.GetMyEmployeeGrades)
 
 			// Admin only routes
-			employeeGradeRoutes.GET("/:id", authMiddleware.RequireAdmin(), employeeGradeHandler.GetEmployeeGradeByID)
-			employeeGradeRoutes.GET("", authMiddleware.RequireAdmin(), employeeGradeHandler.ListEmployeeGrades)
-			employeeGradeRoutes.POST("", authMiddleware.RequireAdmin(), employeeGradeHandler.CreateEmployeeGrade)
-			employeeGradeRoutes.PUT("/:id", authMiddleware.RequireAdmin(), employeeGradeHandler.UpdateEmployeeGrade)
-			employeeGradeRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), employeeGradeHandler.DeleteEmployeeGrade)
+			employeeGradeRoutes.GET("/:id", authMiddleware.RequireCapability(authz.CanAccessAdminModules), employeeGradeHandler.GetEmployeeGradeByID)
+			employeeGradeRoutes.GET("", authMiddleware.RequireCapability(authz.CanAccessAdminModules), employeeGradeHandler.ListEmployeeGrades)
+			employeeGradeRoutes.POST("", authMiddleware.RequireCapability(authz.CanAccessAdminModules), employeeGradeHandler.CreateEmployeeGrade)
+			employeeGradeRoutes.PUT("/:id", authMiddleware.RequireCapability(authz.CanAccessAdminModules), employeeGradeHandler.UpdateEmployeeGrade)
+			employeeGradeRoutes.DELETE("/:id", authMiddleware.RequireCapability(authz.CanAccessAdminModules), employeeGradeHandler.DeleteEmployeeGrade)
 		}
 
 		// Employee Contract management routes
@@ -476,11 +476,11 @@ func main() {
 		contractRoutes := protected.Group("/contracts")
 		{
 			// Admin only routes
-			contractRoutes.GET("/:id", authMiddleware.RequireAdmin(), contractHandler.GetByID)
-			contractRoutes.GET("", authMiddleware.RequireAdmin(), contractHandler.GetAll)
-			contractRoutes.POST("", authMiddleware.RequireAdmin(), contractHandler.Create)
-			contractRoutes.PUT("/:id", authMiddleware.RequireAdmin(), contractHandler.Update)
-			contractRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), contractHandler.Delete)
+			contractRoutes.GET("/:id", authMiddleware.RequireCapability(authz.CanAccessAdminModules), contractHandler.GetByID)
+			contractRoutes.GET("", authMiddleware.RequireCapability(authz.CanAccessAdminModules), contractHandler.GetAll)
+			contractRoutes.POST("", authMiddleware.RequireCapability(authz.CanAccessAdminModules), contractHandler.Create)
+			contractRoutes.PUT("/:id", authMiddleware.RequireCapability(authz.CanAccessAdminModules), contractHandler.Update)
+			contractRoutes.DELETE("/:id", authMiddleware.RequireCapability(authz.CanAccessAdminModules), contractHandler.Delete)
 		}
 
 		// Dashboard routes
@@ -512,16 +512,18 @@ func main() {
 			documentRoutes.POST("/link", documentHandler.LinkDocuments)
 		}
 
-		// Dynamic Email routes (ADMIN only)
+		// Dynamic Email routes (ADMIN, HR)
 		emailRoutes := protected.Group("/emails")
+		emailRoutes.Use(authMiddleware.RequireCapability(authz.CanAccessAdminModules))
 		{
 			emailRoutes.GET("/templates", emailHandler.ListResendTemplates)
 			emailRoutes.GET("/templates/:id/variables", emailHandler.GetTemplateVariables)
 			emailRoutes.POST("/send-template", emailHandler.SendDynamicTemplateEmail)
 		}
 
-		// Mail Configuration routes (ADMIN only)
+		// Mail Configuration routes (ADMIN, HR)
 		mailConfigRoutes := protected.Group("/mail-configs")
+		mailConfigRoutes.Use(authMiddleware.RequireCapability(authz.CanAccessAdminModules))
 		{
 			mailConfigRoutes.GET("", mailConfigHandler.GetAll)
 			mailConfigRoutes.GET("/:id", mailConfigHandler.GetByID)
@@ -578,14 +580,14 @@ func main() {
 		// Report routes (Admin only)
 		reportRoutes := protected.Group("/reports")
 		{
-			reportRoutes.GET("/work-day", authMiddleware.RequireAdmin(), reportHandler.GetWorkDayReport)
-			reportRoutes.POST("/work-day/export", authMiddleware.RequireAdmin(), reportHandler.ExportWorkDayReportExcel)
-			reportRoutes.GET("/efor", authMiddleware.RequireAdmin(), reportHandler.GetEforReport)
-			reportRoutes.GET("/grade", authMiddleware.RequireAdmin(), reportHandler.GetGradeReport)
-			reportRoutes.POST("/grade/export/excel", authMiddleware.RequireAdmin(), reportHandler.ExportGradeReportExcel)
-			reportRoutes.GET("/contract", authMiddleware.RequireAdmin(), reportHandler.GetContractReport)
-			reportRoutes.POST("/contract/export/excel", authMiddleware.RequireAdmin(), reportHandler.ExportContractReportExcel)
-			reportRoutes.POST("/email", authMiddleware.RequireAdmin(), reportHandler.SendReportEmail)
+			reportRoutes.GET("/work-day", authMiddleware.RequireCapability(authz.CanAccessAdminModules), reportHandler.GetWorkDayReport)
+			reportRoutes.POST("/work-day/export", authMiddleware.RequireCapability(authz.CanAccessAdminModules), reportHandler.ExportWorkDayReportExcel)
+			reportRoutes.GET("/efor", authMiddleware.RequireCapability(authz.CanAccessAdminModules), reportHandler.GetEforReport)
+			reportRoutes.GET("/grade", authMiddleware.RequireCapability(authz.CanAccessAdminModules), reportHandler.GetGradeReport)
+			reportRoutes.POST("/grade/export/excel", authMiddleware.RequireCapability(authz.CanAccessAdminModules), reportHandler.ExportGradeReportExcel)
+			reportRoutes.GET("/contract", authMiddleware.RequireCapability(authz.CanAccessAdminModules), reportHandler.GetContractReport)
+			reportRoutes.POST("/contract/export/excel", authMiddleware.RequireCapability(authz.CanAccessAdminModules), reportHandler.ExportContractReportExcel)
+			reportRoutes.POST("/email", authMiddleware.RequireCapability(authz.CanAccessAdminModules), reportHandler.SendReportEmail)
 		}
 
 		// Event Management routes
@@ -596,17 +598,17 @@ func main() {
 			eventRoutes.POST("/:id/participate", eventHandler.ParticipateInEvent)
 
 			// Admin only routes
-			eventRoutes.GET("", authMiddleware.RequireAdmin(), eventHandler.GetEvents)
-			eventRoutes.POST("", authMiddleware.RequireAdmin(), eventHandler.CreateEvent)
-			eventRoutes.PUT("/:id", authMiddleware.RequireAdmin(), eventHandler.UpdateEvent)
-			eventRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), eventHandler.DeleteEvent)
-			eventRoutes.POST("/:id/publish", authMiddleware.RequireAdmin(), eventHandler.PublishEvent)
-			eventRoutes.GET("/:id/participants/export", authMiddleware.RequireAdmin(), eventHandler.ExportParticipants)
+			eventRoutes.GET("", authMiddleware.RequireCapability(authz.CanAccessAdminModules), eventHandler.GetEvents)
+			eventRoutes.POST("", authMiddleware.RequireCapability(authz.CanAccessAdminModules), eventHandler.CreateEvent)
+			eventRoutes.PUT("/:id", authMiddleware.RequireCapability(authz.CanAccessAdminModules), eventHandler.UpdateEvent)
+			eventRoutes.DELETE("/:id", authMiddleware.RequireCapability(authz.CanAccessAdminModules), eventHandler.DeleteEvent)
+			eventRoutes.POST("/:id/publish", authMiddleware.RequireCapability(authz.CanAccessAdminModules), eventHandler.PublishEvent)
+			eventRoutes.GET("/:id/participants/export", authMiddleware.RequireCapability(authz.CanAccessAdminModules), eventHandler.ExportParticipants)
 		}
 
 		// Job Management routes (Admin only)
 		jobRoutes := protected.Group("/jobs")
-		jobRoutes.Use(authMiddleware.RequireAdmin())
+		jobRoutes.Use(authMiddleware.RequireCapability(authz.CanAccessAdminModules))
 		{
 			jobRoutes.GET("", jobHandler.GetJobs)
 			jobRoutes.GET("/:id", jobHandler.GetJobByID)

@@ -68,15 +68,45 @@ func TestHasCapability(t *testing.T) {
 			want:       true,
 		},
 		{
-			name:       "finance cannot manage expense types",
+			name:       "finance can manage expense types",
 			roles:      []string{domain.RoleFinance},
 			capability: CanManageExpenseTypes,
-			want:       false,
+			want:       true,
 		},
 		{
 			name:       "employee has no management capabilities",
 			roles:      []string{domain.RoleEmployee},
 			capability: CanViewLeaveManagement,
+			want:       false,
+		},
+		{
+			name:       "admin can access admin modules",
+			roles:      []string{domain.RoleAdmin},
+			capability: CanAccessAdminModules,
+			want:       true,
+		},
+		{
+			name:       "hr can access admin modules",
+			roles:      []string{domain.RoleHR},
+			capability: CanAccessAdminModules,
+			want:       true,
+		},
+		{
+			name:       "finance cannot access admin modules",
+			roles:      []string{domain.RoleFinance},
+			capability: CanAccessAdminModules,
+			want:       false,
+		},
+		{
+			name:       "employee cannot access admin modules",
+			roles:      []string{domain.RoleEmployee},
+			capability: CanAccessAdminModules,
+			want:       false,
+		},
+		{
+			name:       "hr admin modules does not imply pay",
+			roles:      []string{domain.RoleHR},
+			capability: CanPayExpense,
 			want:       false,
 		},
 		{
@@ -122,6 +152,7 @@ func TestAdminHasAllTicketCapabilities(t *testing.T) {
 		CanManageExpenseTypes,
 		CanManageOtherRequests,
 		CanManageRequestTypes,
+		CanAccessAdminModules,
 	}
 	for _, cap := range all {
 		if !HasCapability([]string{domain.RoleAdmin}, cap) {

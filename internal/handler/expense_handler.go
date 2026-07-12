@@ -794,10 +794,10 @@ func (h *ExpenseHandler) GetExpenseTypes(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageExpenseTypes) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
-			"error":   "Admin access required",
+			"error":   "Insufficient permissions",
 		})
 		return
 	}
@@ -892,10 +892,10 @@ func (h *ExpenseHandler) CreateExpenseType(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageExpenseTypes) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
-			"error":   "Admin access required",
+			"error":   "Insufficient permissions",
 		})
 		return
 	}
@@ -957,10 +957,10 @@ func (h *ExpenseHandler) UpdateExpenseType(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageExpenseTypes) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
-			"error":   "Admin access required",
+			"error":   "Insufficient permissions",
 		})
 		return
 	}
@@ -1077,10 +1077,10 @@ func (h *ExpenseHandler) DeleteExpenseType(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageExpenseTypes) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
-			"error":   "Admin access required",
+			"error":   "Insufficient permissions",
 		})
 		return
 	}

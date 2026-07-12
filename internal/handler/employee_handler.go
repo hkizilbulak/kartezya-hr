@@ -284,12 +284,8 @@ func (h *EmployeeHandler) UpdateEmployee(c *gin.Context) {
 		req.CompanyEmail = email
 	}
 
-	if err := h.employeeService.UpdateEmployee(id, req.Email, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalGap, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.GradeID, req.ContractNo, req.ProfessionStartDate, req.Note, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo, req.Status, email, requestingUserID, hasCapability(roles, authz.CanManageEmployees), req.Roles); err != nil {
-		status := http.StatusInternalServerError
-		if err.Error() == "unauthorized to update this employee profile" {
-			status = http.StatusForbidden
-		}
-		c.JSON(status, gin.H{
+	if err := h.employeeService.UpdateEmployee(id, req.Email, req.CompanyEmail, req.FirstName, req.LastName, req.Phone, req.Address, req.State, req.City, req.Gender, req.DateOfBirth, req.HireDate, req.LeaveDate, req.TotalGap, req.MaritalStatus, req.EmergencyContact, req.EmergencyContactName, req.EmergencyContactRelation, req.GradeID, req.ContractNo, req.ProfessionStartDate, req.Note, req.MotherName, req.FatherName, req.Nationality, req.IdentityNo, req.Status, email, requestingUserID, roles, req.Roles); err != nil {
+		c.JSON(mapEmployeeAuthzError(err), gin.H{
 			"success": false,
 			"error":   err.Error(),
 		})
@@ -353,8 +349,8 @@ func (h *EmployeeHandler) DeleteEmployee(c *gin.Context) {
 		return
 	}
 
-	if err := h.employeeService.DeleteEmployee(id, email, hasCapability(roles, authz.CanManageEmployees)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+	if err := h.employeeService.DeleteEmployee(id, email, roles); err != nil {
+		c.JSON(mapEmployeeAuthzError(err), gin.H{
 			"success": false,
 			"error":   err.Error(),
 		})

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"kartezya-hr/internal/authz"
 	"kartezya-hr/internal/service"
 	"kartezya-hr/internal/types"
 
@@ -59,10 +60,10 @@ func (h *EmployeeGradeHandler) CreateEmployeeGrade(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanAccessAdminModules) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
-			"error":   "Admin access required",
+			"error":   "Insufficient permissions",
 		})
 		return
 	}
@@ -74,6 +75,10 @@ func (h *EmployeeGradeHandler) CreateEmployeeGrade(c *gin.Context) {
 			"error":   "Invalid request format",
 			"details": err.Error(),
 		})
+		return
+	}
+
+	if rejectIfHRMutatingAdminEmployee(c, h.employeeService, req.EmployeeID, roles) {
 		return
 	}
 
@@ -244,10 +249,10 @@ func (h *EmployeeGradeHandler) UpdateEmployeeGrade(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanAccessAdminModules) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
-			"error":   "Admin access required",
+			"error":   "Insufficient permissions",
 		})
 		return
 	}
@@ -271,7 +276,11 @@ func (h *EmployeeGradeHandler) UpdateEmployeeGrade(c *gin.Context) {
 		return
 	}
 
-	if err := h.employeeGradeService.UpdateEmployeeGrade(id, req.EmployeeID, req.GradeID, req.StartDate, req.EndDate, email, requestingUserID, isAdmin(roles)); err != nil {
+	if rejectIfHRMutatingAdminEmployee(c, h.employeeService, req.EmployeeID, roles) {
+		return
+	}
+
+	if err := h.employeeGradeService.UpdateEmployeeGrade(id, req.EmployeeID, req.GradeID, req.StartDate, req.EndDate, email, requestingUserID, hasCapability(roles, authz.CanAccessAdminModules)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   err.Error(),
@@ -318,10 +327,10 @@ func (h *EmployeeGradeHandler) DeleteEmployeeGrade(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanAccessAdminModules) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
-			"error":   "Admin access required",
+			"error":   "Insufficient permissions",
 		})
 		return
 	}
@@ -332,6 +341,18 @@ func (h *EmployeeGradeHandler) DeleteEmployeeGrade(c *gin.Context) {
 			"success": false,
 			"error":   "Invalid employee grade ID",
 		})
+		return
+	}
+
+	existing, err := h.employeeGradeService.GetEmployeeGradeByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+	if rejectIfHRMutatingAdminEmployee(c, h.employeeService, existing.Employee.ID, roles) {
 		return
 	}
 
