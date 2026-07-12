@@ -438,6 +438,11 @@ func (h *EmployeeHandler) ListEmployees(c *gin.Context) {
 		filters["company"] = company
 	}
 
+	// City / il filter
+	if city, ok := normalizeTextFilter(c.Query("city")); ok {
+		filters["city"] = city
+	}
+
 	if department, ok := normalizeTextFilter(c.Query("department")); ok {
 		filters["department"] = department
 	}

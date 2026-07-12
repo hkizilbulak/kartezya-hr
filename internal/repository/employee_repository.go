@@ -314,6 +314,14 @@ func (r *employeeRepository) GetAllWithFilters(limit, offset int, sortParams typ
 			query = query.Where(fmt.Sprintf("%s.grade_id = ?", domain.GetTableName("hr_employees")), gradeID)
 		}
 
+		// City filter (il)
+		if city, ok := filters["city"]; ok {
+			cityFilter := normalizedLikePattern(city)
+			if cityFilter != "" {
+				query = query.Where(fmt.Sprintf("LOWER(%s.city) LIKE LOWER(?)", domain.GetTableName("hr_employees")), cityFilter)
+			}
+		}
+
 	}
 	// Log the final SQL query using GORM's Statement.SQL.String()
 	sql := query.Statement.SQL.String()
@@ -445,6 +453,14 @@ func (r *employeeRepository) GetAllWithFilters(limit, offset int, sortParams typ
 		}
 		if gradeID, ok := filters["grade_id"]; ok {
 			countQuery = countQuery.Where(fmt.Sprintf("%s.grade_id = ?", domain.GetTableName("hr_employees")), gradeID)
+		}
+
+		// City filter (il) for count query
+		if city, ok := filters["city"]; ok {
+			cityFilter := normalizedLikePattern(city)
+			if cityFilter != "" {
+				countQuery = countQuery.Where(fmt.Sprintf("LOWER(%s.city) LIKE LOWER(?)", domain.GetTableName("hr_employees")), cityFilter)
+			}
 		}
 	}
 
