@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/types"
 
@@ -89,51 +90,80 @@ func (r *expenseRepository) GetAll(employeeID *uint, page, limit int, sortParams
 	var expenses []*domain.ExpenseRequest
 	var total int64
 
-	query := r.db.Preload("Employee").Preload("ExpenseType").Preload("Approver").
-		Where("deleted = ?", false)
+	expTable := domain.GetTableName("hr_expense_requests")
 
-	// Filter by employee
-	if employeeID != nil {
-		query = query.Where("employee_id = ?", *employeeID)
+	countQuery := applyExpenseRequestListFilters(r.db.Model(&domain.ExpenseRequest{}), expTable, employeeID, status, expenseTypeID, startDate, endDate)
+	if err := countQuery.Count(&total).Error; err != nil {
+		return nil, 0, err
 	}
 
-	// Filter by status
-	if status != "" {
-		query = query.Where("status = ?", status)
-	}
+	query := applyExpenseRequestListFilters(
+		r.db.Model(&domain.ExpenseRequest{}).
+			Preload("Employee").
+			Preload("ExpenseType").
+			Preload("Approver"),
+		expTable, employeeID, status, expenseTypeID, startDate, endDate,
+	)
 
-	if expenseTypeID != nil {
-		query = query.Where("expense_type_id = ?", *expenseTypeID)
+	orderClause, needsEmployeeJoin, needsTypeJoin := buildExpenseRequestOrderClause(sortParams.Sort, sortParams.Direction)
+	if needsEmployeeJoin {
+		empTable := domain.GetTableName("hr_employees")
+		query = query.Joins(fmt.Sprintf("LEFT JOIN %s ON %s.id = %s.employee_id", empTable, empTable, expTable))
 	}
-	if startDate != nil && *startDate != "" {
-		query = query.Where("expense_date >= ?", *startDate)
+	if needsTypeJoin {
+		typeTable := domain.GetTableName("hr_expense_types")
+		query = query.Joins(fmt.Sprintf("LEFT JOIN %s ON %s.id = %s.expense_type_id", typeTable, typeTable, expTable))
 	}
-	if endDate != nil && *endDate != "" {
-		// Include full day
-		query = query.Where("expense_date <= ?", *endDate+" 23:59:59")
-	}
+	query = query.Order(orderClause)
 
-	// Count total
-	query.Model(&domain.ExpenseRequest{}).Count(&total)
-
-	// Apply sorting
-	if sortParams.Sort != "" {
-		orderClause := sortParams.Sort
-		if sortParams.Direction == "DESC" {
-			orderClause += " DESC"
-		} else {
-			orderClause += " ASC"
-		}
-		query = query.Order(orderClause)
-	} else {
-		query = query.Order("created_at DESC")
-	}
-
-	// Apply pagination
+	// Apply pagination after ORDER BY
 	offset := (page - 1) * limit
 	err := query.Limit(limit).Offset(offset).Find(&expenses).Error
 
 	return expenses, total, err
+}
+
+// applyExpenseRequestListFilters qualifies main-table columns so employee/type joins
+// cannot make shared names (deleted, status, id, …) ambiguous under PostgreSQL.
+func applyExpenseRequestListFilters(
+	q *gorm.DB,
+	expTable string,
+	employeeID *uint,
+	status string,
+	expenseTypeID *uint,
+	startDate *string,
+	endDate *string,
+) *gorm.DB {
+	q = q.Where(fmt.Sprintf("%s.deleted = ?", expTable), false)
+	if employeeID != nil {
+		q = q.Where(fmt.Sprintf("%s.employee_id = ?", expTable), *employeeID)
+	}
+	if status != "" {
+		q = q.Where(fmt.Sprintf("%s.status = ?", expTable), status)
+	}
+	if expenseTypeID != nil {
+		q = q.Where(fmt.Sprintf("%s.expense_type_id = ?", expTable), *expenseTypeID)
+	}
+	if startDate != nil && *startDate != "" {
+		q = q.Where(fmt.Sprintf("%s.expense_date >= ?", expTable), *startDate)
+	}
+	if endDate != nil && *endDate != "" {
+		q = q.Where(fmt.Sprintf("%s.expense_date <= ?", expTable), *endDate+" 23:59:59")
+	}
+	return q
+}
+
+// expenseRequestListFilterExpressions returns the qualified WHERE expressions used by GetAll.
+// Tests assert shared columns stay table-qualified for joined sorts.
+func expenseRequestListFilterExpressions(expTable string) []string {
+	return []string{
+		fmt.Sprintf("%s.deleted = ?", expTable),
+		fmt.Sprintf("%s.employee_id = ?", expTable),
+		fmt.Sprintf("%s.status = ?", expTable),
+		fmt.Sprintf("%s.expense_type_id = ?", expTable),
+		fmt.Sprintf("%s.expense_date >= ?", expTable),
+		fmt.Sprintf("%s.expense_date <= ?", expTable),
+	}
 }
 
 func (r *expenseRepository) Update(expense *domain.ExpenseRequest) error {
@@ -169,29 +199,25 @@ func (r *expenseTypeRepository) GetAll(limit, offset int, sortParams types.SortP
 	var expenseTypes []*domain.ExpenseType
 	var total int64
 
-	query := r.db.Where("deleted = ?", false)
+	etTable := domain.GetTableName("hr_expense_types")
+	query := r.db.Model(&domain.ExpenseType{}).Where(fmt.Sprintf("%s.deleted = ?", etTable), false)
 
 	if roleID != nil {
-		query = query.Where("role_id = ? OR role_id IS NULL", *roleID)
+		query = query.Where(fmt.Sprintf("%s.role_id = ? OR %s.role_id IS NULL", etTable, etTable), *roleID)
 	}
 
-	// Count total
-	query.Model(&domain.ExpenseType{}).Count(&total)
-
-	// Apply sorting
-	if sortParams.Sort != "" {
-		orderClause := sortParams.Sort
-		if sortParams.Direction == "DESC" {
-			orderClause += " DESC"
-		} else {
-			orderClause += " ASC"
-		}
-		query = query.Order(orderClause)
-	} else {
-		query = query.Order("name ASC")
+	// Count total before optional role join used only for sorting
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
 	}
 
-	// Apply pagination if limit > 0
+	orderClause, needsRoleJoin := buildExpenseTypeOrderClause(sortParams.Sort, sortParams.Direction)
+	if needsRoleJoin {
+		rolesTable := domain.GetTableName("hr_roles")
+		query = query.Joins(fmt.Sprintf("LEFT JOIN %s ON %s.id = %s.role_id", rolesTable, rolesTable, etTable))
+	}
+	query = query.Order(orderClause)
+
 	if limit > 0 {
 		query = query.Limit(limit).Offset(offset)
 	}

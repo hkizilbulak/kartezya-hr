@@ -6,6 +6,7 @@ import (
 
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/service"
+	"kartezya-hr/internal/types"
 
 	"github.com/gin-gonic/gin"
 )
@@ -189,21 +190,12 @@ func (h *DocumentHandler) GetRelatedDocuments(c *gin.Context) {
 		rolesSlice = rolesList
 	}
 
-	attachments, err := h.documentService.GetRelatedDocuments(
-		domain.AttachmentRelatedType(relatedTypeInt),
-		uint(relatedID),
-		userID.(uint),
-		rolesSlice,
-	)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve documents"})
-		return
-	}
-
 	limitStr := c.DefaultQuery("limit", "100")
 	pageStr := c.DefaultQuery("page", "1")
-	sortStr := c.DefaultQuery("sort", "created_at")
-	directionStr := c.DefaultQuery("direction", "DESC")
+	sortParams := types.SortParams{
+		Sort:      c.DefaultQuery("sort", "created_at"),
+		Direction: types.NormalizeSortDirection(c.DefaultQuery("direction", "DESC"), "DESC"),
+	}
 
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil || limit <= 0 {
@@ -215,9 +207,19 @@ func (h *DocumentHandler) GetRelatedDocuments(c *gin.Context) {
 		page = 1
 	}
 
-	// Calculate pagination offsets if using paginated DB query,
-	// but since GetRelatedDocuments currently returns all mapped
-	// documents, we'll manually slice the array to simulate pagination.
+	attachments, err := h.documentService.GetRelatedDocumentsOrdered(
+		domain.AttachmentRelatedType(relatedTypeInt),
+		uint(relatedID),
+		userID.(uint),
+		rolesSlice,
+		sortParams,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve documents"})
+		return
+	}
+
+	// Auth-filtered full ordered set; slice for response pagination.
 	total := len(attachments)
 	totalPages := 1
 	if limit > 0 {
@@ -243,8 +245,8 @@ func (h *DocumentHandler) GetRelatedDocuments(c *gin.Context) {
 			"page":        page,
 			"limit":       limit,
 			"total_pages": totalPages,
-			"sort":        sortStr,
-			"direction":   directionStr,
+			"sort":        sortParams.Sort,
+			"direction":   sortParams.Direction,
 		},
 	})
 }
@@ -324,17 +326,12 @@ func (h *DocumentHandler) GetUserDocuments(c *gin.Context) {
 		return
 	}
 
-	attachments, err := h.documentService.GetUserDocuments(uint(ownerID))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve documents"})
-		return
-	}
-
-	// Handle pagination and sort from query params
 	pageStr := c.DefaultQuery("page", "1")
-	limitStr := c.DefaultQuery("limit", "10")
-	sort := c.DefaultQuery("sort", "id")
-	direction := c.DefaultQuery("direction", "ASC")
+	limitStr := c.DefaultQuery("limit", "100")
+	sortParams := types.SortParams{
+		Sort:      c.DefaultQuery("sort", "created_at"),
+		Direction: types.NormalizeSortDirection(c.DefaultQuery("direction", "DESC"), "DESC"),
+	}
 
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil || limit <= 0 {
@@ -346,33 +343,26 @@ func (h *DocumentHandler) GetUserDocuments(c *gin.Context) {
 		page = 1
 	}
 
-	total := len(attachments)
+	attachments, total, err := h.documentService.GetUserDocumentsPaginated(uint(ownerID), page, limit, sortParams)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve documents"})
+		return
+	}
+
 	totalPages := 1
 	if limit > 0 {
-		totalPages = (total + limit - 1) / limit
+		totalPages = int((total + int64(limit) - 1) / int64(limit))
 	}
-
-	startIndex := (page - 1) * limit
-	endIndex := startIndex + limit
-
-	if startIndex > total {
-		startIndex = total
-	}
-	if endIndex > total {
-		endIndex = total
-	}
-
-	paginatedAttachments := append([]domain.Attachment(nil), attachments[startIndex:endIndex]...)
 
 	c.JSON(http.StatusOK, gin.H{
-		"data": paginatedAttachments,
+		"data": attachments,
 		"page": gin.H{
 			"total":       total,
 			"page":        page,
 			"limit":       limit,
 			"total_pages": totalPages,
-			"sort":        sort,
-			"direction":   direction,
+			"sort":        sortParams.Sort,
+			"direction":   sortParams.Direction,
 		},
 	})
 }

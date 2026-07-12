@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"time"
 
 	"kartezya-hr/internal/domain"
@@ -16,7 +17,7 @@ type LeaveRepository interface {
 	GetAll(limit, offset int, sortParams types.SortParams) ([]*domain.LeaveRequest, int64, error)
 	GetByEmployeeIDWithLeaveType(employeeID uint, limit, offset int, sortParams types.SortParams) ([]*domain.LeaveRequest, int64, error)
 	GetByEmployeeIDWithLeaveTypeAndStatus(employeeID uint, limit, offset int, sortParams types.SortParams, status string) ([]*domain.LeaveRequest, int64, error)
-	GetAllWithStatus(employeeID *uint, limit, offset int, sortParams types.SortParams, status string, leaveTypeID *uint, startDate *string, endDate *string) ([]*domain.LeaveRequest, int64, error)
+	GetAllWithStatus(employeeID *uint, limit, offset int, sortParams types.SortParams, status string, leaveTypeID *uint, startDate *string, endDate *string, listGroup string) ([]*domain.LeaveRequest, int64, error)
 	Update(leave *domain.LeaveRequest) error
 	Delete(id uint) error
 	GetByEmployeeID(employeeID uint, sortBy string, sortDir types.SortDirection) ([]*domain.LeaveRequest, error)
@@ -229,66 +230,59 @@ func (r *leaveRepository) GetByDateRange(startDate, endDate string) ([]*domain.L
 	return leaves, err
 }
 
-func (r *leaveRepository) GetAllWithStatus(employeeID *uint, limit, offset int, sortParams types.SortParams, status string, leaveTypeID *uint, startDate *string, endDate *string) ([]*domain.LeaveRequest, int64, error) {
+func (r *leaveRepository) GetAllWithStatus(employeeID *uint, limit, offset int, sortParams types.SortParams, status string, leaveTypeID *uint, startDate *string, endDate *string, listGroup string) ([]*domain.LeaveRequest, int64, error) {
 	var leaves []*domain.LeaveRequest
 	var total int64
 
-	// Build query with status filter if provided
-	query := r.db.Model(&domain.LeaveRequest{}).Where("deleted = ?", false)
-	if status != "" {
-		query = query.Where("status = ?", status)
-	}
-	if employeeID != nil {
-		query = query.Where("employee_id = ?", *employeeID)
-	}
-	if leaveTypeID != nil {
-		query = query.Where("leave_type_id = ?", *leaveTypeID)
-	}
-	if startDate != nil && *startDate != "" {
-		query = query.Where("start_date >= ?", *startDate)
-	}
-	if endDate != nil && *endDate != "" {
-		// Append time to end_date to include the full day
-		query = query.Where("start_date <= ?", *endDate+" 23:59:59")
+	lrTable := domain.GetTableName("hr_leave_requests")
+
+	applyFilters := func(q *gorm.DB) *gorm.DB {
+		q = q.Where(fmt.Sprintf("%s.deleted = ?", lrTable), false)
+		if clause, args, ok := buildLeaveListGroupClause(listGroup, lrTable); ok {
+			q = q.Where(clause, args...)
+		}
+		if status != "" {
+			q = q.Where(fmt.Sprintf("%s.status = ?", lrTable), status)
+		}
+		if employeeID != nil {
+			q = q.Where(fmt.Sprintf("%s.employee_id = ?", lrTable), *employeeID)
+		}
+		if leaveTypeID != nil {
+			q = q.Where(fmt.Sprintf("%s.leave_type_id = ?", lrTable), *leaveTypeID)
+		}
+		if startDate != nil && *startDate != "" {
+			q = q.Where(fmt.Sprintf("%s.start_date >= ?", lrTable), *startDate)
+		}
+		if endDate != nil && *endDate != "" {
+			q = q.Where(fmt.Sprintf("%s.start_date <= ?", lrTable), *endDate+" 23:59:59")
+		}
+		return q
 	}
 
-	// Count total records
-	if err := query.Count(&total).Error; err != nil {
+	countQuery := applyFilters(r.db.Model(&domain.LeaveRequest{}))
+	if err := countQuery.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
-	// Build main query with preloads
-	mainQuery := r.db.Preload("Employee").Preload("LeaveType").Preload("Approver").Preload("Approver.Employee").Where("deleted = ?", false)
-	if status != "" {
-		mainQuery = mainQuery.Where("status = ?", status)
-	}
-	if employeeID != nil {
-		mainQuery = mainQuery.Where("employee_id = ?", *employeeID)
-	}
-	if leaveTypeID != nil {
-		mainQuery = mainQuery.Where("leave_type_id = ?", *leaveTypeID)
-	}
-	if startDate != nil && *startDate != "" {
-		mainQuery = mainQuery.Where("start_date >= ?", *startDate)
-	}
-	if endDate != nil && *endDate != "" {
-		mainQuery = mainQuery.Where("start_date <= ?", *endDate+" 23:59:59")
-	}
+	mainQuery := applyFilters(
+		r.db.Model(&domain.LeaveRequest{}).
+			Preload("Employee").
+			Preload("LeaveType").
+			Preload("Approver").
+			Preload("Approver.Employee"),
+	)
 
-	// Apply sorting
-	if sortParams.Sort != "" {
-		orderClause := sortParams.Sort
-		if sortParams.Direction == "DESC" {
-			orderClause += " DESC"
-		} else {
-			orderClause += " ASC"
-		}
-		mainQuery = mainQuery.Order(orderClause)
-	} else {
-		mainQuery = mainQuery.Order("id ASC")
+	orderClause, needsEmployeeJoin, needsTypeJoin := buildLeaveRequestOrderClause(sortParams.Sort, sortParams.Direction)
+	if needsEmployeeJoin {
+		empTable := domain.GetTableName("hr_employees")
+		mainQuery = mainQuery.Joins(fmt.Sprintf("LEFT JOIN %s ON %s.id = %s.employee_id", empTable, empTable, lrTable))
 	}
+	if needsTypeJoin {
+		typeTable := domain.GetTableName("hr_leave_types")
+		mainQuery = mainQuery.Joins(fmt.Sprintf("LEFT JOIN %s ON %s.id = %s.leave_type_id", typeTable, typeTable, lrTable))
+	}
+	mainQuery = mainQuery.Order(orderClause)
 
-	// Apply pagination
 	if limit > 0 {
 		mainQuery = mainQuery.Limit(limit)
 	}
@@ -385,23 +379,10 @@ func (r *leaveTypeRepository) GetAll(limit, offset int, sortParams types.SortPar
 		return nil, 0, err
 	}
 
-	// Build main query
-	query := r.db.Where("deleted = ?", false)
+	// Build main query — allowlisted ORDER BY before LIMIT/OFFSET
+	query := r.db.Where("deleted = ?", false).
+		Order(buildLeaveTypeOrderClause(sortParams.Sort, sortParams.Direction))
 
-	// Apply sorting
-	if sortParams.Sort != "" {
-		orderClause := sortParams.Sort
-		if sortParams.Direction == "DESC" {
-			orderClause += " DESC"
-		} else {
-			orderClause += " ASC"
-		}
-		query = query.Order(orderClause)
-	} else {
-		query = query.Order("id ASC")
-	}
-
-	// Apply pagination
 	if limit > 0 {
 		query = query.Limit(limit)
 	}

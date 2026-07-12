@@ -121,32 +121,8 @@ func (r *employeeRepository) GetAll(limit, offset int, sortParams types.SortPara
 	var employees []*domain.Employee
 	var total int64
 
-	// Validate and sanitize sort field
-	validSortFields := map[string]bool{
-		"id":            true,
-		"user_id":       true,
-		"employee_id":   true,
-		"first_name":    true,
-		"last_name":     true,
-		"phone":         true,
-		"address":       true,
-		"date_of_birth": true,
-		"hire_date":     true,
-		"created_at":    true,
-		"updated_at":    true,
-	}
-
-	sortField := "id"
-	if validSortFields[sortParams.Sort] {
-		sortField = sortParams.Sort
-	}
-
-	direction := "ASC"
-	if sortParams.Direction == "DESC" {
-		direction = "DESC"
-	}
-
-	orderBy := fmt.Sprintf("%s %s", sortField, direction)
+	// Validate and sanitize sort field using shared employee list allowlist
+	orderBy := buildEmployeeListOrderClause(sortParams.Sort, sortParams.Direction)
 
 	// Count total records
 	r.db.Model(&domain.Employee{}).Where("deleted = ?", false).Count(&total)
@@ -467,36 +443,13 @@ func (r *employeeRepository) GetAllWithFilters(limit, offset int, sortParams typ
 	// Get the count
 	countQuery.Count(&total)
 
-	// Validate and sanitize sort field
-	validSortFields := map[string]bool{
-		"id":            true,
-		"user_id":       true,
-		"employee_id":   true,
-		"first_name":    true,
-		"last_name":     true,
-		"phone":         true,
-		"address":       true,
-		"date_of_birth": true,
-		"hire_date":     true,
-		"created_at":    true,
-		"updated_at":    true,
-	}
+	orderBy := buildEmployeeListOrderClause(sortParams.Sort, sortParams.Direction)
 
-	sortField := "id"
-	if validSortFields[sortParams.Sort] {
-		sortField = sortParams.Sort
-	}
-
-	direction := "ASC"
-	if sortParams.Direction == "DESC" {
-		direction = "DESC"
-	}
-
-	orderBy := fmt.Sprintf("%s.%s %s", domain.GetTableName("hr_employees"), sortField, direction)
-
-	// Get paginated records with sorting and preloading
+	// GROUP BY primary key collapses duplicate rows from filter JOINs while still
+	// allowing ORDER BY correlated display-field subqueries (unlike SELECT DISTINCT).
 	err := query.Preload("User").
-		Select(fmt.Sprintf("DISTINCT %s.*", domain.GetTableName("hr_employees"))).
+		Select(fmt.Sprintf("%s.*", domain.GetTableName("hr_employees"))).
+		Group(fmt.Sprintf("%s.id", domain.GetTableName("hr_employees"))).
 		Order(orderBy).
 		Limit(limit).
 		Offset(offset).

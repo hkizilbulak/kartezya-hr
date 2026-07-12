@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"fmt"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/types"
 
@@ -55,29 +54,7 @@ func (r *companyRepository) GetAll(limit, offset int, sortParams types.SortParam
 	var companies []*domain.Company
 	var total int64
 
-	// Validate and sanitize sort field
-	validSortFields := map[string]bool{
-		"id":         true,
-		"name":       true,
-		"address":    true,
-		"phone":      true,
-		"email":      true,
-		"website":    true,
-		"created_at": true,
-		"updated_at": true,
-	}
-
-	sortField := "id"
-	if validSortFields[sortParams.Sort] {
-		sortField = sortParams.Sort
-	}
-
-	direction := "ASC"
-	if sortParams.Direction == "DESC" {
-		direction = "DESC"
-	}
-
-	orderBy := fmt.Sprintf("%s %s", sortField, direction)
+	orderBy := buildCompanyOrderClause(sortParams.Sort, sortParams.Direction)
 
 	// Count total records
 	r.db.Model(&domain.Company{}).Where("deleted = ?", false).Count(&total)

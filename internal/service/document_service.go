@@ -14,6 +14,7 @@ import (
 	"kartezya-hr/internal/config"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/repository"
+	"kartezya-hr/internal/types"
 )
 
 // StorageProvider defines interface for file storage (S3, Azure Blob, Local, etc.)
@@ -30,7 +31,9 @@ type DocumentService interface {
 	GetDocument(id string, userID uint, roles []string) (*domain.Attachment, error)
 	GetDocumentURL(id string, userID uint, roles []string, expiryMinutes int) (string, error)
 	GetUserDocuments(ownerID uint) ([]domain.Attachment, error)
+	GetUserDocumentsPaginated(ownerID uint, page, limit int, sortParams types.SortParams) ([]domain.Attachment, int64, error)
 	GetRelatedDocuments(relatedType domain.AttachmentRelatedType, relatedID uint, userID uint, roles []string) ([]domain.Attachment, error)
+	GetRelatedDocumentsOrdered(relatedType domain.AttachmentRelatedType, relatedID uint, userID uint, roles []string, sortParams types.SortParams) ([]domain.Attachment, error)
 	LinkDocumentsToRecord(documentIDs []string, relatedType domain.AttachmentRelatedType, relatedID uint, ownerID uint) error
 	DeleteDocument(id string, userID uint, roles []string) error
 	CleanupTemporaryFiles(hoursOld int) (int, error)
@@ -177,14 +180,30 @@ func (s *documentService) GetUserDocuments(ownerID uint) ([]domain.Attachment, e
 	return s.repo.FindByOwnerID(ownerID)
 }
 
+// GetUserDocumentsPaginated retrieves owner documents with DB ordering before LIMIT/OFFSET.
+func (s *documentService) GetUserDocumentsPaginated(ownerID uint, page, limit int, sortParams types.SortParams) ([]domain.Attachment, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	offset := (page - 1) * limit
+	return s.repo.FindByOwnerIDPaginated(ownerID, limit, offset, sortParams)
+}
+
 // GetRelatedDocuments retrieves documents linked to a specific record with authorization
 func (s *documentService) GetRelatedDocuments(relatedType domain.AttachmentRelatedType, relatedID uint, userID uint, roles []string) ([]domain.Attachment, error) {
-	attachments, err := s.repo.FindByRelatedRecord(relatedType, relatedID)
+	return s.GetRelatedDocumentsOrdered(relatedType, relatedID, userID, roles, types.SortParams{Sort: "created_at", Direction: "DESC"})
+}
+
+// GetRelatedDocumentsOrdered loads related docs with allowlisted ORDER BY, then applies auth filter.
+func (s *documentService) GetRelatedDocumentsOrdered(relatedType domain.AttachmentRelatedType, relatedID uint, userID uint, roles []string, sortParams types.SortParams) ([]domain.Attachment, error) {
+	attachments, err := s.repo.FindByRelatedRecordOrdered(relatedType, relatedID, sortParams)
 	if err != nil {
 		return nil, err
 	}
 
-	// Filter by authorization
 	authorized := []domain.Attachment{}
 	for _, att := range attachments {
 		if s.canAccessDocument(&att, userID, roles) {
@@ -339,8 +358,8 @@ func GenerateStoragePath(relatedType domain.AttachmentRelatedType, filename stri
 		folder = "employee"
 	case domain.AttachmentRelatedTypeContract:
 		folder = "contract"
-	case domain.AttachmentRelatedTypeOtherRequest: 
-    folder = "other_requests"	
+	case domain.AttachmentRelatedTypeOtherRequest:
+		folder = "other_requests"
 	}
 
 	// Get file extension

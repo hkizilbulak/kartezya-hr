@@ -63,19 +63,8 @@ func (r *jobRepository) GetByKey(key string) (*domain.Job, error) {
 
 func (r *jobRepository) GetAll(sortParams types.SortParams) ([]domain.Job, error) {
 	var jobs []domain.Job
-	query := r.db.Model(&domain.Job{})
-
-	if sortParams.Sort != "" {
-		orderClause := sortParams.Sort
-		if sortParams.Direction == "DESC" {
-			orderClause += " DESC"
-		} else {
-			orderClause += " ASC"
-		}
-		query = query.Order(orderClause)
-	} else {
-		query = query.Order("id ASC")
-	}
+	query := r.db.Model(&domain.Job{}).
+		Order(buildJobOrderClause(sortParams.Sort, sortParams.Direction))
 
 	if err := query.Find(&jobs).Error; err != nil {
 		return nil, err

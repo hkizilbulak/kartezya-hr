@@ -2,9 +2,9 @@ package repository
 
 import (
 	"fmt"
-	"log"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/types"
+	"log"
 
 	"gorm.io/gorm"
 )
@@ -55,13 +55,15 @@ func (r *otherRequestRepository) GetAllRequestTypes(limit, offset int, sortParam
 	query := r.db.Model(&domain.RequestType{}).Where("deleted = ?", false)
 	query.Count(&total)
 
-	allowedSort := []string{"created_at", "name", "id", "status"}
-	safeSort := sanitizeSort(sortParams.Sort, allowedSort)
-	
-	orderDir := "ASC"
-	if sortParams.Direction == "DESC" {
-		orderDir = "DESC"
+	allowedSort := map[string]bool{
+		"created_at":  true,
+		"name":        true,
+		"id":          true,
+		"description": true,
+		"active":      true,
 	}
+	safeSort := types.AllowedSortOrDefault(sortParams.Sort, allowedSort, "created_at")
+	orderDir := types.NormalizeSortDirection(sortParams.Direction, "ASC")
 	query = query.Order(safeSort + " " + orderDir)
 
 	if limit > 0 {
@@ -71,7 +73,6 @@ func (r *otherRequestRepository) GetAllRequestTypes(limit, offset int, sortParam
 	err := query.Find(&reqTypes).Error
 	return reqTypes, total, err
 }
-
 
 func (r *otherRequestRepository) UpdateRequestType(reqType *domain.RequestType, modifiedBy string) error {
 	return r.db.Model(reqType).Updates(map[string]interface{}{
@@ -137,57 +138,62 @@ func (r *otherRequestRepository) GetRequestsByUserID(userID uint) ([]*domain.Oth
 }
 
 func (r *otherRequestRepository) GetAllRequests(filterEmployeeID *uint, limit, offset int, sortParams types.SortParams) ([]*domain.OtherRequest, int64, error) {
-    var reqs []*domain.OtherRequest
-    var total int64
+	var reqs []*domain.OtherRequest
+	var total int64
 
-    query := r.db.Model(&domain.OtherRequest{}).
-        Preload("Employee").
-        Preload("RequestType").
-        Preload("Attachments").
-        Where("deleted = ?", false)
+	reqTable := domain.GetTableName("hr_other_requests")
 
-    if filterEmployeeID != nil {
-        query = query.Where("employee_id = ?", *filterEmployeeID)
-    }
+	query := r.db.Model(&domain.OtherRequest{}).
+		Preload("Employee").
+		Preload("RequestType").
+		Preload("Attachments").
+		Where(fmt.Sprintf("%s.deleted = ?", reqTable), false)
 
-    if err := query.Count(&total).Error; err != nil {
-        log.Printf("ERROR: Count query failed: %v", err)
-        return nil, 0, err
-    }
+	if filterEmployeeID != nil {
+		query = query.Where(fmt.Sprintf("%s.employee_id = ?", reqTable), *filterEmployeeID)
+	}
 
-    allowedSort := []string{"created_at", "id"}
-    safeSort := sanitizeSort(sortParams.Sort, allowedSort)
-    orderDir := "ASC"
-    if sortParams.Direction == "DESC" {
-        orderDir = "DESC"
-    }
-    query = query.Order(safeSort + " " + orderDir)
+	if err := query.Count(&total).Error; err != nil {
+		log.Printf("ERROR: Count query failed: %v", err)
+		return nil, 0, err
+	}
 
-    if limit > 0 {
-        query = query.Limit(limit).Offset(offset)
-    }
+	orderClause, needsEmployeeJoin, needsTypeJoin := buildOtherRequestOrderClause(sortParams.Sort, sortParams.Direction)
+	if needsEmployeeJoin {
+		empTable := domain.GetTableName("hr_employees")
+		query = query.Joins(fmt.Sprintf("LEFT JOIN %s ON %s.id = %s.employee_id", empTable, empTable, reqTable))
+	}
+	if needsTypeJoin {
+		typeTable := domain.GetTableName("hr_request_types")
+		query = query.Joins(fmt.Sprintf("LEFT JOIN %s ON %s.id = %s.request_type_id", typeTable, typeTable, reqTable))
+	}
+	query = query.Order(orderClause)
 
-    err := query.Find(&reqs).Error
-    if err != nil {
-        log.Printf("ERROR: Find query failed: %v", err)
-        return nil, 0, err
-    }
+	if limit > 0 {
+		query = query.Limit(limit).Offset(offset)
+	}
 
-    log.Printf("DEBUG: GetAllRequests - Bulunan: %d, Toplam: %d", len(reqs), total)
-    return reqs, total, nil
+	err := query.Find(&reqs).Error
+	if err != nil {
+		log.Printf("ERROR: Find query failed: %v", err)
+		return nil, 0, err
+	}
+
+	log.Printf("DEBUG: GetAllRequests - Bulunan: %d, Toplam: %d", len(reqs), total)
+	return reqs, total, nil
 }
 
 func (r *otherRequestRepository) UpdateRequest(req *domain.OtherRequest, modifiedBy string) error {
-    return r.db.Model(&domain.OtherRequest{}).
-        Where("id = ?", req.ID).
-        Updates(map[string]interface{}{
-            "request_type_id": req.RequestTypeID,
-            "description":     req.Description,
-            "status":          req.Status,
-            "completed_by":    req.CompletedBy,
-            "completed_at":    req.CompletedAt,
-            "modified_by":     modifiedBy,
-        }).Error
+	return r.db.Model(&domain.OtherRequest{}).
+		Where("id = ?", req.ID).
+		Updates(map[string]interface{}{
+			"request_type_id": req.RequestTypeID,
+			"description":     req.Description,
+			"status":          req.Status,
+			"completed_by":    req.CompletedBy,
+			"completed_at":    req.CompletedAt,
+			"modified_by":     modifiedBy,
+		}).Error
 }
 
 func (r *otherRequestRepository) CancelRequest(id uint, deletedBy string) error {
@@ -197,13 +203,4 @@ func (r *otherRequestRepository) CancelRequest(id uint, deletedBy string) error 
 			"status":      domain.RequestStatusCancelled,
 			"modified_by": deletedBy,
 		}).Error
-}
-
-func sanitizeSort(sortField string, allowedFields []string) string {
-	for _, field := range allowedFields {
-		if field == sortField {
-			return sortField
-		}
-	}
-	return "created_at" 
 }
