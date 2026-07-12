@@ -769,7 +769,7 @@ func (h *LeaveHandler) GetMyLeaveRequests(c *gin.Context) {
 	// Parse sorting parameters
 	sortParams := types.SortParams{
 		Sort:      c.DefaultQuery("sort", "created_at"),
-		Direction: c.DefaultQuery("direction", "DESC"),
+		Direction: types.NormalizeSortDirection(c.DefaultQuery("direction", "DESC"), "DESC"),
 	}
 
 	result, err := h.leaveService.GetMyLeaveRequestsPaginated(userID, page, limit, sortParams, status, leaveTypeID, startDate, endDate)
@@ -859,10 +859,11 @@ func (h *LeaveHandler) GetAllLeaveRequests(c *gin.Context) {
 	// Parse sorting parameters
 	sortParams := types.SortParams{
 		Sort:      c.DefaultQuery("sort", "created_at"),
-		Direction: c.DefaultQuery("direction", "DESC"),
+		Direction: types.NormalizeSortDirection(c.DefaultQuery("direction", "DESC"), "DESC"),
 	}
+	listGroup := c.Query("list_group") // optional: pending | completed
 
-	result, err := h.leaveService.GetAllLeaveRequestsPaginated(empIDPtr, page, limit, sortParams, status, leaveTypeID, startDate, endDate)
+	result, err := h.leaveService.GetAllLeaveRequestsPaginated(empIDPtr, page, limit, sortParams, status, leaveTypeID, startDate, endDate, listGroup)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,

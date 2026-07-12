@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"fmt"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/types"
 
@@ -43,30 +42,10 @@ func (r *faqRepository) GetAll(limit, offset int, sortParams types.SortParams) (
 	var faqs []*domain.FAQ
 	var total int64
 
-	sortField := "created_at"
-	direction := "DESC"
-
-	if sortParams.Direction == "ASC" {
-		direction = "ASC"
-	}
-
-	if sortParams.Sort != "" {
-		switch sortParams.Sort {
-		case "title":
-			sortField = "title"
-		case "status":
-			sortField = "status"
-		case "created_at":
-			sortField = "created_at"
-		case "updated_at":
-			sortField = "updated_at"
-		}
-	}
-
 	query := r.db.Model(&domain.FAQ{}).Where("deleted = ?", false)
 	query.Count(&total)
 
-	err := query.Order(fmt.Sprintf("%s %s", sortField, direction)).
+	err := query.Order(buildFAQOrderClause(sortParams.Sort, sortParams.Direction)).
 		Limit(limit).Offset(offset).
 		Find(&faqs).Error
 

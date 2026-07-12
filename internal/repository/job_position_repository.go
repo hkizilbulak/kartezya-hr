@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"fmt"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/types"
 
@@ -55,25 +54,7 @@ func (r *jobPositionRepository) GetAll(limit, offset int, sortParams types.SortP
 	var jobPositions []*domain.JobPosition
 	var total int64
 
-	// Validate and sanitize sort field
-	validSortFields := map[string]bool{
-		"id":         true,
-		"title":      true,
-		"created_at": true,
-		"updated_at": true,
-	}
-
-	sortField := "id"
-	if validSortFields[sortParams.Sort] {
-		sortField = sortParams.Sort
-	}
-
-	direction := "ASC"
-	if sortParams.Direction == "DESC" {
-		direction = "DESC"
-	}
-
-	orderBy := fmt.Sprintf("%s %s", sortField, direction)
+	orderBy := buildJobPositionOrderClause(sortParams.Sort, sortParams.Direction)
 
 	// Count total records
 	r.db.Model(&domain.JobPosition{}).Where("deleted = ?", false).Count(&total)

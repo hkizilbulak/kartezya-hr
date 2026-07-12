@@ -7,6 +7,7 @@ import (
 
 	"kartezya-hr/internal/authz"
 	"kartezya-hr/internal/service"
+	"kartezya-hr/internal/types"
 
 	"github.com/gin-gonic/gin"
 )
@@ -451,6 +452,11 @@ func (h *EmployeeHandler) ListEmployees(c *gin.Context) {
 		filters["company"] = company
 	}
 
+	// City / il filter
+	if city, ok := normalizeTextFilter(c.Query("city")); ok {
+		filters["city"] = city
+	}
+
 	if department, ok := normalizeTextFilter(c.Query("department")); ok {
 		filters["department"] = department
 	}
@@ -510,19 +516,12 @@ func (h *EmployeeHandler) ListEmployees(c *gin.Context) {
 		filters["status"] = status
 	}
 
-	// Parse sorting parameters
+	// Parse sorting parameters (display-oriented keys; repo allowlist resolves defaults)
 	sortField := c.Query("sort")
-	sortDirection := c.Query("direction")
-
-	// Set default sorting to first_name, last_name ASC if no sort field is provided
 	if sortField == "" {
-		sortField = "first_name"
+		sortField = "employee_name"
 	}
-
-	// Default direction is ASC
-	if sortDirection != "ASC" && sortDirection != "DESC" {
-		sortDirection = "ASC"
-	}
+	sortDirection := types.NormalizeSortDirection(c.Query("direction"), "ASC")
 
 	offset := (page - 1) * limit
 

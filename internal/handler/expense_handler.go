@@ -227,7 +227,7 @@ func (h *ExpenseHandler) GetMyExpenseRequests(c *gin.Context) {
 
 	sortParams := types.SortParams{
 		Sort:      c.DefaultQuery("sort", "created_at"),
-		Direction: c.DefaultQuery("direction", "DESC"),
+		Direction: types.NormalizeSortDirection(c.DefaultQuery("direction", "DESC"), "DESC"),
 	}
 
 	result, err := h.expenseService.GetMyExpenseRequestsPaginated(userID, page, limit, sortParams, status, expenseTypeID, startDate, endDate)
@@ -313,7 +313,7 @@ func (h *ExpenseHandler) GetAllExpenseRequests(c *gin.Context) {
 
 	sortParams := types.SortParams{
 		Sort:      c.DefaultQuery("sort", "created_at"),
-		Direction: c.DefaultQuery("direction", "DESC"),
+		Direction: types.NormalizeSortDirection(c.DefaultQuery("direction", "DESC"), "DESC"),
 	}
 
 	result, err := h.expenseService.GetAllExpenseRequestsPaginated(employeeID, page, limit, sortParams, status, expenseTypeID, startDate, endDate)

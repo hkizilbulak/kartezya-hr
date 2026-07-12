@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"kartezya-hr/internal/domain"
+	"kartezya-hr/internal/types"
 
 	"gorm.io/gorm"
 )
@@ -13,7 +14,9 @@ type AttachmentRepository interface {
 	Create(attachment *domain.Attachment) error
 	FindByID(id string) (*domain.Attachment, error)
 	FindByOwnerID(ownerID uint) ([]domain.Attachment, error)
+	FindByOwnerIDPaginated(ownerID uint, limit, offset int, sortParams types.SortParams) ([]domain.Attachment, int64, error)
 	FindByRelatedRecord(relatedType domain.AttachmentRelatedType, relatedID uint) ([]domain.Attachment, error)
+	FindByRelatedRecordOrdered(relatedType domain.AttachmentRelatedType, relatedID uint, sortParams types.SortParams) ([]domain.Attachment, error)
 	CountByRelatedRecord(relatedType domain.AttachmentRelatedType, relatedID uint) (int64, error)
 	FindTemporaryOlderThan(hours int) ([]domain.Attachment, error)
 	UpdateStatus(id string, status domain.AttachmentStatus, relatedID *uint) error
@@ -58,26 +61,58 @@ func (r *attachmentRepository) FindByID(id string) (*domain.Attachment, error) {
 func (r *attachmentRepository) FindByOwnerID(ownerID uint) ([]domain.Attachment, error) {
 	var attachments []domain.Attachment
 	err := r.db.Where("owner_id = ? AND status != ?", ownerID, domain.AttachmentStatusArchived).
-		Order("created_at DESC").
+		Order(buildAttachmentOrderClause("created_at", "DESC")).
 		Find(&attachments).Error
 	return attachments, err
 }
 
+// FindByOwnerIDPaginated returns owner attachments with allowlisted ORDER BY before LIMIT/OFFSET.
+func (r *attachmentRepository) FindByOwnerIDPaginated(ownerID uint, limit, offset int, sortParams types.SortParams) ([]domain.Attachment, int64, error) {
+	var attachments []domain.Attachment
+	var total int64
+
+	base := r.db.Model(&domain.Attachment{}).
+		Where("owner_id = ? AND status != ?", ownerID, domain.AttachmentStatusArchived)
+
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	query := r.db.Where("owner_id = ? AND status != ?", ownerID, domain.AttachmentStatusArchived).
+		Order(buildAttachmentOrderClause(sortParams.Sort, sortParams.Direction))
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+
+	err := query.Find(&attachments).Error
+	return attachments, total, err
+}
+
 // FindByRelatedRecord retrieves all attachments linked to a specific record
 func (r *attachmentRepository) FindByRelatedRecord(relatedType domain.AttachmentRelatedType, relatedID uint) ([]domain.Attachment, error) {
+	return r.FindByRelatedRecordOrdered(relatedType, relatedID, types.SortParams{Sort: "created_at", Direction: "DESC"})
+}
+
+// FindByRelatedRecordOrdered retrieves related attachments with allowlisted ORDER BY (full set for auth filtering).
+func (r *attachmentRepository) FindByRelatedRecordOrdered(relatedType domain.AttachmentRelatedType, relatedID uint, sortParams types.SortParams) ([]domain.Attachment, error) {
 	var attachments []domain.Attachment
+	order := buildAttachmentOrderClause(sortParams.Sort, sortParams.Direction)
 
 	if relatedType == domain.AttachmentRelatedTypeEmployee {
 		err := r.db.Where("related_type = ? AND (related_id = ? OR owner_id = ?) AND status != ?",
 			relatedType, relatedID, relatedID, domain.AttachmentStatusArchived).
-			Order("created_at DESC").
+			Order(order).
 			Find(&attachments).Error
 		return attachments, err
 	}
 
 	err := r.db.Where("related_type = ? AND related_id = ? AND status = ?",
 		relatedType, relatedID, domain.AttachmentStatusLinked).
-		Order("created_at DESC").
+		Order(order).
 		Find(&attachments).Error
 	return attachments, err
 }
