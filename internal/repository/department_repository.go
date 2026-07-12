@@ -65,40 +65,16 @@ func (r *departmentRepository) GetAll(limit, offset int, sortParams types.SortPa
 	deptTable := domain.GetTableName("hr_departments")
 	companyTable := domain.GetTableName("hr_companies")
 
-	// Determine sort field and direction
-	sortField := fmt.Sprintf("%s.id", deptTable)
-	direction := "ASC"
-
-	if sortParams.Direction == "DESC" {
-		direction = "DESC"
-	}
-
-	// Map frontend sort fields to database columns
-	if sortParams.Sort != "" {
-		switch sortParams.Sort {
-		case "company":
-			sortField = fmt.Sprintf("%s.name", companyTable)
-		case "name":
-			sortField = fmt.Sprintf("%s.name", deptTable)
-		case "manager":
-			sortField = fmt.Sprintf("%s.manager", deptTable)
-		case "created_at":
-			sortField = fmt.Sprintf("%s.created_at", deptTable)
-		case "updated_at":
-			sortField = fmt.Sprintf("%s.updated_at", deptTable)
-		default:
-			sortField = fmt.Sprintf("%s.id", deptTable)
-		}
-	}
+	orderClause := buildDepartmentOrderClause(sortParams.Sort, sortParams.Direction)
 
 	// Build SQL query with proper JOIN
 	query := fmt.Sprintf(`
 		SELECT %s.* FROM %s
 		LEFT JOIN %s ON %s.id = %s.company_id
 		WHERE %s.deleted = false
-		ORDER BY %s %s
+		ORDER BY %s
 		LIMIT ? OFFSET ?
-	`, deptTable, deptTable, companyTable, companyTable, deptTable, deptTable, sortField, direction)
+	`, deptTable, deptTable, companyTable, companyTable, deptTable, deptTable, orderClause)
 
 	// Execute query
 	err := r.db.Raw(query, limit, offset).

@@ -53,38 +53,13 @@ func (r *eventRepository) GetAll(limit, offset int, sortParams types.SortParams)
 	var events []*domain.Event
 	var total int64
 
-	table := domain.GetTableName("events")
-
-	// Determine sort field and direction
-	sortField := fmt.Sprintf("%s.start_date", table) // Default sort by start_date
-	direction := "DESC"
-
-	if sortParams.Direction == "ASC" {
-		direction = "ASC"
-	}
-
-	if sortParams.Sort != "" {
-		switch sortParams.Sort {
-		case "name":
-			sortField = fmt.Sprintf("%s.name", table)
-		case "type":
-			sortField = fmt.Sprintf("%s.type", table)
-		case "start_date":
-			sortField = fmt.Sprintf("%s.start_date", table)
-		case "status":
-			sortField = fmt.Sprintf("%s.status", table)
-		default:
-			sortField = fmt.Sprintf("%s.start_date", table)
-		}
-	}
-
 	query := r.db.Model(&domain.Event{}).Where("deleted = ?", false)
 
 	// Count total records
 	query.Count(&total)
 
-	// Execute query
-	err := query.Order(fmt.Sprintf("%s %s", sortField, direction)).
+	// Execute query — allowlisted ORDER BY before LIMIT/OFFSET
+	err := query.Order(buildEventOrderClause(sortParams.Sort, sortParams.Direction)).
 		Preload("Participants", "deleted = ?", false).
 		Preload("Participants.User.Employee").
 		Limit(limit).Offset(offset).

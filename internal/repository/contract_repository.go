@@ -2,7 +2,6 @@ package repository
 
 import (
 	"fmt"
-	"strings"
 
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/types"
@@ -67,15 +66,7 @@ func (r *contractRepository) GetAll(limit, offset int, sortParams types.SortPara
 		return nil, 0, err
 	}
 
-	if sortParams.Sort != "" {
-		direction := "ASC"
-		if strings.ToUpper(sortParams.Direction) == "DESC" {
-			direction = "DESC"
-		}
-		query = query.Order(fmt.Sprintf("%s %s", sortParams.Sort, direction))
-	} else {
-		query = query.Order("created_at DESC")
-	}
+	query = query.Order(buildContractOrderClause(sortParams.Sort, sortParams.Direction))
 
 	query = query.Preload("EmployeeContracts", "deleted = ?", false).
 		Preload("EmployeeContracts.Employee")
