@@ -67,7 +67,7 @@ type LeaveService interface {
 	CalculateEndDate(startDate time.Time, requestedDays float64, isStartDateFullDay, isFinishDateFullDay bool) (time.Time, error)
 
 	// Leave Document methods (using Attachment system)
-	UploadLeaveDocument(leaveRequestID uint, file *multipart.FileHeader, userID uint) (*domain.Attachment, error)
+	UploadLeaveDocument(leaveRequestID uint, file *multipart.FileHeader, userID uint, canManage bool) (*domain.Attachment, error)
 	GetLeaveDocuments(leaveRequestID uint, userID uint, isAdmin bool) ([]domain.Attachment, error)
 	DeleteLeaveDocument(documentID string, userID uint, isAdmin bool) error
 	DownloadLeaveDocument(documentID string, userID uint, isAdmin bool) (string, error)
@@ -1314,23 +1314,23 @@ func (s *leaveService) CalculateEndDate(startDate time.Time, requestedDays float
 
 // ==================== Leave Document Methods ====================
 
-// UploadLeaveDocument uploads a document for a leave request using Attachment system
-func (s *leaveService) UploadLeaveDocument(leaveRequestID uint, file *multipart.FileHeader, userID uint) (*domain.Attachment, error) {
+// UploadLeaveDocument uploads a document for a leave request using Attachment system.
+// Owners may upload to their own requests; callers with leave management capability may upload to any.
+func (s *leaveService) UploadLeaveDocument(leaveRequestID uint, file *multipart.FileHeader, userID uint, canManage bool) (*domain.Attachment, error) {
 	// Check if leave request exists
 	leave, err := s.leaveRepo.GetByID(leaveRequestID)
 	if err != nil {
 		return nil, errors.New("leave request not found")
 	}
 
-	// Get employee to check ownership
-	employee, err := s.employeeRepo.GetByUserID(userID)
-	if err != nil {
-		return nil, errors.New("employee not found")
-	}
-
-	// Only the owner can upload documents (admin can also upload via their own user context)
-	if leave.EmployeeID != employee.ID {
-		return nil, errors.New("you can only upload documents to your own leave requests")
+	if !canManage {
+		employee, err := s.employeeRepo.GetByUserID(userID)
+		if err != nil {
+			return nil, errors.New("employee not found")
+		}
+		if leave.EmployeeID != employee.ID {
+			return nil, errors.New("you can only upload documents to your own leave requests")
+		}
 	}
 
 	// Documents can be uploaded to any leave (not just PENDING like expenses)

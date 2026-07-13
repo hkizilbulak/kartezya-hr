@@ -109,10 +109,10 @@ type ExpenseService interface {
 	MarkAsPaid(id uint, paymentReference string, userID uint) error
 
 	// Expense Document methods (using Attachment system)
-	UploadExpenseDocument(expenseRequestID uint, file *multipart.FileHeader, userID uint) (*domain.Attachment, error)
-	GetExpenseDocuments(expenseRequestID uint, userID uint, isAdmin bool) ([]domain.Attachment, error)
-	DeleteExpenseDocument(documentID string, userID uint, isAdmin bool) error
-	DownloadExpenseDocument(documentID string, userID uint, isAdmin bool) (string, error)
+	UploadExpenseDocument(expenseRequestID uint, file *multipart.FileHeader, userID uint, canManage bool) (*domain.Attachment, error)
+	GetExpenseDocuments(expenseRequestID uint, userID uint, canManage bool) ([]domain.Attachment, error)
+	DeleteExpenseDocument(documentID string, userID uint, canManage bool) error
+	DownloadExpenseDocument(documentID string, userID uint, canManage bool) (string, error)
 
 	// Expense Type methods
 	CreateExpenseType(expenseType *domain.ExpenseType, createdBy string) error
@@ -501,23 +501,23 @@ func (s *expenseService) DeleteExpenseType(id uint) error {
 
 // ==================== Expense Document Methods ====================
 
-// UploadExpenseDocument uploads a document for an expense request using Attachment system
-func (s *expenseService) UploadExpenseDocument(expenseRequestID uint, file *multipart.FileHeader, userID uint) (*domain.Attachment, error) {
+// UploadExpenseDocument uploads a document for an expense request using Attachment system.
+// Owners may upload to their own requests; callers with expense management capability may upload to any.
+func (s *expenseService) UploadExpenseDocument(expenseRequestID uint, file *multipart.FileHeader, userID uint, canManage bool) (*domain.Attachment, error) {
 	// Check if expense request exists and user has permission
 	expense, err := s.expenseRepo.FindByID(expenseRequestID)
 	if err != nil {
 		return nil, errors.New("expense request not found")
 	}
 
-	// Get employee to check ownership
-	employee, err := s.employeeRepo.GetByUserID(userID)
-	if err != nil {
-		return nil, errors.New("employee not found")
-	}
-
-	// Only the owner can upload documents
-	if expense.EmployeeID != employee.ID {
-		return nil, errors.New("you can only upload documents to your own expense requests")
+	if !canManage {
+		employee, err := s.employeeRepo.GetByUserID(userID)
+		if err != nil {
+			return nil, errors.New("employee not found")
+		}
+		if expense.EmployeeID != employee.ID {
+			return nil, errors.New("you can only upload documents to your own expense requests")
+		}
 	}
 
 	// Only PENDING requests can have documents uploaded
@@ -581,15 +581,15 @@ func (s *expenseService) uploadExpenseAttachment(file *multipart.FileHeader, own
 }
 
 // GetExpenseDocuments retrieves all documents for an expense request
-func (s *expenseService) GetExpenseDocuments(expenseRequestID uint, userID uint, isAdmin bool) ([]domain.Attachment, error) {
+func (s *expenseService) GetExpenseDocuments(expenseRequestID uint, userID uint, canManage bool) ([]domain.Attachment, error) {
 	// Check if expense request exists
 	expense, err := s.expenseRepo.FindByID(expenseRequestID)
 	if err != nil {
 		return nil, errors.New("expense request not found")
 	}
 
-	// Check permission: admin or owner can view
-	if !isAdmin {
+	// Check permission: management capability or owner can view
+	if !canManage {
 		employee, err := s.employeeRepo.GetByUserID(userID)
 		if err != nil {
 			return nil, errors.New("employee not found")
@@ -604,7 +604,7 @@ func (s *expenseService) GetExpenseDocuments(expenseRequestID uint, userID uint,
 }
 
 // DeleteExpenseDocument deletes a document
-func (s *expenseService) DeleteExpenseDocument(documentID string, userID uint, isAdmin bool) error {
+func (s *expenseService) DeleteExpenseDocument(documentID string, userID uint, canManage bool) error {
 	// Get attachment
 	attachment, err := s.attachmentRepo.FindByID(documentID)
 	if err != nil {
@@ -622,8 +622,8 @@ func (s *expenseService) DeleteExpenseDocument(documentID string, userID uint, i
 		return errors.New("expense request not found")
 	}
 
-	// Check permission: admin or owner can delete
-	if !isAdmin {
+	// Check permission: management capability or owner can delete
+	if !canManage {
 		employee, err := s.employeeRepo.GetByUserID(userID)
 		if err != nil {
 			return errors.New("employee not found")
@@ -656,7 +656,7 @@ func (s *expenseService) DeleteExpenseDocument(documentID string, userID uint, i
 }
 
 // DownloadExpenseDocument generates a download URL for a document
-func (s *expenseService) DownloadExpenseDocument(documentID string, userID uint, isAdmin bool) (string, error) {
+func (s *expenseService) DownloadExpenseDocument(documentID string, userID uint, canManage bool) (string, error) {
 	// Get attachment
 	attachment, err := s.attachmentRepo.FindByID(documentID)
 	if err != nil {
@@ -674,8 +674,8 @@ func (s *expenseService) DownloadExpenseDocument(documentID string, userID uint,
 		return "", errors.New("expense request not found")
 	}
 
-	// Check permission: admin or owner can download
-	if !isAdmin {
+	// Check permission: management capability or owner can download
+	if !canManage {
 		employee, err := s.employeeRepo.GetByUserID(userID)
 		if err != nil {
 			return "", errors.New("employee not found")

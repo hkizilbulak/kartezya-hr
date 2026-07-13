@@ -434,8 +434,16 @@ func (h *ExpenseHandler) UpdateExpenseRequest(c *gin.Context) {
 		return
 	}
 
-	// Verify ownership
-	if existing.Employee != nil && existing.Employee.UserID != userID {
+	// Ownership: compare expense.EmployeeID to caller's employee (do not rely on Employee preload).
+	callerEmployee, err := h.employeeService.GetEmployeeByUserID(userID)
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"error":   "Access denied",
+		})
+		return
+	}
+	if existing.EmployeeID != callerEmployee.ID {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Access denied",
@@ -1125,7 +1133,7 @@ func (h *ExpenseHandler) DeleteExpenseType(c *gin.Context) {
 // @Router /expense/requests/{id}/documents [post]
 func (h *ExpenseHandler) UploadExpenseDocument(c *gin.Context) {
 	// Get user from context
-	userID, _, _, ok := getUserContext(c)
+	userID, _, roles, ok := getUserContext(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -1155,8 +1163,8 @@ func (h *ExpenseHandler) UploadExpenseDocument(c *gin.Context) {
 		return
 	}
 
-	// Upload document
-	document, err := h.expenseService.UploadExpenseDocument(uint(expenseRequestID), file, userID)
+	canManage := hasCapability(roles, authz.CanViewExpenseManagement)
+	document, err := h.expenseService.UploadExpenseDocument(uint(expenseRequestID), file, userID, canManage)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -1254,7 +1262,7 @@ func (h *ExpenseHandler) DeleteExpenseDocument(c *gin.Context) {
 	}
 
 	// Delete document
-	if err := h.expenseService.DeleteExpenseDocument(documentID, userID, isAdmin(roles)); err != nil {
+	if err := h.expenseService.DeleteExpenseDocument(documentID, userID, hasCapability(roles, authz.CanViewExpenseManagement)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   err.Error(),
