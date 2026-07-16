@@ -118,12 +118,16 @@ func (d *Database) Migrate() error {
 		&domain.OtherRequest{},
 		&domain.MailConfiguration{}, // Mail Configuration Module
 		&domain.MailRecipient{},     // Mail Configuration Module
+		&domain.PortalContract{},         // Portal Contract Approval Tracking
+		&domain.EmployeePortalContract{}, // Portal Contract Approval Tracking Pivot
 		// Note: AuditLog is excluded - it's created by schema.sql
 	)
 
 	if err != nil {
 		return fmt.Errorf("auto-migration failed: %w", err)
 	}
+
+	seedPortalContracts(d.DB)
 
 	log.Println("Auto-migration completed successfully")
 	return nil
@@ -146,4 +150,39 @@ func (d *Database) Health() error {
 		return err
 	}
 	return sqlDB.Ping()
+}
+
+func seedPortalContracts(db *gorm.DB) {
+	var count int64
+	db.Model(&domain.PortalContract{}).Count(&count)
+	if count == 0 {
+		contracts := []domain.PortalContract{
+			{
+				Title:   "Personel Aydınlatma Metni (KVKK)",
+				Content: "KVKK kapsamında personel aydınlatma metni içeriği...",
+				Version: "v1.0",
+			},
+			{
+				Title:   "Personel Gizlilik Sözleşmesi",
+				Content: "Personel gizlilik sözleşmesi içeriği...",
+				Version: "v1.0",
+			},
+			{
+				Title:   "Rüşvet ve Yolsuzlukla Mücadele Politikası",
+				Content: "Rüşvet ve yolsuzlukla mücadele politikası içeriği...",
+				Version: "v1.0",
+			},
+			{
+				Title:   "Fotoğraf ve Görsel Paylaşım İzin Metni",
+				Content: "Fotoğraf ve görsel paylaşım izin metni içeriği...",
+				Version: "v1.0",
+			},
+		}
+
+		for _, c := range contracts {
+			c.CreatedBy = "System"
+			db.Create(&c)
+		}
+		log.Println("Seeded default portal contracts successfully")
+	}
 }

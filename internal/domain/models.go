@@ -726,3 +726,35 @@ type KvkkLog struct {
 func (KvkkLog) TableName() string {
 	return GetTableName("hr_kvkk_logs")
 }
+
+// PortalContract represents the mandatory agreements/contracts
+type PortalContract struct {
+	AuditableModel
+	Title   string `json:"title" gorm:"size:255;not null"`
+	Content string `json:"content" gorm:"type:text;not null"`
+	Version string `json:"version" gorm:"size:50;not null"`
+}
+
+// TableName returns the table name for PortalContract
+func (PortalContract) TableName() string {
+	return GetTableName("hr_portal_contracts")
+}
+
+// EmployeePortalContract represents the junction/pivot table tracking employee signatures/approvals
+type EmployeePortalContract struct {
+	AuditableModel
+	EmployeeID uint       `json:"employee_id" gorm:"not null;uniqueIndex:idx_emp_portal_contract"`
+	ContractID uint       `json:"contract_id" gorm:"not null;uniqueIndex:idx_emp_portal_contract"`
+	Status     string     `json:"status" gorm:"size:20;not null;default:'pending'"` // 'approved', 'pending', 'rejected'
+	ApprovedAt *time.Time `json:"approved_at"`
+	IPAddress  string     `json:"ip_address" gorm:"size:45"`
+
+	// Relationships
+	Employee Employee       `json:"employee,omitempty" gorm:"foreignKey:EmployeeID"`
+	Contract PortalContract `json:"contract,omitempty" gorm:"foreignKey:ContractID"`
+}
+
+// TableName returns the table name for EmployeePortalContract
+func (EmployeePortalContract) TableName() string {
+	return GetTableName("hr_employee_portal_contracts")
+}

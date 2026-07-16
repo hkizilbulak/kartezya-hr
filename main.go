@@ -92,6 +92,7 @@ func main() {
 	employeeContractRepo := repository.NewEmployeeContractRepository(db.DB)
 	contractRepo := repository.NewContractRepository(db.DB)
 	attachmentRepo := repository.NewAttachmentRepository(db.DB)
+	portalContractRepo := repository.NewPortalContractRepository(db.DB)
 	expenseRepo := repository.NewExpenseRepository(db.DB)
 	expenseTypeRepo := repository.NewExpenseTypeRepository(db.DB)
 	jobRepo := repository.NewJobRepository(db.DB)
@@ -143,6 +144,7 @@ func main() {
 	employeeGradeService := service.NewEmployeeGradeService(employeeGradeRepo, employeeRepo, gradeRepo, auditService)
 	employeeContractService := service.NewEmployeeContractService(employeeContractRepo, employeeRepo, auditService)
 	contractService := service.NewContractService(contractRepo, employeeContractRepo, auditService)
+	portalContractService := service.NewPortalContractService(portalContractRepo, employeeRepo)
 	expenseService := service.NewExpenseService(expenseRepo, expenseTypeRepo, attachmentRepo, employeeRepo, storageProvider, auditService)
 	reportService := service.NewReportService(employeeRepo, workInfoRepo, leaveRepo, holidayRepo, leaveService)
 	jobService := service.NewJobService(jobRepo, auditService)
@@ -170,6 +172,7 @@ func main() {
 	employeeGradeHandler := handler.NewEmployeeGradeHandler(employeeGradeService, employeeService)
 	employeeContractHandler := handler.NewEmployeeContractHandler(employeeContractService, employeeService)
 	contractHandler := handler.NewContractHandler(contractService)
+	portalContractHandler := handler.NewPortalContractHandler(portalContractService)
 	reportHandler := handler.NewReportHandler(reportService, emailService, mailConfigService, cfg)
 	documentHandler := handler.NewDocumentHandler(documentService)
 	expenseHandler := handler.NewExpenseHandler(expenseService, employeeService, emailService, mailConfigService)
@@ -297,6 +300,7 @@ func main() {
 			employeeRoutes.POST("", authMiddleware.RequireAdmin(), employeeHandler.CreateEmployee)
 			employeeRoutes.GET("", authMiddleware.RequireAdmin(), employeeHandler.ListEmployees)
 			employeeRoutes.DELETE("/:id", authMiddleware.RequireAdmin(), employeeHandler.DeleteEmployee)
+			employeeRoutes.GET("/:id/contracts", authMiddleware.RequireAdmin(), portalContractHandler.GetEmployeeContracts)
 		}
 
 		// Leave management routes
