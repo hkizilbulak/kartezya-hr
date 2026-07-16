@@ -594,3 +594,14 @@ type ContractReportExportRequest struct {
 	DepartmentIDs []uint         `json:"department_ids"`
 	ExportColumns []ColumnConfig `json:"export_columns" binding:"required"`
 }
+
+// EmployeePortalContractResponse represents the approval status of a contract for an employee
+type EmployeePortalContractResponse struct {
+	ContractID uint       `json:"contract_id"`
+	Title      string     `json:"title"`
+	Content    string     `json:"content"`
+	Version    string     `json:"version"`
+	Status     string     `json:"status"` // "approved", "pending", "rejected"
+	ApprovedAt *time.Time `json:"approved_at"`
+	IPAddress  string     `json:"ip_address"`
+}
