@@ -292,6 +292,9 @@ func main() {
 		// Employee routes
 		employeeRoutes := protected.Group("/employees")
 		{
+			// Portal contracts for employee (specific route should be before the generic GET ":id")
+			employeeRoutes.GET(":id/contracts", authMiddleware.RequireCapability(authz.CanViewEmployees), portalContractHandler.GetEmployeeContracts)
+
 			employeeRoutes.GET("/me", employeeHandler.GetMyProfile)
 			employeeRoutes.PUT("/me", employeeHandler.UpdateMyProfile)
 			employeeRoutes.PUT("/:id", authMiddleware.RequireCapability(authz.CanManageEmployees), employeeHandler.UpdateEmployee)
