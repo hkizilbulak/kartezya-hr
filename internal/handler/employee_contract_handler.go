@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"kartezya-hr/internal/authz"
 	"kartezya-hr/internal/service"
 	"kartezya-hr/internal/types"
 
@@ -55,7 +56,7 @@ func (h *EmployeeContractHandler) CreateEmployeeContract(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageEmployees) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Admin access required",
@@ -70,6 +71,10 @@ func (h *EmployeeContractHandler) CreateEmployeeContract(c *gin.Context) {
 			"error":   "Invalid request format",
 			"details": err.Error(),
 		})
+		return
+	}
+
+	if rejectIfHRMutatingAdminEmployee(c, h.employeeService, req.EmployeeID, roles) {
 		return
 	}
 
@@ -240,7 +245,7 @@ func (h *EmployeeContractHandler) UpdateEmployeeContract(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageEmployees) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Admin access required",
@@ -267,7 +272,11 @@ func (h *EmployeeContractHandler) UpdateEmployeeContract(c *gin.Context) {
 		return
 	}
 
-	if err := h.employeeContractService.UpdateContract(id, req.EmployeeID, req.ContractID, email, requestingUserID, isAdmin(roles)); err != nil {
+	if rejectIfHRMutatingAdminEmployee(c, h.employeeService, req.EmployeeID, roles) {
+		return
+	}
+
+	if err := h.employeeContractService.UpdateContract(id, req.EmployeeID, req.ContractID, email, requestingUserID, hasCapability(roles, authz.CanManageEmployees)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   err.Error(),
@@ -314,7 +323,7 @@ func (h *EmployeeContractHandler) DeleteEmployeeContract(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageEmployees) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Admin access required",
@@ -328,6 +337,18 @@ func (h *EmployeeContractHandler) DeleteEmployeeContract(c *gin.Context) {
 			"success": false,
 			"error":   "Invalid employee contract ID",
 		})
+		return
+	}
+
+	existing, err := h.employeeContractService.GetContractByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+	if rejectIfHRMutatingAdminEmployee(c, h.employeeService, existing.Employee.ID, roles) {
 		return
 	}
 

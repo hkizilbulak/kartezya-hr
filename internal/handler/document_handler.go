@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"kartezya-hr/internal/authz"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/service"
 	"kartezya-hr/internal/types"
@@ -295,6 +296,12 @@ func (h *DocumentHandler) LinkDocuments(c *gin.Context) {
 		return
 	}
 
+	roles, _ := c.Get("roles")
+	rolesSlice := []string{}
+	if rolesList, ok := roles.([]string); ok {
+		rolesSlice = rolesList
+	}
+
 	var req LinkDocumentsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -306,23 +313,42 @@ func (h *DocumentHandler) LinkDocuments(c *gin.Context) {
 		req.RelatedType,
 		req.RelatedID,
 		userID.(uint),
+		rolesSlice,
 	)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Documents linked successfully"})
 }
 
-// GetUserDocuments retrieves documents for a specific user
+// GetUserDocuments retrieves documents for a specific user (OwnerID = user ID).
 // GET /api/v1/documents/user/:id
 func (h *DocumentHandler) GetUserDocuments(c *gin.Context) {
-	// Parse user ID from URL
+	callerID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	roles, _ := c.Get("roles")
+	rolesSlice := []string{}
+	if rolesList, ok := roles.([]string); ok {
+		rolesSlice = rolesList
+	}
+
+	// Parse user ID from URL — this is OwnerID (user id), not employee id.
 	ownerIDStr := c.Param("id")
 	ownerID, err := strconv.Atoi(ownerIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	callerUserID := callerID.(uint)
+	if uint(ownerID) != callerUserID && !authz.HasCapability(rolesSlice, authz.CanManageEmployees) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 

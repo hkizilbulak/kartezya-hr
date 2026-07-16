@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"kartezya-hr/internal/authz"
 	"kartezya-hr/internal/config"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/repository"
@@ -34,7 +35,7 @@ type DocumentService interface {
 	GetUserDocumentsPaginated(ownerID uint, page, limit int, sortParams types.SortParams) ([]domain.Attachment, int64, error)
 	GetRelatedDocuments(relatedType domain.AttachmentRelatedType, relatedID uint, userID uint, roles []string) ([]domain.Attachment, error)
 	GetRelatedDocumentsOrdered(relatedType domain.AttachmentRelatedType, relatedID uint, userID uint, roles []string, sortParams types.SortParams) ([]domain.Attachment, error)
-	LinkDocumentsToRecord(documentIDs []string, relatedType domain.AttachmentRelatedType, relatedID uint, ownerID uint) error
+	LinkDocumentsToRecord(documentIDs []string, relatedType domain.AttachmentRelatedType, relatedID uint, ownerID uint, roles []string) error
 	DeleteDocument(id string, userID uint, roles []string) error
 	CleanupTemporaryFiles(hoursOld int) (int, error)
 }
@@ -43,11 +44,23 @@ type documentService struct {
 	repo             repository.AttachmentRepository
 	storage          StorageProvider
 	cfg              *config.Config
+	employeeRepo     repository.EmployeeRepository
+	leaveRepo        repository.LeaveRepository
+	expenseRepo      repository.ExpenseRepository
+	otherRequestRepo repository.OtherRequestRepository
 	allowedMimeTypes map[string]bool
 	maxFileSize      int64
 }
 
-func NewDocumentService(repo repository.AttachmentRepository, storage StorageProvider, cfg *config.Config) DocumentService {
+func NewDocumentService(
+	repo repository.AttachmentRepository,
+	storage StorageProvider,
+	cfg *config.Config,
+	employeeRepo repository.EmployeeRepository,
+	leaveRepo repository.LeaveRepository,
+	expenseRepo repository.ExpenseRepository,
+	otherRequestRepo repository.OtherRequestRepository,
+) DocumentService {
 	// Define allowed MIME types
 	allowedMimeTypes := map[string]bool{
 		"application/pdf":    true,
@@ -65,6 +78,10 @@ func NewDocumentService(repo repository.AttachmentRepository, storage StoragePro
 		repo:             repo,
 		storage:          storage,
 		cfg:              cfg,
+		employeeRepo:     employeeRepo,
+		leaveRepo:        leaveRepo,
+		expenseRepo:      expenseRepo,
+		otherRequestRepo: otherRequestRepo,
 		allowedMimeTypes: allowedMimeTypes,
 		maxFileSize:      10 * 1024 * 1024, // 10 MB default
 	}
@@ -214,10 +231,15 @@ func (s *documentService) GetRelatedDocumentsOrdered(relatedType domain.Attachme
 	return authorized, nil
 }
 
-// LinkDocumentsToRecord links uploaded documents to a specific record (e.g., Expense, Leave)
-func (s *documentService) LinkDocumentsToRecord(documentIDs []string, relatedType domain.AttachmentRelatedType, relatedID uint, ownerID uint) error {
+// LinkDocumentsToRecord links uploaded documents to a specific record (e.g., Expense, Leave).
+// Caller must own the temporary documents and be authorized for the target record.
+func (s *documentService) LinkDocumentsToRecord(documentIDs []string, relatedType domain.AttachmentRelatedType, relatedID uint, ownerID uint, roles []string) error {
 	if len(documentIDs) == 0 {
 		return nil
+	}
+
+	if err := s.authorizeLinkTarget(relatedType, relatedID, ownerID, roles); err != nil {
+		return err
 	}
 
 	// Verify all documents belong to the owner and are temporary
@@ -239,6 +261,76 @@ func (s *documentService) LinkDocumentsToRecord(documentIDs []string, relatedTyp
 
 	// Link all documents atomically
 	return s.repo.LinkToRecord(documentIDs, relatedType, relatedID)
+}
+
+// authorizeLinkTarget fail-closes unless the caller owns the target or has the matching management capability.
+func (s *documentService) authorizeLinkTarget(relatedType domain.AttachmentRelatedType, relatedID uint, userID uint, roles []string) error {
+	switch relatedType {
+	case domain.AttachmentRelatedTypeLeave:
+		leave, err := s.leaveRepo.GetByID(relatedID)
+		if err != nil {
+			return errors.New("target leave request not found")
+		}
+		if authz.HasCapability(roles, authz.CanViewLeaveManagement) {
+			return nil
+		}
+		employee, err := s.employeeRepo.GetByUserID(userID)
+		if err != nil || leave.EmployeeID != employee.ID {
+			return errors.New("access denied: not authorized to link documents to this leave request")
+		}
+		return nil
+
+	case domain.AttachmentRelatedTypeExpense:
+		expense, err := s.expenseRepo.FindByID(relatedID)
+		if err != nil {
+			return errors.New("target expense request not found")
+		}
+		if authz.HasCapability(roles, authz.CanViewExpenseManagement) {
+			return nil
+		}
+		employee, err := s.employeeRepo.GetByUserID(userID)
+		if err != nil || expense.EmployeeID != employee.ID {
+			return errors.New("access denied: not authorized to link documents to this expense request")
+		}
+		return nil
+
+	case domain.AttachmentRelatedTypeOtherRequest:
+		req, err := s.otherRequestRepo.GetRequestByID(relatedID)
+		if err != nil {
+			return errors.New("target other request not found")
+		}
+		if authz.HasCapability(roles, authz.CanManageOtherRequests) {
+			return nil
+		}
+		employee, err := s.employeeRepo.GetByUserID(userID)
+		if err != nil || req.EmployeeID != employee.ID {
+			return errors.New("access denied: not authorized to link documents to this other request")
+		}
+		return nil
+
+	case domain.AttachmentRelatedTypeEmployee:
+		targetEmployee, err := s.employeeRepo.GetByID(relatedID)
+		if err != nil {
+			return errors.New("target employee not found")
+		}
+		if authz.HasCapability(roles, authz.CanManageEmployees) {
+			return nil
+		}
+		callerEmployee, err := s.employeeRepo.GetByUserID(userID)
+		if err != nil || callerEmployee.ID != targetEmployee.ID {
+			return errors.New("access denied: not authorized to link documents to this employee record")
+		}
+		return nil
+
+	case domain.AttachmentRelatedTypeUser:
+		if relatedID == userID {
+			return nil
+		}
+		return errors.New("access denied: not authorized to link documents to this user record")
+
+	default:
+		return errors.New("access denied: unsupported or unauthorized document link target")
+	}
 }
 
 // DeleteDocument deletes a document (soft delete by archiving)
@@ -282,33 +374,34 @@ func (s *documentService) CleanupTemporaryFiles(hoursOld int) (int, error) {
 	return count, nil
 }
 
-// canAccessDocument checks if user can access the document (RBAC)
+// canAccessDocument checks if user can access the document (RBAC + ownership)
 func (s *documentService) canAccessDocument(attachment *domain.Attachment, userID uint, roles []string) bool {
-	// Admin can access all documents
-	if s.hasRole(roles, domain.RoleAdmin) {
-		return true
-	}
-
-	// Access check depending on related resource (e.g. employee) or skip for now if testing.
-	// We'll permit access to employee documents for now if relatedType is Employee
-	if attachment.RelatedType == domain.AttachmentRelatedTypeEmployee {
-		// HR / Manager logic could go here; for now allow to avoid blank responses.
-		return true
-	}
-
 	// Owner can always access their own documents
 	if attachment.OwnerID == userID {
 		return true
 	}
 
-	// TODO: Manager can access their team's documents (requires team relationship check)
-	// This would require additional context about team membership
+	// Personnel / CV documents: owner (above) or employee managers — not CanViewEmployees alone.
+	if attachment.RelatedType == domain.AttachmentRelatedTypeEmployee {
+		return authz.HasCapability(roles, authz.CanManageEmployees)
+	}
+
+	// Legacy ADMIN role string access for non-personnel generic documents.
+	if s.hasRole(roles, domain.RoleAdmin) {
+		return true
+	}
 
 	return false
 }
 
 // canDeleteDocument checks if user can delete the document
 func (s *documentService) canDeleteDocument(attachment *domain.Attachment, userID uint, roles []string) bool {
+	// Personnel / CV documents: employee managers may delete linked files.
+	if attachment.RelatedType == domain.AttachmentRelatedTypeEmployee &&
+		authz.HasCapability(roles, authz.CanManageEmployees) {
+		return true
+	}
+
 	// Admin can delete any document
 	if s.hasRole(roles, domain.RoleAdmin) {
 		return true

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"kartezya-hr/internal/authz"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/repository"
 	"kartezya-hr/internal/types"
@@ -14,9 +15,10 @@ type EmployeeService interface {
 	CreateEmployee(email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalGap float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, createdBy string, roles []string) (*domain.Employee, error)
 	GetEmployeeByID(id uint) (*types.EmployeeDetailResponse, error)
 	GetEmployeeByUserID(userID uint) (*types.EmployeeDetailResponse, error)
-	UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalGap float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo, status string, modifiedBy string, requestingUserID uint, isAdmin bool, roles []string) error
+	UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalGap float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo, status string, modifiedBy string, requestingUserID uint, actorRoles []string, roles []string) error
 	UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, professionStartDate string, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, motherName, fatherName, nationality, identityNo string) error
-	DeleteEmployee(id uint, deletedBy string, isAdmin bool) error
+	DeleteEmployee(id uint, deletedBy string, actorRoles []string) error
+	EmployeeUserHasAdminRole(employeeID uint) (bool, error)
 	ListEmployees(limit, offset int, isAdmin bool) ([]*types.EmployeeResponse, error)
 	ListEmployeesWithFilters(limit, offset int, sortField, sortDirection string, filters map[string]interface{}, isAdmin bool) ([]*types.EmployeeResponse, error)
 	GetTotalCount() (int64, error)
@@ -54,6 +56,11 @@ func NewEmployeeService(employeeRepo repository.EmployeeRepository, userRepo rep
 }
 
 func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalGap float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, createdBy string, roles []string) (*domain.Employee, error) {
+	creationRole, err := ValidateEmployeeCreationRoles(roles)
+	if err != nil {
+		return nil, err
+	}
+
 	// Delegate user creation to AuthService (respecting domain boundaries)
 	// companyEmail is used as the user's email in the user table
 	user, err := s.authService.CreateUserForEmployee(companyEmail, createdBy)
@@ -148,15 +155,8 @@ func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastNam
 
 	fmt.Printf("Employee created successfully. User ID: %d, Employee ID: %d\n", user.ID, employee.ID)
 
-	// Assign roles to user if provided
-	if len(roles) > 0 {
-		fmt.Printf("Attempting to assign %d roles to user %d\n", len(roles), user.ID)
-		if err := s.assignRolesToUser(user.ID, roles, createdBy); err != nil {
-			// Log error but don't fail the operation - employee is already created
-			fmt.Printf("ERROR: failed to assign roles to user %d: %v\n", user.ID, err)
-		}
-	} else {
-		fmt.Printf("No roles provided for user %d\n", user.ID)
+	if err := s.assignRolesToUser(user.ID, []string{creationRole}, createdBy); err != nil {
+		return nil, fmt.Errorf("failed to assign role: %w", err)
 	}
 
 	// Send welcome email — CC resolved from PERSONEL_INFO_EMAIL_WELCOME config if defined
@@ -420,16 +420,33 @@ func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeDetai
 	}, nil
 }
 
-func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalGap float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo, status string, modifiedBy string, requestingUserID uint, isAdmin bool, roles []string) error {
+func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalGap float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo, status string, modifiedBy string, requestingUserID uint, actorRoles []string, roles []string) error {
 	// Get existing employee for authorization check and audit trail
 	existingEmployee, err := s.employeeRepo.GetByID(id)
 	if err != nil {
 		return err
 	}
 
-	// Check authorization - employees can only update their own profile, admins can update any
-	if !isAdmin && existingEmployee.UserID != requestingUserID {
+	canManageEmployees := authz.HasCapability(actorRoles, authz.CanManageEmployees)
+	actor := authz.ClassifyActor(actorRoles)
+
+	// Check authorization - employees can only update their own profile, managers can update any
+	if !canManageEmployees && existingEmployee.UserID != requestingUserID {
 		return errors.New("unauthorized to update this employee profile")
+	}
+
+	if canManageEmployees {
+		targetHasAdmin, err := s.userRoleRepo.HasRole(existingEmployee.UserID, domain.RoleAdmin)
+		if err != nil {
+			return fmt.Errorf("failed to verify target roles: %w", err)
+		}
+		if err := authz.DenyHRMutatingAdminTarget(actor, targetHasAdmin); err != nil {
+			return err
+		}
+	}
+
+	if err := authz.ValidateAssignableRoles(actor, roles); err != nil {
+		return err
 	}
 
 	// Update user email if it has changed
@@ -560,8 +577,7 @@ func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName
 	// Update roles if provided
 	if len(roles) > 0 {
 		if err := s.updateUserRoles(existingEmployee.UserID, roles, modifiedBy); err != nil {
-			// Log error but don't fail the operation - employee is already updated
-			fmt.Printf("Warning: failed to update roles for user %d: %v\n", existingEmployee.UserID, err)
+			return fmt.Errorf("failed to update roles for user %d: %w", existingEmployee.UserID, err)
 		}
 	}
 
@@ -619,14 +635,22 @@ func (s *employeeService) UpdateMyProfile(userID uint, email, phone, address, st
 	return nil
 }
 
-func (s *employeeService) DeleteEmployee(id uint, deletedBy string, isAdmin bool) error {
-	if !isAdmin {
+func (s *employeeService) DeleteEmployee(id uint, deletedBy string, actorRoles []string) error {
+	if !authz.HasCapability(actorRoles, authz.CanManageEmployees) {
 		return errors.New("only administrators can delete employee profiles")
 	}
 
 	// Get existing employee for audit trail
 	existingEmployee, err := s.employeeRepo.GetByID(id)
 	if err != nil {
+		return err
+	}
+
+	targetHasAdmin, err := s.userRoleRepo.HasRole(existingEmployee.UserID, domain.RoleAdmin)
+	if err != nil {
+		return fmt.Errorf("failed to verify target roles: %w", err)
+	}
+	if err := authz.DenyHRMutatingAdminTarget(authz.ClassifyActor(actorRoles), targetHasAdmin); err != nil {
 		return err
 	}
 
@@ -907,6 +931,14 @@ func (s *employeeService) GetEmployeeCountByCompanyDepartment() ([]interface{}, 
 // GetEmployeeCountByGrade returns employee count grouped by grade
 func (s *employeeService) GetEmployeeCountByGrade() ([]interface{}, error) {
 	return s.employeeRepo.GetEmployeeCountByGrade()
+}
+
+func (s *employeeService) EmployeeUserHasAdminRole(employeeID uint) (bool, error) {
+	employee, err := s.employeeRepo.GetByID(employeeID)
+	if err != nil {
+		return false, err
+	}
+	return s.userRoleRepo.HasRole(employee.UserID, domain.RoleAdmin)
 }
 
 // assignRolesToUser assigns roles to a user based on role names

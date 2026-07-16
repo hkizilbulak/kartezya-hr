@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"kartezya-hr/internal/authz"
+	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/repository"
 	"kartezya-hr/internal/service"
 
@@ -17,15 +19,17 @@ type AuthHandler struct {
 	emailService      service.EmailService
 	mailConfigService service.MailConfigService
 	userRepo          repository.UserRepository
+	userRoleRepo      repository.UserRoleRepository
 	employeeRepo      repository.EmployeeRepository
 }
 
-func NewAuthHandler(authService service.AuthService, emailService service.EmailService, userRepo repository.UserRepository, employeeRepo repository.EmployeeRepository, mailConfigService service.MailConfigService) *AuthHandler {
+func NewAuthHandler(authService service.AuthService, emailService service.EmailService, userRepo repository.UserRepository, userRoleRepo repository.UserRoleRepository, employeeRepo repository.EmployeeRepository, mailConfigService service.MailConfigService) *AuthHandler {
 	return &AuthHandler{
 		authService:       authService,
 		emailService:      emailService,
 		mailConfigService: mailConfigService,
 		userRepo:          userRepo,
+		userRoleRepo:      userRoleRepo,
 		employeeRepo:      employeeRepo,
 	}
 }
@@ -391,8 +395,8 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 // @Failure 401 {object} APIResponse
 // @Router /auth/send-password-reset-email [post]
 func (h *AuthHandler) SendPasswordResetEmail(c *gin.Context) {
-	_, exists := c.Get("userID")
-	if !exists {
+	_, _, roles, ok := getUserContext(c)
+	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
 			"error":   "User not authenticated",
@@ -416,6 +420,22 @@ func (h *AuthHandler) SendPasswordResetEmail(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   "User not found",
+		})
+		return
+	}
+
+	targetHasAdmin, err := h.userRoleRepo.HasRole(user.ID, domain.RoleAdmin)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "failed to verify target user roles",
+		})
+		return
+	}
+	if err := authz.DenyHRMutatingAdminTarget(authz.ClassifyActor(roles), targetHasAdmin); err != nil {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"error":   err.Error(),
 		})
 		return
 	}
@@ -492,11 +512,16 @@ func getUserContext(c *gin.Context) (uint, string, []string, bool) {
 // Helper function to check if user has admin role
 func isAdmin(roles []string) bool {
 	for _, role := range roles {
-		if role == "ADMIN" {
+		if role == domain.RoleAdmin {
 			return true
 		}
 	}
 	return false
+}
+
+// hasCapability reports whether any of the caller's roles grants the capability.
+func hasCapability(roles []string, capability authz.Capability) bool {
+	return authz.HasCapability(roles, capability)
 }
 
 // Helper function to parse uint from string parameter

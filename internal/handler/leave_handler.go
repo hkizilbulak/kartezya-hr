@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"kartezya-hr/internal/authz"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/service"
 	"kartezya-hr/internal/types"
@@ -386,48 +387,17 @@ func (h *LeaveHandler) CreateLeaveRequest(c *gin.Context) {
 		return
 	}
 
-	// Authorization check: Non-admin users can only create leave requests for themselves
-	if !isAdmin(roles) {
-		// First get the employee record from userID to get the correct employeeID
-		log.Printf("DEBUG: Non-admin user creating leave request - userID: %d, requestedEmployeeID: %v", userID, req.EmployeeID)
-
-		employee, err := h.employeeService.GetEmployeeByUserID(userID)
-		if err != nil {
-			log.Printf("DEBUG: Failed to get employee by userID %d - Error: %v", userID, err)
-			c.JSON(http.StatusForbidden, gin.H{
-				"success": false,
-				"error":   "Unable to verify employee authorization",
-			})
-			return
-		}
-
-		log.Printf("DEBUG: Employee found - employee.ID: %d, req.EmployeeID: %v", employee.ID, req.EmployeeID)
-
-		if req.EmployeeID == nil {
-			req.EmployeeID = &employee.ID
-		} else if *req.EmployeeID != employee.ID {
-			log.Printf("DEBUG: Authorization failed - Employee mismatch. Employee.ID: %d != req.EmployeeID: %d", employee.ID, *req.EmployeeID)
-			c.JSON(http.StatusForbidden, gin.H{
-				"success": false,
-				"error":   "You can only create leave requests for yourself",
-			})
-			return
-		}
-
-		log.Printf("DEBUG: Authorization passed - Employee ID matches")
-	} else if req.EmployeeID == nil {
-		// Admin users: if no employee_id provided, use authenticated user's employee ID
-		employee, err := h.employeeService.GetEmployeeByUserID(userID)
-		if err != nil {
-			log.Printf("DEBUG: Admin user - Failed to get employee by userID %d - Error: %v", userID, err)
-			c.JSON(http.StatusBadRequest, gin.H{
-				"success": false,
-				"error":   "employee_id is required or authenticated user must be an employee",
-			})
-			return
-		}
-		req.EmployeeID = &employee.ID
+	// Self-service create: always bind the leave to the caller's employee record.
+	// Client-supplied employee_id is ignored for all roles (including ADMIN).
+	employee, err := h.employeeService.GetEmployeeByUserID(userID)
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"error":   "Unable to verify employee authorization",
+		})
+		return
 	}
+	callerEmployeeID := employee.ID
 
 	// Calculate working days between start and end date
 	workingDays, err := h.leaveService.CalculateWorkingDays(req.StartDate, req.EndDate, req.IsStartDateFullDay, req.IsFinishDateFullDay)
@@ -455,7 +425,7 @@ func (h *LeaveHandler) CreateLeaveRequest(c *gin.Context) {
 
 	// Create LeaveRequest entity
 	leave := &domain.LeaveRequest{
-		EmployeeID:          *req.EmployeeID,
+		EmployeeID:          callerEmployeeID,
 		LeaveTypeID:         req.LeaveTypeID,
 		StartDate:           req.StartDate,
 		EndDate:             req.EndDate,
@@ -528,7 +498,7 @@ func (h *LeaveHandler) CreateLeaveRequest(c *gin.Context) {
 		} else {
 			log.Printf("[LEAVE] INFO notification sent for new leave request (employee %d)", empID)
 		}
-	}(*req.EmployeeID, req.StartDate, req.EndDate, req.Reason, leaveType.Name, workingDays, leave.IsPaid)
+	}(callerEmployeeID, req.StartDate, req.EndDate, req.Reason, leaveType.Name, workingDays, leave.IsPaid)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true,
@@ -589,9 +559,8 @@ func (h *LeaveHandler) UpdateLeaveRequest(c *gin.Context) {
 		return
 	}
 
-	// Authorization check - employees can only update their own requests, admins can update any
-	if !isAdmin(roles) {
-		// First get the employee record from userID to get the correct employeeID
+	// Owner may update own requests; leave managers (ADMIN/HR via CanApproveLeave) may update any.
+	if !hasCapability(roles, authz.CanApproveLeave) {
 		employee, err := h.employeeService.GetEmployeeByUserID(userID)
 		if err != nil {
 			c.JSON(http.StatusForbidden, gin.H{
@@ -600,9 +569,6 @@ func (h *LeaveHandler) UpdateLeaveRequest(c *gin.Context) {
 			})
 			return
 		}
-
-		// Log the values for debugging authorization
-		log.Printf("Authorization check - existingLeave.EmployeeID: %d, employee.ID: %d", existingLeave.EmployeeID, employee.ID)
 
 		if existingLeave.EmployeeID != employee.ID {
 			c.JSON(http.StatusForbidden, gin.H{
@@ -814,7 +780,7 @@ func (h *LeaveHandler) GetAllLeaveRequests(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanViewLeaveManagement) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Only administrators can view all leave requests",
@@ -935,7 +901,7 @@ func (h *LeaveHandler) ApproveLeaveRequest(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanApproveLeave) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Only administrators can approve leave requests",
@@ -990,7 +956,7 @@ func (h *LeaveHandler) RejectLeaveRequest(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanApproveLeave) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Only administrators can reject leave requests",
@@ -1064,7 +1030,7 @@ func (h *LeaveHandler) CancelLeaveRequest(c *gin.Context) {
 		return
 	}
 
-	if err := h.leaveService.CancelLeave(id, "İptal", userID, isAdmin(roles)); err != nil {
+	if err := h.leaveService.CancelLeave(id, "İptal", userID, hasCapability(roles, authz.CanApproveLeave)); err != nil {
 		status := http.StatusInternalServerError
 		if err.Error() == "you can only cancel your own leave requests" ||
 			err.Error() == "only pending leave requests can be cancelled, current status: PENDING" ||
@@ -1164,7 +1130,7 @@ func (h *LeaveHandler) GetLeaveBalances(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageLeaveTypes) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Only administrators can view other employees' leave balances",
@@ -1317,7 +1283,7 @@ func (h *LeaveHandler) CalculateWorkingDays(c *gin.Context) {
 // @Router /leave/requests/{id}/documents [post]
 func (h *LeaveHandler) UploadLeaveDocument(c *gin.Context) {
 	// Get user from context
-	userID, _, _, ok := getUserContext(c)
+	userID, _, roles, ok := getUserContext(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -1347,8 +1313,8 @@ func (h *LeaveHandler) UploadLeaveDocument(c *gin.Context) {
 		return
 	}
 
-	// Upload document
-	document, err := h.leaveService.UploadLeaveDocument(uint(leaveRequestID), file, userID)
+	canManage := hasCapability(roles, authz.CanViewLeaveManagement)
+	document, err := h.leaveService.UploadLeaveDocument(uint(leaveRequestID), file, userID, canManage)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -1398,7 +1364,7 @@ func (h *LeaveHandler) GetLeaveDocuments(c *gin.Context) {
 	}
 
 	// Get documents
-	documents, err := h.leaveService.GetLeaveDocuments(uint(leaveRequestID), userID, isAdmin(roles))
+	documents, err := h.leaveService.GetLeaveDocuments(uint(leaveRequestID), userID, hasCapability(roles, authz.CanViewLeaveManagement))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -1446,7 +1412,7 @@ func (h *LeaveHandler) DeleteLeaveDocument(c *gin.Context) {
 	}
 
 	// Delete document
-	if err := h.leaveService.DeleteLeaveDocument(documentID, userID, isAdmin(roles)); err != nil {
+	if err := h.leaveService.DeleteLeaveDocument(documentID, userID, hasCapability(roles, authz.CanViewLeaveManagement)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   err.Error(),
@@ -1493,7 +1459,7 @@ func (h *LeaveHandler) DownloadLeaveDocument(c *gin.Context) {
 	}
 
 	// Get download URL
-	url, err := h.leaveService.DownloadLeaveDocument(documentID, userID, isAdmin(roles))
+	url, err := h.leaveService.DownloadLeaveDocument(documentID, userID, hasCapability(roles, authz.CanViewLeaveManagement))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,

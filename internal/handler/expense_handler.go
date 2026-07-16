@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"kartezya-hr/internal/authz"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/service"
 	"kartezya-hr/internal/types"
@@ -272,7 +273,7 @@ func (h *ExpenseHandler) GetAllExpenseRequests(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanViewExpenseManagement) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Admin access required",
@@ -344,7 +345,7 @@ func (h *ExpenseHandler) GetAllExpenseRequests(c *gin.Context) {
 // @Failure 404 {object} APIResponse
 // @Router /expense/requests/{id} [get]
 func (h *ExpenseHandler) GetExpenseRequestByID(c *gin.Context) {
-	_, _, _, ok := getUserContext(c)
+	userID, _, roles, ok := getUserContext(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -362,11 +363,16 @@ func (h *ExpenseHandler) GetExpenseRequestByID(c *gin.Context) {
 		return
 	}
 
-	expense, err := h.expenseService.GetExpenseRequestByID(id)
+	canViewManagement := hasCapability(roles, authz.CanViewExpenseManagement)
+	expense, err := h.expenseService.GetExpenseRequestByIDForCaller(id, userID, canViewManagement)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
+		status := http.StatusNotFound
+		if err.Error() == "access denied" {
+			status = http.StatusForbidden
+		}
+		c.JSON(status, gin.H{
 			"success": false,
-			"error":   "Expense request not found",
+			"error":   err.Error(),
 		})
 		return
 	}
@@ -428,8 +434,16 @@ func (h *ExpenseHandler) UpdateExpenseRequest(c *gin.Context) {
 		return
 	}
 
-	// Verify ownership
-	if existing.Employee != nil && existing.Employee.UserID != userID {
+	// Ownership: compare expense.EmployeeID to caller's employee (do not rely on Employee preload).
+	callerEmployee, err := h.employeeService.GetEmployeeByUserID(userID)
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"error":   "Access denied",
+		})
+		return
+	}
+	if existing.EmployeeID != callerEmployee.ID {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Access denied",
@@ -544,7 +558,7 @@ func (h *ExpenseHandler) ApproveExpenseRequest(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanApproveExpense) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Admin access required",
@@ -653,7 +667,7 @@ func (h *ExpenseHandler) RejectExpenseRequest(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanApproveExpense) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Admin access required",
@@ -719,7 +733,7 @@ func (h *ExpenseHandler) MarkExpenseAsPaid(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanPayExpense) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "Admin access required",
@@ -788,10 +802,10 @@ func (h *ExpenseHandler) GetExpenseTypes(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageExpenseTypes) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
-			"error":   "Admin access required",
+			"error":   "Insufficient permissions",
 		})
 		return
 	}
@@ -886,10 +900,10 @@ func (h *ExpenseHandler) CreateExpenseType(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageExpenseTypes) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
-			"error":   "Admin access required",
+			"error":   "Insufficient permissions",
 		})
 		return
 	}
@@ -951,10 +965,10 @@ func (h *ExpenseHandler) UpdateExpenseType(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageExpenseTypes) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
-			"error":   "Admin access required",
+			"error":   "Insufficient permissions",
 		})
 		return
 	}
@@ -1071,10 +1085,10 @@ func (h *ExpenseHandler) DeleteExpenseType(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(roles) {
+	if !hasCapability(roles, authz.CanManageExpenseTypes) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
-			"error":   "Admin access required",
+			"error":   "Insufficient permissions",
 		})
 		return
 	}
@@ -1119,7 +1133,7 @@ func (h *ExpenseHandler) DeleteExpenseType(c *gin.Context) {
 // @Router /expense/requests/{id}/documents [post]
 func (h *ExpenseHandler) UploadExpenseDocument(c *gin.Context) {
 	// Get user from context
-	userID, _, _, ok := getUserContext(c)
+	userID, _, roles, ok := getUserContext(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -1149,8 +1163,8 @@ func (h *ExpenseHandler) UploadExpenseDocument(c *gin.Context) {
 		return
 	}
 
-	// Upload document
-	document, err := h.expenseService.UploadExpenseDocument(uint(expenseRequestID), file, userID)
+	canManage := hasCapability(roles, authz.CanViewExpenseManagement)
+	document, err := h.expenseService.UploadExpenseDocument(uint(expenseRequestID), file, userID, canManage)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -1200,7 +1214,7 @@ func (h *ExpenseHandler) GetExpenseDocuments(c *gin.Context) {
 	}
 
 	// Get documents
-	documents, err := h.expenseService.GetExpenseDocuments(uint(expenseRequestID), userID, isAdmin(roles))
+	documents, err := h.expenseService.GetExpenseDocuments(uint(expenseRequestID), userID, hasCapability(roles, authz.CanViewExpenseManagement))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -1248,7 +1262,7 @@ func (h *ExpenseHandler) DeleteExpenseDocument(c *gin.Context) {
 	}
 
 	// Delete document
-	if err := h.expenseService.DeleteExpenseDocument(documentID, userID, isAdmin(roles)); err != nil {
+	if err := h.expenseService.DeleteExpenseDocument(documentID, userID, hasCapability(roles, authz.CanViewExpenseManagement)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   err.Error(),
@@ -1295,7 +1309,7 @@ func (h *ExpenseHandler) DownloadExpenseDocument(c *gin.Context) {
 	}
 
 	// Get download URL
-	url, err := h.expenseService.DownloadExpenseDocument(documentID, userID, isAdmin(roles))
+	url, err := h.expenseService.DownloadExpenseDocument(documentID, userID, hasCapability(roles, authz.CanViewExpenseManagement))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
