@@ -65,13 +65,17 @@ func main() {
 	defer db.Close()
 
 	// Run migrations
-	if err := db.Migrate(); err != nil {
-		log.Fatalf("Failed to migrate database: %v", err)
-	}
+	if cfg.Database.AutoMigrate {
+		if err := db.Migrate(); err != nil {
+			log.Fatalf("Failed to migrate database: %v", err)
+		}
 
-	// Seed database with default data
-	if err := seedDatabase(db); err != nil {
-		log.Printf("Warning: Failed to seed database: %v", err)
+		// Seed database with default data
+		if err := seedDatabase(db); err != nil {
+			log.Printf("Warning: Failed to seed database: %v", err)
+		}
+	} else {
+		log.Println("Database auto-migration and seeding are disabled by configuration")
 	}
 
 	// Initialize repositories

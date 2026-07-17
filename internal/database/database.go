@@ -83,6 +83,11 @@ func (d *Database) Close() {
 
 // Migrate runs GORM auto-migration to create tables
 func (d *Database) Migrate() error {
+	if !d.Config.Database.AutoMigrate {
+		log.Println("Database auto-migration is disabled by configuration")
+		return nil
+	}
+
 	log.Println("Running GORM auto-migration...")
 
 	d.DB.Config.DisableForeignKeyConstraintWhenMigrating = true

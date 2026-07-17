@@ -31,6 +31,7 @@ type DatabaseConfig struct {
 	SSLMode     string
 	Debug       bool
 	TablePrefix string
+	AutoMigrate bool
 }
 
 type JWTConfig struct {
@@ -125,6 +126,7 @@ func Load() *Config {
 			SSLMode:     getEnv("DB_SSLMODE", "disable"),
 			Debug:       getEnv("DB_DEBUG", "false") == "true",
 			TablePrefix: getEnv("DB_TABLE_PREFIX", "hr"),
+			AutoMigrate: getEnv("DB_AUTO_MIGRATE", "true") != "false",
 		},
 		JWT: JWTConfig{
 			Secret:      getEnv("JWT_SECRET", "default-secret-change-me"),
