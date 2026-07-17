@@ -27,6 +27,7 @@ type EmployeeRepository interface {
 	GetEmployeeCountByGender() ([]interface{}, error)
 	GetEmployeeCountByPosition() ([]interface{}, error)
 	GetEmployeeCountByCompanyDepartment() ([]interface{}, error)
+	GetInternCountByCompanyDepartment() ([]interface{}, error)
 	GetEmployeeCountByGrade() ([]interface{}, error)
 	GetWorkDayReportData(startDate, endDate string, companyID *uint, departmentIDs []uint, isActive *bool) ([]types.WorkDayReportRow, error)
 	GetGradeReportData(companyID *uint, departmentIDs []uint, isActive *bool) ([]types.GradeReportRow, error)
@@ -868,6 +869,70 @@ func (r *employeeRepository) GetEmployeeCountByCompanyDepartment() ([]interface{
 	}
 
 	// Convert to []interface{}
+	var data []interface{}
+	for _, result := range results {
+		data = append(data, result)
+	}
+	return data, nil
+}
+
+// GetInternCountByCompanyDepartment returns active interns count grouped by company and department
+func (r *employeeRepository) GetInternCountByCompanyDepartment() ([]interface{}, error) {
+	type CompanyDepartmentCount struct {
+		CompanyName    string `json:"company_name"`
+		DepartmentName string `json:"department_name"`
+		Count          int64  `json:"count"`
+	}
+
+	var results []CompanyDepartmentCount
+	err := r.db.Model(&domain.Employee{}).
+		Joins(fmt.Sprintf(`JOIN %s ON %s.employee_id = %s.id 
+			AND %s.deleted = false 
+			AND %s.id = (
+				SELECT id FROM %s 
+				WHERE employee_id = %s.id 
+				AND deleted = false 
+				ORDER BY start_date DESC 
+				LIMIT 1
+			)`,
+			domain.GetTableName("hr_employee_work_information"),
+			domain.GetTableName("hr_employee_work_information"),
+			domain.GetTableName("hr_employees"),
+			domain.GetTableName("hr_employee_work_information"),
+			domain.GetTableName("hr_employee_work_information"),
+			domain.GetTableName("hr_employee_work_information"),
+			domain.GetTableName("hr_employees"))).
+		Joins(fmt.Sprintf("JOIN %s ON %s.id = %s.department_id AND %s.deleted = false",
+			domain.GetTableName("hr_departments"),
+			domain.GetTableName("hr_departments"),
+			domain.GetTableName("hr_employee_work_information"),
+			domain.GetTableName("hr_departments"))).
+		Joins(fmt.Sprintf("JOIN %s ON %s.id = %s.company_id AND %s.deleted = false",
+			domain.GetTableName("hr_companies"),
+			domain.GetTableName("hr_companies"),
+			domain.GetTableName("hr_departments"),
+			domain.GetTableName("hr_companies"))).
+		Joins(fmt.Sprintf("JOIN %s ON %s.id = %s.job_position_id AND %s.deleted = false",
+			domain.GetTableName("hr_job_positions"),
+			domain.GetTableName("hr_job_positions"),
+			domain.GetTableName("hr_employee_work_information"),
+			domain.GetTableName("hr_job_positions"))).
+		Where(fmt.Sprintf("%s.deleted = ? AND %s.status = ? AND (LOWER(%s.title) LIKE ? OR LOWER(%s.title) LIKE ?)", 
+			domain.GetTableName("hr_employees"), 
+			domain.GetTableName("hr_employees"), 
+			domain.GetTableName("hr_job_positions"), 
+			domain.GetTableName("hr_job_positions")), 
+			false, "ACTIVE", "%intern%", "%stajyer%").
+		Group(fmt.Sprintf("%s.name, %s.name", domain.GetTableName("hr_companies"), domain.GetTableName("hr_departments"))).
+		Select(fmt.Sprintf("%s.name as company_name, %s.name as department_name, COUNT(*) as count",
+			domain.GetTableName("hr_companies"), domain.GetTableName("hr_departments"))).
+		Order(fmt.Sprintf("%s.name ASC, %s.name ASC", domain.GetTableName("hr_companies"), domain.GetTableName("hr_departments"))).
+		Scan(&results).Error
+
+	if err != nil {
+		return nil, err
+	}
+
 	var data []interface{}
 	for _, result := range results {
 		data = append(data, result)

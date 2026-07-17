@@ -26,6 +26,7 @@ type EmployeeService interface {
 	GetEmployeeCountByGender() ([]interface{}, error)
 	GetEmployeeCountByPosition() ([]interface{}, error)
 	GetEmployeeCountByCompanyDepartment() ([]interface{}, error)
+	GetInternCountByCompanyDepartment() ([]interface{}, error)
 	GetEmployeeCountByGrade() ([]interface{}, error)
 }
 
@@ -926,6 +927,11 @@ func (s *employeeService) GetEmployeeCountByPosition() ([]interface{}, error) {
 // GetEmployeeCountByCompanyDepartment returns employee count grouped by company and department
 func (s *employeeService) GetEmployeeCountByCompanyDepartment() ([]interface{}, error) {
 	return s.employeeRepo.GetEmployeeCountByCompanyDepartment()
+}
+
+// GetInternCountByCompanyDepartment returns active interns count grouped by company and department
+func (s *employeeService) GetInternCountByCompanyDepartment() ([]interface{}, error) {
+	return s.employeeRepo.GetInternCountByCompanyDepartment()
 }
 
 // GetEmployeeCountByGrade returns employee count grouped by grade

@@ -500,6 +500,7 @@ func main() {
 			dashboardRoutes.GET("/employees-by-gender", dashboardHandler.GetEmployeesByGender)
 			dashboardRoutes.GET("/employees-by-position", dashboardHandler.GetEmployeesByPosition)
 			dashboardRoutes.GET("/employees-by-company-department", dashboardHandler.GetEmployeesByCompanyDepartment)
+			dashboardRoutes.GET("/interns-by-company-department", dashboardHandler.GetInternsByCompanyDepartment)
 			dashboardRoutes.GET("/employees-by-grade", dashboardHandler.GetEmployeesByGrade)
 		}
 

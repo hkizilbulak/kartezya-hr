@@ -85,6 +85,9 @@ func (s *stubEmployeeRepoForExpense) GetEmployeeCountByPosition() ([]interface{}
 func (s *stubEmployeeRepoForExpense) GetEmployeeCountByCompanyDepartment() ([]interface{}, error) {
 	return nil, nil
 }
+func (s *stubEmployeeRepoForExpense) GetInternCountByCompanyDepartment() ([]interface{}, error) {
+	return nil, nil
+}
 func (s *stubEmployeeRepoForExpense) GetEmployeeCountByGrade() ([]interface{}, error) {
 	return nil, nil
 }
