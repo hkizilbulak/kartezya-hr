@@ -98,7 +98,7 @@ ADMIN ile aynı yönetim alanlarının çoğu (`CanPayExpense` hariç). İzin y�
 
 ---
 
-## 4. FINANCE
+## 4. FINANCIAL
 
 ### Erişebildiği API’ler
 
@@ -113,9 +113,9 @@ ADMIN ile aynı yönetim alanlarının çoğu (`CanPayExpense` hariç). İzin y�
 | Expense types | Tip CRUD | `/api/v1/expense/types` | `CanManageExpenseTypes` |
 | Dashboard / FAQ / Event portal | Okuma / katılım | `/dashboard`, `/faqs`, `/events/dashboard` | JWT |
 
-#### Masraf işlemleri (FINANCE)
+#### Masraf işlemleri (FINANCIAL)
 
-| Masraf işlemi | FINANCE erişimi | Backend kontrolü |
+| Masraf işlemi | FINANCIAL erişimi | Backend kontrolü |
 |---|---|---|
 | Masraf listesi | Tümü | `CanViewExpenseManagement` |
 | Masraf detayı | Tümü | Owner veya `CanViewExpenseManagement` |
@@ -140,7 +140,7 @@ ADMIN ile aynı yönetim alanlarının çoğu (`CanPayExpense` hariç). İzin y�
 | Reports / Jobs / Mail | Yok | `CanAccessAdminModules` yok |
 | Expense approve / reject | Yok | `CanApproveExpense` yok |
 
-`CanViewEmployees` çalışan listesi ve detayını görüntülemeye yeterlidir. Personel belgeleri için `CanManageEmployees` gerektiğinden FINANCE personel belgelerine erişemez.
+`CanViewEmployees` çalışan listesi ve detayını görüntülemeye yeterlidir. Personel belgeleri için `CanManageEmployees` gerektiğinden FINANCIAL personel belgelerine erişemez.
 
 ---
 
@@ -169,7 +169,7 @@ Management capability listesi boştur (`RoleCapabilities[EMPLOYEE] = []`). Self-
 
 ## 6. Kritik Rol Farkları
 
-| İşlem | ADMIN | HR | FINANCE | EMPLOYEE |
+| İşlem | ADMIN | HR | FINANCIAL | EMPLOYEE |
 |---|---|---|---|---|
 | Çalışan görüntüleme | Tümü | Tümü | Tümü | Yok |
 | Çalışan yönetme | Tümü | ADMIN hedef hariç | Yok | Yok |

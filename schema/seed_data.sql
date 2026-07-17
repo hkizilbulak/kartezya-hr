@@ -10,7 +10,7 @@ INSERT INTO hr_roles (name, description, created_by, modified_by) VALUES
 ('ADMIN', 'Administrator with full system access', 'system', 'system'),
 ('EMPLOYEE', 'Regular employee with limited access', 'system', 'system'),
 ('HR', 'HR specialist with HR management access', 'system', 'system'),
-('FINANCE', 'Finance specialist with payment access', 'system', 'system');
+('FINANCIAL', 'Finance specialist with payment access', 'system', 'system');
 
 -- ================================================
 -- ADMIN USER (Password: admin123)

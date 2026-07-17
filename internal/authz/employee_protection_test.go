@@ -16,7 +16,7 @@ func TestClassifyActor(t *testing.T) {
 		{name: "admin", roles: []string{domain.RoleAdmin}, want: ActorAdmin},
 		{name: "hr", roles: []string{domain.RoleHR}, want: ActorHR},
 		{name: "admin wins over hr", roles: []string{domain.RoleHR, domain.RoleAdmin}, want: ActorAdmin},
-		{name: "finance", roles: []string{domain.RoleFinance}, want: ActorOther},
+		{name: "finance", roles: []string{domain.RoleFinancial}, want: ActorOther},
 		{name: "employee", roles: []string{domain.RoleEmployee}, want: ActorOther},
 		{name: "empty", roles: nil, want: ActorOther},
 	}
@@ -44,12 +44,12 @@ func TestValidateAssignableRoles(t *testing.T) {
 		{
 			name:      "admin can assign all four",
 			actor:     ActorAdmin,
-			requested: []string{domain.RoleAdmin, domain.RoleEmployee, domain.RoleHR, domain.RoleFinance},
+			requested: []string{domain.RoleAdmin, domain.RoleEmployee, domain.RoleHR, domain.RoleFinancial},
 		},
 		{
 			name:      "hr can assign employee hr finance",
 			actor:     ActorHR,
-			requested: []string{domain.RoleEmployee, domain.RoleHR, domain.RoleFinance},
+			requested: []string{domain.RoleEmployee, domain.RoleHR, domain.RoleFinancial},
 		},
 		{
 			name:      "hr cannot assign admin",
@@ -114,7 +114,7 @@ func TestDenyHRMutatingAdminTarget(t *testing.T) {
 }
 
 func TestFinanceCannotManageEmployees(t *testing.T) {
-	if HasCapability([]string{domain.RoleFinance}, CanManageEmployees) {
-		t.Fatal("FINANCE must not mutate employees")
+	if HasCapability([]string{domain.RoleFinancial}, CanManageEmployees) {
+		t.Fatal("FINANCIAL must not mutate employees")
 	}
 }

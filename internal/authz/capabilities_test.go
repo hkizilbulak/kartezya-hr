@@ -33,25 +33,25 @@ func TestHasCapability(t *testing.T) {
 		},
 		{
 			name:       "finance can pay expense",
-			roles:      []string{domain.RoleFinance},
+			roles:      []string{domain.RoleFinancial},
 			capability: CanPayExpense,
 			want:       true,
 		},
 		{
 			name:       "finance cannot approve expense",
-			roles:      []string{domain.RoleFinance},
+			roles:      []string{domain.RoleFinancial},
 			capability: CanApproveExpense,
 			want:       false,
 		},
 		{
 			name:       "finance cannot manage employees",
-			roles:      []string{domain.RoleFinance},
+			roles:      []string{domain.RoleFinancial},
 			capability: CanManageEmployees,
 			want:       false,
 		},
 		{
 			name:       "finance can view employees",
-			roles:      []string{domain.RoleFinance},
+			roles:      []string{domain.RoleFinancial},
 			capability: CanViewEmployees,
 			want:       true,
 		},
@@ -69,7 +69,7 @@ func TestHasCapability(t *testing.T) {
 		},
 		{
 			name:       "finance can manage expense types",
-			roles:      []string{domain.RoleFinance},
+			roles:      []string{domain.RoleFinancial},
 			capability: CanManageExpenseTypes,
 			want:       true,
 		},
@@ -93,7 +93,7 @@ func TestHasCapability(t *testing.T) {
 		},
 		{
 			name:       "finance cannot access admin modules",
-			roles:      []string{domain.RoleFinance},
+			roles:      []string{domain.RoleFinancial},
 			capability: CanAccessAdminModules,
 			want:       false,
 		},
@@ -111,13 +111,13 @@ func TestHasCapability(t *testing.T) {
 		},
 		{
 			name:       "multi-role union grants pay from finance",
-			roles:      []string{domain.RoleHR, domain.RoleFinance},
+			roles:      []string{domain.RoleHR, domain.RoleFinancial},
 			capability: CanPayExpense,
 			want:       true,
 		},
 		{
 			name:       "multi-role union grants approve from hr",
-			roles:      []string{domain.RoleHR, domain.RoleFinance},
+			roles:      []string{domain.RoleHR, domain.RoleFinancial},
 			capability: CanApproveExpense,
 			want:       true,
 		},

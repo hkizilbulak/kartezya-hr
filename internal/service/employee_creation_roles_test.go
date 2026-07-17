@@ -25,8 +25,8 @@ func TestValidateEmployeeCreationRoles(t *testing.T) {
 		},
 		{
 			name:  "finance accepted",
-			roles: []string{domain.RoleFinance},
-			want:  domain.RoleFinance,
+			roles: []string{domain.RoleFinancial},
+			want:  domain.RoleFinancial,
 		},
 		{
 			name:    "admin rejected",

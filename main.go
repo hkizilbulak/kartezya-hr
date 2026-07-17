@@ -299,7 +299,7 @@ func main() {
 			employeeRoutes.PUT("/me", employeeHandler.UpdateMyProfile)
 			employeeRoutes.PUT("/:id", authMiddleware.RequireCapability(authz.CanManageEmployees), employeeHandler.UpdateEmployee)
 
-			// Employee read (ADMIN, HR, FINANCE) / manage (ADMIN, HR)
+			// Employee read (ADMIN, HR, FINANCIAL) / manage (ADMIN, HR)
 			employeeRoutes.GET("/:id", authMiddleware.RequireCapability(authz.CanViewEmployees), employeeHandler.GetEmployeeByID)
 			employeeRoutes.POST("", authMiddleware.RequireCapability(authz.CanManageEmployees), employeeHandler.CreateEmployee)
 			employeeRoutes.GET("", authMiddleware.RequireCapability(authz.CanViewEmployees), employeeHandler.ListEmployees)
@@ -651,7 +651,7 @@ func seedDatabase(db *database.Database) error {
 		{Name: domain.RoleAdmin, Description: "Administrator with full system access"},
 		{Name: domain.RoleEmployee, Description: "Regular employee with limited access"},
 		{Name: domain.RoleHR, Description: "HR specialist with HR management access"},
-		{Name: domain.RoleFinance, Description: "Finance specialist with payment access"},
+		{Name: domain.RoleFinancial, Description: "Finance specialist with payment access"},
 	}
 
 	for _, role := range roles {
