@@ -12,7 +12,7 @@ import (
 type ActorKind int
 
 const (
-	// ActorOther is any caller that is neither ADMIN nor HR (e.g. FINANCE, EMPLOYEE).
+	// ActorOther is any caller that is neither ADMIN nor HR (e.g. FINANCIAL, EMPLOYEE).
 	ActorOther ActorKind = iota
 	// ActorAdmin is a caller with the ADMIN role (takes precedence over HR).
 	ActorAdmin
@@ -76,7 +76,7 @@ func ValidateAssignableRoles(actor ActorKind, requested []string) error {
 	allowed := map[string]bool{
 		domain.RoleEmployee: true,
 		domain.RoleHR:       true,
-		domain.RoleFinance:  true,
+		domain.RoleFinancial: true,
 	}
 	if actor == ActorAdmin {
 		allowed[domain.RoleAdmin] = true

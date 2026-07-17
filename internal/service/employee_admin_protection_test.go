@@ -198,7 +198,7 @@ func TestUpdateEmployeeHRCanAssignAllowedRoles(t *testing.T) {
 	emp := &domain.Employee{AuditableModel: domain.AuditableModel{ID: 1}, UserID: 10, CompanyEmail: "t@example.com"}
 	svc, _, _ := newProtectionEmployeeService(emp, false)
 
-	err := svc.UpdateEmployee(1, "p@example.com", "t@example.com", "A", "B", "", "", "", "", "", "", "", "", 0, "", "", "", "", nil, "", "", "", "", "", "", "", "ACTIVE", "hr@x", 99, []string{domain.RoleHR}, []string{domain.RoleEmployee, domain.RoleHR, domain.RoleFinance})
+	err := svc.UpdateEmployee(1, "p@example.com", "t@example.com", "A", "B", "", "", "", "", "", "", "", "", 0, "", "", "", "", nil, "", "", "", "", "", "", "", "ACTIVE", "hr@x", 99, []string{domain.RoleHR}, []string{domain.RoleEmployee, domain.RoleHR, domain.RoleFinancial})
 	if err != nil {
 		t.Fatalf("HR should assign allowed roles: %v", err)
 	}
@@ -257,9 +257,9 @@ func TestDeleteEmployeeFinanceCannotMutate(t *testing.T) {
 	emp := &domain.Employee{AuditableModel: domain.AuditableModel{ID: 1}, UserID: 10}
 	svc, empRepo, _ := newProtectionEmployeeService(emp, false)
 
-	err := svc.DeleteEmployee(1, "finance@x", []string{domain.RoleFinance})
+	err := svc.DeleteEmployee(1, "finance@x", []string{domain.RoleFinancial})
 	if err == nil {
-		t.Fatal("FINANCE must not delete employees")
+		t.Fatal("FINANCIAL must not delete employees")
 	}
 	if empRepo.deleted {
 		t.Fatal("must not delete")

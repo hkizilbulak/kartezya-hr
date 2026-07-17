@@ -346,7 +346,7 @@ const (
 	RoleAdmin    = "ADMIN"
 	RoleEmployee = "EMPLOYEE"
 	RoleHR       = "HR"
-	RoleFinance  = "FINANCE"
+	RoleFinancial = "FINANCIAL"
 )
 
 // Constants for leave request status

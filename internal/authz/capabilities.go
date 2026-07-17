@@ -53,7 +53,7 @@ var RoleCapabilities = map[string][]Capability{
 		CanManageRequestTypes,
 		CanAccessAdminModules,
 	},
-	domain.RoleFinance: {
+	domain.RoleFinancial: {
 		CanViewEmployees,
 		CanViewExpenseManagement,
 		CanPayExpense,
