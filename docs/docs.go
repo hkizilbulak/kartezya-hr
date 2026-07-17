@@ -258,6 +258,67 @@ const docTemplate = `{
                 }
             }
         },
+        "/auth/kvkk": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Save the user's decision to accept or reject the photo/video sharing consent, and logs the operation",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Save KVKK consent decision",
+                "parameters": [
+                    {
+                        "description": "Consent Decision",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.SaveKvkkConsentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/auth/login": {
             "post": {
                 "description": "Authenticate user with email and password",
@@ -436,6 +497,49 @@ const docTemplate = `{
                         "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/settings": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get settings and preferences for the authenticated user, including KVKK approval status",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Get user settings",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -1198,6 +1302,61 @@ const docTemplate = `{
                 }
             }
         },
+        "/dashboard/interns-by-company-department": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get intern statistics grouped by company and department",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dashboard"
+                ],
+                "summary": "Get interns count by company and department",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/handler.CompanyDepartmentChartData"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/departments": {
             "get": {
                 "security": [
@@ -1535,6 +1694,55 @@ const docTemplate = `{
                         "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/emails/send-template": {
+            "post": {
+                "description": "Sends an email using a Resend template with custom template_data variables",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "email"
+                ],
+                "summary": "Send a dynamic template email via Resend",
+                "parameters": [
+                    {
+                        "description": "Email payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.SendDynamicEmailRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -2821,6 +3029,76 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/employees/{id}/contracts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all portal contracts with their approval status for a specific employee",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "portal-contracts"
+                ],
+                "summary": "Get employee portal contracts",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Employee ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.EmployeePortalContractResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/handler.APIResponse"
                         }
@@ -6309,104 +6587,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/other-requests": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "other_requests"
-                ],
-                "summary": "Talepleri listeler",
-                "responses": {}
-            },
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "other_requests"
-                ],
-                "summary": "Çalışan için yeni talep oluşturur",
-                "parameters": [
-                    {
-                        "description": "Request Data",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.CreateOtherRequestReq"
-                        }
-                    }
-                ],
-                "responses": {}
-            }
-        },
-        "/other-requests/{id}/cancel": {
-            "patch": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "other_requests"
-                ],
-                "summary": "Çalışan tarafından talebi iptal eder",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Request ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {}
-            }
-        },
-        "/other-requests/{id}/complete": {
-            "patch": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "other_requests"
-                ],
-                "summary": "İK personeli tarafından talebi tamamlar",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Request ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {}
-            }
-        },
         "/reports/efor": {
             "get": {
                 "security": [
@@ -6784,60 +6964,6 @@ const docTemplate = `{
                             "additionalProperties": {
                                 "type": "string"
                             }
-                        }
-                    }
-                }
-            }
-        },
-        "/request-types": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "request_types"
-                ],
-                "summary": "Talep Türlerini listeler",
-                "responses": {}
-            },
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "request_types"
-                ],
-                "summary": "Yeni Talep Türü oluşturur",
-                "parameters": [
-                    {
-                        "description": "Request Type Data",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.CreateRequestTypeReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
                         }
                     }
                 }
@@ -8130,6 +8256,9 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/domain.UserRole"
                     }
+                },
+                "user_setting": {
+                    "$ref": "#/definitions/domain.UserSetting"
                 }
             }
         },
@@ -8167,6 +8296,83 @@ const docTemplate = `{
                             "$ref": "#/definitions/domain.User"
                         }
                     ]
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "domain.UserSetting": {
+            "type": "object",
+            "properties": {
+                "anti_bribery_policy": {
+                    "description": "\"PENDING\", \"READ\"",
+                    "type": "string"
+                },
+                "anti_bribery_policy_at": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "string"
+                },
+                "deleted": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "kvkk_approved": {
+                    "type": "boolean"
+                },
+                "kvkk_approved_at": {
+                    "type": "string"
+                },
+                "kvkk_last_postponed_at": {
+                    "type": "string"
+                },
+                "kvkk_rejected_at": {
+                    "type": "string"
+                },
+                "kvkk_status": {
+                    "description": "Deprecated (Kept for backward compatibility)",
+                    "type": "string"
+                },
+                "kvkk_text": {
+                    "description": "\"PENDING\", \"READ\"",
+                    "type": "string"
+                },
+                "kvkk_text_at": {
+                    "type": "string"
+                },
+                "modified_by": {
+                    "type": "string"
+                },
+                "photo_consent": {
+                    "description": "Consent States for the 4 Documents",
+                    "type": "string"
+                },
+                "photo_consent_at": {
+                    "description": "Timestamps",
+                    "type": "string"
+                },
+                "privacy_policy": {
+                    "description": "\"PENDING\", \"READ\"",
+                    "type": "string"
+                },
+                "privacy_policy_at": {
+                    "type": "string"
+                },
+                "promotion_email_allowed": {
+                    "type": "boolean"
+                },
+                "promotion_sms_allowed": {
+                    "type": "boolean"
+                },
+                "updated_at": {
+                    "type": "string"
                 },
                 "user_id": {
                     "type": "integer"
@@ -8602,38 +8808,6 @@ const docTemplate = `{
                 }
             }
         },
-        "handler.CreateOtherRequestReq": {
-            "type": "object",
-            "required": [
-                "description",
-                "request_type_id"
-            ],
-            "properties": {
-                "description": {
-                    "type": "string"
-                },
-                "request_type_id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handler.CreateRequestTypeReq": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "active": {
-                    "type": "boolean"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                }
-            }
-        },
         "handler.CreateWorkInformationRequest": {
             "type": "object",
             "required": [
@@ -8773,6 +8947,72 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.SaveKvkkConsentRequest": {
+            "type": "object",
+            "required": [
+                "action"
+            ],
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": [
+                        "SUBMIT",
+                        "REMIND_LATER"
+                    ]
+                },
+                "anti_bribery_policy": {
+                    "type": "string",
+                    "enum": [
+                        "READ"
+                    ]
+                },
+                "kvkk_text": {
+                    "type": "string",
+                    "enum": [
+                        "READ"
+                    ]
+                },
+                "photo_consent": {
+                    "type": "string",
+                    "enum": [
+                        "APPROVED",
+                        "REJECTED"
+                    ]
+                },
+                "privacy_policy": {
+                    "type": "string",
+                    "enum": [
+                        "READ"
+                    ]
+                }
+            }
+        },
+        "handler.SendDynamicEmailRequest": {
+            "type": "object",
+            "required": [
+                "template_code",
+                "template_data",
+                "to"
+            ],
+            "properties": {
+                "mail_key": {
+                    "type": "string"
+                },
+                "subject": {
+                    "type": "string"
+                },
+                "template_code": {
+                    "type": "string"
+                },
+                "template_data": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "to": {
                     "type": "string"
                 }
             }
@@ -8969,7 +9209,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "max_amount": {
-                    "type": "number"
+                    "description": "Use null to clear, omit to keep existing",
+                    "type": "number",
+                    "example": 100
                 },
                 "name": {
                     "type": "string"
@@ -9747,6 +9989,33 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "last_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.EmployeePortalContractResponse": {
+            "type": "object",
+            "properties": {
+                "approved_at": {
+                    "type": "string"
+                },
+                "content": {
+                    "type": "string"
+                },
+                "contract_id": {
+                    "type": "integer"
+                },
+                "ip_address": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "\"approved\", \"pending\", \"rejected\"",
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "version": {
                     "type": "string"
                 }
             }

@@ -70,6 +70,9 @@ func (s *stubEmployeeRepoForProtection) GetEmployeeCountByPosition() ([]interfac
 func (s *stubEmployeeRepoForProtection) GetEmployeeCountByCompanyDepartment() ([]interface{}, error) {
 	return nil, nil
 }
+func (s *stubEmployeeRepoForProtection) GetInternCountByCompanyDepartment() ([]interface{}, error) {
+	return nil, nil
+}
 func (s *stubEmployeeRepoForProtection) GetEmployeeCountByGrade() ([]interface{}, error) {
 	return nil, nil
 }

@@ -583,6 +583,8 @@ definitions:
         items:
           $ref: '#/definitions/domain.UserRole'
         type: array
+      user_setting:
+        $ref: '#/definitions/domain.UserSetting'
     type: object
   domain.UserRole:
     properties:
@@ -606,6 +608,59 @@ definitions:
         allOf:
         - $ref: '#/definitions/domain.User'
         description: Relationships
+      user_id:
+        type: integer
+    type: object
+  domain.UserSetting:
+    properties:
+      anti_bribery_policy:
+        description: '"PENDING", "READ"'
+        type: string
+      anti_bribery_policy_at:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted:
+        type: boolean
+      id:
+        type: integer
+      kvkk_approved:
+        type: boolean
+      kvkk_approved_at:
+        type: string
+      kvkk_last_postponed_at:
+        type: string
+      kvkk_rejected_at:
+        type: string
+      kvkk_status:
+        description: Deprecated (Kept for backward compatibility)
+        type: string
+      kvkk_text:
+        description: '"PENDING", "READ"'
+        type: string
+      kvkk_text_at:
+        type: string
+      modified_by:
+        type: string
+      photo_consent:
+        description: Consent States for the 4 Documents
+        type: string
+      photo_consent_at:
+        description: Timestamps
+        type: string
+      privacy_policy:
+        description: '"PENDING", "READ"'
+        type: string
+      privacy_policy_at:
+        type: string
+      promotion_email_allowed:
+        type: boolean
+      promotion_sms_allowed:
+        type: boolean
+      updated_at:
+        type: string
       user_id:
         type: integer
     type: object
@@ -895,27 +950,6 @@ definitions:
     required:
     - name
     type: object
-  handler.CreateOtherRequestReq:
-    properties:
-      description:
-        type: string
-      request_type_id:
-        type: integer
-    required:
-    - description
-    - request_type_id
-    type: object
-  handler.CreateRequestTypeReq:
-    properties:
-      active:
-        type: boolean
-      description:
-        type: string
-      name:
-        type: string
-    required:
-    - name
-    type: object
   handler.CreateWorkInformationRequest:
     properties:
       company_id:
@@ -1010,6 +1044,51 @@ definitions:
     - email
     - new_password
     - token
+    type: object
+  handler.SaveKvkkConsentRequest:
+    properties:
+      action:
+        enum:
+        - SUBMIT
+        - REMIND_LATER
+        type: string
+      anti_bribery_policy:
+        enum:
+        - READ
+        type: string
+      kvkk_text:
+        enum:
+        - READ
+        type: string
+      photo_consent:
+        enum:
+        - APPROVED
+        - REJECTED
+        type: string
+      privacy_policy:
+        enum:
+        - READ
+        type: string
+    required:
+    - action
+    type: object
+  handler.SendDynamicEmailRequest:
+    properties:
+      mail_key:
+        type: string
+      subject:
+        type: string
+      template_code:
+        type: string
+      template_data:
+        additionalProperties: true
+        type: object
+      to:
+        type: string
+    required:
+    - template_code
+    - template_data
+    - to
     type: object
   handler.SendPasswordResetEmailRequest:
     properties:
@@ -1139,6 +1218,8 @@ definitions:
       description:
         type: string
       max_amount:
+        description: Use null to clear, omit to keep existing
+        example: 100
         type: number
       name:
         type: string
@@ -1655,6 +1736,24 @@ definitions:
       last_name:
         type: string
     type: object
+  types.EmployeePortalContractResponse:
+    properties:
+      approved_at:
+        type: string
+      content:
+        type: string
+      contract_id:
+        type: integer
+      ip_address:
+        type: string
+      status:
+        description: '"approved", "pending", "rejected"'
+        type: string
+      title:
+        type: string
+      version:
+        type: string
+    type: object
   types.GradeLookup:
     properties:
       id:
@@ -2154,6 +2253,47 @@ paths:
       summary: Request password reset email
       tags:
       - auth
+  /auth/kvkk:
+    post:
+      consumes:
+      - application/json
+      description: Save the user's decision to accept or reject the photo/video sharing
+        consent, and logs the operation
+      parameters:
+      - description: Consent Decision
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.SaveKvkkConsentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Save KVKK consent decision
+      tags:
+      - settings
   /auth/login:
     post:
       consumes:
@@ -2268,6 +2408,35 @@ paths:
       summary: Send password reset email to a single user
       tags:
       - auth
+  /auth/settings:
+    get:
+      consumes:
+      - application/json
+      description: Get settings and preferences for the authenticated user, including
+        KVKK approval status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get user settings
+      tags:
+      - settings
   /auth/validate-reset-token:
     post:
       consumes:
@@ -2728,6 +2897,38 @@ paths:
       summary: Get employees count by position
       tags:
       - dashboard
+  /dashboard/interns-by-company-department:
+    get:
+      consumes:
+      - application/json
+      description: Get intern statistics grouped by company and department
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/handler.CompanyDepartmentChartData'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get interns count by company and department
+      tags:
+      - dashboard
   /departments:
     get:
       description: Get all departments with pagination (Admin only)
@@ -2939,6 +3140,40 @@ paths:
       summary: Update department
       tags:
       - departments
+  /emails/send-template:
+    post:
+      consumes:
+      - application/json
+      description: Sends an email using a Resend template with custom template_data
+        variables
+      parameters:
+      - description: Email payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.SendDynamicEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Send a dynamic template email via Resend
+      tags:
+      - email
   /employee-contracts:
     get:
       consumes:
@@ -3677,6 +3912,49 @@ paths:
       summary: Update employee
       tags:
       - employees
+  /employees/{id}/contracts:
+    get:
+      consumes:
+      - application/json
+      description: Get all portal contracts with their approval status for a specific
+        employee
+      parameters:
+      - description: Employee ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/types.EmployeePortalContractResponse'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get employee portal contracts
+      tags:
+      - portal-contracts
   /employees/me:
     get:
       consumes:
@@ -5917,66 +6195,6 @@ paths:
       summary: Get all roles for lookup
       tags:
       - Lookup
-  /other-requests:
-    get:
-      produces:
-      - application/json
-      responses: {}
-      security:
-      - BearerAuth: []
-      summary: Talepleri listeler
-      tags:
-      - other_requests
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Request Data
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handler.CreateOtherRequestReq'
-      produces:
-      - application/json
-      responses: {}
-      security:
-      - BearerAuth: []
-      summary: Çalışan için yeni talep oluşturur
-      tags:
-      - other_requests
-  /other-requests/{id}/cancel:
-    patch:
-      parameters:
-      - description: Request ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses: {}
-      security:
-      - BearerAuth: []
-      summary: Çalışan tarafından talebi iptal eder
-      tags:
-      - other_requests
-  /other-requests/{id}/complete:
-    patch:
-      parameters:
-      - description: Request ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses: {}
-      security:
-      - BearerAuth: []
-      summary: İK personeli tarafından talebi tamamlar
-      tags:
-      - other_requests
   /reports/efor:
     get:
       consumes:
@@ -6230,39 +6448,6 @@ paths:
       summary: Export Work Day Report as Excel
       tags:
       - reports
-  /request-types:
-    get:
-      produces:
-      - application/json
-      responses: {}
-      security:
-      - BearerAuth: []
-      summary: Talep Türlerini listeler
-      tags:
-      - request_types
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Request Type Data
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handler.CreateRequestTypeReq'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            additionalProperties: true
-            type: object
-      security:
-      - BearerAuth: []
-      summary: Yeni Talep Türü oluşturur
-      tags:
-      - request_types
   /work-information:
     get:
       consumes:
