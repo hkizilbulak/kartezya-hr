@@ -25,17 +25,17 @@ func NewJobHandler(jobService service.JobService, scheduler *jobs.Scheduler) *Jo
 }
 
 func (h *JobHandler) GetJobs(c *gin.Context) {
-    sortParams := types.SortParams{
-        Sort:      c.DefaultQuery("sort", "id"),
-        Direction: c.DefaultQuery("direction", "ASC"), 
-    }
+	sortParams := types.SortParams{
+		Sort:      c.DefaultQuery("sort", "id"),
+		Direction: c.DefaultQuery("direction", "ASC"),
+	}
 
-    allJobs, err := h.jobService.GetAllJobs(sortParams)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get jobs"})
-        return
-    }
-    c.JSON(http.StatusOK, allJobs)
+	allJobs, err := h.jobService.GetAllJobs(sortParams)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get jobs"})
+		return
+	}
+	c.JSON(http.StatusOK, allJobs)
 }
 
 func (h *JobHandler) GetJobByID(c *gin.Context) {
@@ -137,14 +137,26 @@ func (h *JobHandler) GetJobHistory(c *gin.Context) {
 		return
 	}
 
-	limitStr := c.DefaultQuery("limit", "50")
-	limit, _ := strconv.Atoi(limitStr)
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
-	history, err := h.jobService.GetHistory(uint(id), limit)
+	sortParams := types.SortParams{
+		Sort:      c.DefaultQuery("sort", "start_time"),
+		Direction: types.NormalizeSortDirection(c.DefaultQuery("direction", "DESC"), "DESC"),
+	}
+
+	result, err := h.jobService.GetHistory(uint(id), page, limit, sortParams)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get job history"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to get job history",
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, history)
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    result.Data,
+		"page":    result.Page,
+	})
 }
