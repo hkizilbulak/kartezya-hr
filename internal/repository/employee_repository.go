@@ -686,6 +686,14 @@ func (r *employeeRepository) GetTotalCountWithFilters(filters map[string]interfa
 				query = query.Where(fmt.Sprintf("LOWER(%s.manager) LIKE LOWER(?)", domain.GetTableName("hr_departments")), managerFilter)
 			}
 		}
+
+		// City filter (il) — must match GetAllWithFilters list/count city logic
+		if city, ok := filters["city"]; ok {
+			cityFilter := normalizedLikePattern(city)
+			if cityFilter != "" {
+				query = query.Where(fmt.Sprintf("LOWER(%s.city) LIKE LOWER(?)", domain.GetTableName("hr_employees")), cityFilter)
+			}
+		}
 	}
 
 	err := query.Count(&count).Error
