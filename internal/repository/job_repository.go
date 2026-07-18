@@ -20,7 +20,7 @@ type JobRepository interface {
 	// JobHistory methods
 	CreateHistory(history *domain.JobHistory) error
 	UpdateHistory(history *domain.JobHistory) error
-	GetHistoryByJobID(jobID uint, limit int) ([]domain.JobHistory, error)
+	GetHistoryByJobID(jobID uint, limit, offset int, sortParams types.SortParams) ([]domain.JobHistory, int64, error)
 }
 
 type jobRepository struct {
@@ -88,14 +88,27 @@ func (r *jobRepository) UpdateHistory(history *domain.JobHistory) error {
 	return r.db.Save(history).Error
 }
 
-func (r *jobRepository) GetHistoryByJobID(jobID uint, limit int) ([]domain.JobHistory, error) {
+func (r *jobRepository) GetHistoryByJobID(jobID uint, limit, offset int, sortParams types.SortParams) ([]domain.JobHistory, int64, error) {
 	var history []domain.JobHistory
-	query := r.db.Where("job_id = ?", jobID).Order("start_time desc")
+	var total int64
+
+	base := r.db.Model(&domain.JobHistory{}).Where("job_id = ?", jobID)
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	query := r.db.Where("job_id = ?", jobID).
+		Order(buildJobHistoryOrderClause(sortParams.Sort, sortParams.Direction))
+
 	if limit > 0 {
 		query = query.Limit(limit)
 	}
-	if err := query.Find(&history).Error; err != nil {
-		return nil, err
+	if offset > 0 {
+		query = query.Offset(offset)
 	}
-	return history, nil
+
+	if err := query.Find(&history).Error; err != nil {
+		return nil, 0, err
+	}
+	return history, total, nil
 }

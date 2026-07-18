@@ -191,6 +191,28 @@ func buildJobOrderClause(sortKey, direction string) string {
 	return buildAllowlistedOrder(sortKey, direction, jobDefaultSort, string(types.ASC), jobSortAllowlist)
 }
 
+var jobHistorySortAllowlist = map[string]bool{
+	"id":              true,
+	"start_time":      true,
+	"end_time":        true,
+	"processed_count": true,
+	"status":          true,
+}
+
+const jobHistoryDefaultSort = "start_time"
+
+// NormalizeJobHistorySortParams maps sort/direction to the values used in ORDER BY and page metadata.
+func NormalizeJobHistorySortParams(sortParams types.SortParams) types.SortParams {
+	sortParams.Direction = types.NormalizeSortDirection(sortParams.Direction, string(types.DESC))
+	sortParams.Sort = types.AllowedSortOrDefault(sortParams.Sort, jobHistorySortAllowlist, jobHistoryDefaultSort)
+	return sortParams
+}
+
+func buildJobHistoryOrderClause(sortKey, direction string) string {
+	normalized := NormalizeJobHistorySortParams(types.SortParams{Sort: sortKey, Direction: direction})
+	return fmt.Sprintf("%s %s", normalized.Sort, normalized.Direction)
+}
+
 var eventSortAllowlist = map[string]bool{
 	"name":            true,
 	"type":            true,

@@ -17,7 +17,7 @@ type JobService interface {
 	GetJobByID(id uint) (*domain.Job, error)
 	GetJobByKey(key string) (*domain.Job, error)
 	UpdateJob(id uint, job *domain.Job, userID uint) error
-	GetHistory(jobID uint, limit int) ([]domain.JobHistory, error)
+	GetHistory(jobID uint, page, limit int, sortParams types.SortParams) (*PaginatedResponse, error)
 	LogJobStart(jobID uint) (*domain.JobHistory, error)
 	LogJobEnd(history *domain.JobHistory, status string, processedCount int, errSummary string) error
 }
@@ -126,8 +126,33 @@ func (s *jobService) UpdateJob(id uint, updateData *domain.Job, userID uint) err
 	return nil
 }
 
-func (s *jobService) GetHistory(jobID uint, limit int) ([]domain.JobHistory, error) {
-	return s.jobRepo.GetHistoryByJobID(jobID, limit)
+func (s *jobService) GetHistory(jobID uint, page, limit int, sortParams types.SortParams) (*PaginatedResponse, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 10
+	}
+
+	sortParams = repository.NormalizeJobHistorySortParams(sortParams)
+
+	offset := (page - 1) * limit
+	history, total, err := s.jobRepo.GetHistoryByJobID(jobID, limit, offset, sortParams)
+	if err != nil {
+		return nil, err
+	}
+
+	return &PaginatedResponse{
+		Data: history,
+		Page: PageInfo{
+			Total:      total,
+			Page:       page,
+			Limit:      limit,
+			TotalPages: (total + int64(limit) - 1) / int64(limit),
+			Sort:       sortParams.Sort,
+			Direction:  sortParams.Direction,
+		},
+	}, nil
 }
 
 func (s *jobService) LogJobStart(jobID uint) (*domain.JobHistory, error) {
