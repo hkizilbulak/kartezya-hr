@@ -128,8 +128,16 @@ func (r *employeeRepository) GetAll(limit, offset int, sortParams types.SortPara
 	// Count total records
 	r.db.Model(&domain.Employee{}).Where("deleted = ?", false).Count(&total)
 
-	// Get paginated records with sorting
+	// Get paginated records with sorting — all relations preloaded in bulk (eliminates N+1)
 	err := r.db.Preload("User").
+		Preload("User.UserRoles").
+		Preload("User.UserRoles.Role").
+		Preload("EmployeeWorkInformation", func(db *gorm.DB) *gorm.DB {
+			return db.Where("deleted = ?", false).Order("start_date DESC").Limit(1)
+		}).
+		Preload("EmployeeWorkInformation.Company").
+		Preload("EmployeeWorkInformation.Department").
+		Preload("EmployeeWorkInformation.JobPosition").
 		Where("deleted = ?", false).
 		Order(orderBy).
 		Limit(limit).
@@ -449,6 +457,14 @@ func (r *employeeRepository) GetAllWithFilters(limit, offset int, sortParams typ
 	// GROUP BY primary key collapses duplicate rows from filter JOINs while still
 	// allowing ORDER BY correlated display-field subqueries (unlike SELECT DISTINCT).
 	err := query.Preload("User").
+		Preload("User.UserRoles").
+		Preload("User.UserRoles.Role").
+		Preload("EmployeeWorkInformation", func(db *gorm.DB) *gorm.DB {
+			return db.Where("deleted = ?", false).Order("start_date DESC").Limit(1)
+		}).
+		Preload("EmployeeWorkInformation.Company").
+		Preload("EmployeeWorkInformation.Department").
+		Preload("EmployeeWorkInformation.JobPosition").
 		Select(fmt.Sprintf("%s.*", domain.GetTableName("hr_employees"))).
 		Group(fmt.Sprintf("%s.id", domain.GetTableName("hr_employees"))).
 		Order(orderBy).
