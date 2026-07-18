@@ -827,6 +827,7 @@ func (r *employeeRepository) GetEmployeeCountByCompanyDepartment() ([]interface{
 		CompanyName    string `json:"company_name"`
 		DepartmentName string `json:"department_name"`
 		Count          int64  `json:"count"`
+		EmployeeNames  string `json:"employee_names"`
 	}
 
 	var results []CompanyDepartmentCount
@@ -859,8 +860,8 @@ func (r *employeeRepository) GetEmployeeCountByCompanyDepartment() ([]interface{
 			domain.GetTableName("hr_companies"))).
 		Where(fmt.Sprintf("%s.deleted = ? AND %s.status = ?", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), false, "ACTIVE").
 		Group(fmt.Sprintf("%s.name, %s.name", domain.GetTableName("hr_companies"), domain.GetTableName("hr_departments"))).
-		Select(fmt.Sprintf("%s.name as company_name, %s.name as department_name, COUNT(*) as count",
-			domain.GetTableName("hr_companies"), domain.GetTableName("hr_departments"))).
+		Select(fmt.Sprintf("%s.name as company_name, %s.name as department_name, COUNT(*) as count, STRING_AGG(CONCAT(%s.first_name, ' ', %s.last_name), ', ') as employee_names",
+			domain.GetTableName("hr_companies"), domain.GetTableName("hr_departments"), domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees"))).
 		Order(fmt.Sprintf("%s.name ASC, %s.name ASC", domain.GetTableName("hr_companies"), domain.GetTableName("hr_departments"))).
 		Scan(&results).Error
 
@@ -882,6 +883,7 @@ func (r *employeeRepository) GetInternCountByCompanyDepartment() ([]interface{},
 		CompanyName    string `json:"company_name"`
 		DepartmentName string `json:"department_name"`
 		Count          int64  `json:"count"`
+		EmployeeNames  string `json:"employee_names"`
 	}
 
 	var results []CompanyDepartmentCount
@@ -924,8 +926,8 @@ func (r *employeeRepository) GetInternCountByCompanyDepartment() ([]interface{},
 			domain.GetTableName("hr_job_positions")), 
 			false, "ACTIVE", "%intern%", "%stajyer%").
 		Group(fmt.Sprintf("%s.name, %s.name", domain.GetTableName("hr_companies"), domain.GetTableName("hr_departments"))).
-		Select(fmt.Sprintf("%s.name as company_name, %s.name as department_name, COUNT(*) as count",
-			domain.GetTableName("hr_companies"), domain.GetTableName("hr_departments"))).
+		Select(fmt.Sprintf("%s.name as company_name, %s.name as department_name, COUNT(*) as count, STRING_AGG(CONCAT(%s.first_name, ' ', %s.last_name), ', ') as employee_names",
+			domain.GetTableName("hr_companies"), domain.GetTableName("hr_departments"), domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees"))).
 		Order(fmt.Sprintf("%s.name ASC, %s.name ASC", domain.GetTableName("hr_companies"), domain.GetTableName("hr_departments"))).
 		Scan(&results).Error
 
