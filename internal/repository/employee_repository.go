@@ -882,7 +882,16 @@ func (r *employeeRepository) GetEmployeeCountByCompanyDepartment() ([]interface{
 			domain.GetTableName("hr_companies"),
 			domain.GetTableName("hr_departments"),
 			domain.GetTableName("hr_companies"))).
-		Where(fmt.Sprintf("%s.deleted = ? AND %s.status = ?", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), false, "ACTIVE").
+		Joins(fmt.Sprintf("JOIN %s ON %s.id = %s.job_position_id AND %s.deleted = false",
+			domain.GetTableName("hr_job_positions"),
+			domain.GetTableName("hr_job_positions"),
+			domain.GetTableName("hr_employee_work_information"),
+			domain.GetTableName("hr_job_positions"))).
+		Where(fmt.Sprintf("%s.deleted = ? AND %s.status = ? AND LOWER(%s.title) NOT LIKE ? AND LOWER(%s.title) NOT LIKE ?",
+			domain.GetTableName("hr_employees"),
+			domain.GetTableName("hr_employees"),
+			domain.GetTableName("hr_job_positions"),
+			domain.GetTableName("hr_job_positions")), false, "ACTIVE", "%intern%", "%stajyer%").
 		Group(fmt.Sprintf("%s.name, %s.name", domain.GetTableName("hr_companies"), domain.GetTableName("hr_departments"))).
 		Select(fmt.Sprintf("%s.name as company_name, %s.name as department_name, COUNT(*) as count, STRING_AGG(CONCAT(%s.first_name, ' ', %s.last_name), ', ') as employee_names",
 			domain.GetTableName("hr_companies"), domain.GetTableName("hr_departments"), domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees"))).
