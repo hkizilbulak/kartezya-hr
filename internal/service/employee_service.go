@@ -315,7 +315,28 @@ func (s *employeeService) GetEmployeeByID(id uint) (*types.EmployeeDetailRespons
 func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeDetailResponse, error) {
 	employee, err := s.employeeRepo.GetByUserID(userID)
 	if err != nil {
-		return nil, err
+		// Fallback: If employee record not found, fetch user info and return minimal profile instead of 404 error
+		user, userErr := s.userRepo.GetByID(userID)
+		if userErr != nil {
+			return nil, err
+		}
+
+		userRoles, _ := s.userRoleRepo.GetRolesByUserID(user.ID)
+		roleNames := make([]string, len(userRoles))
+		for i, role := range userRoles {
+			roleNames[i] = role.Name
+		}
+
+		return &types.EmployeeDetailResponse{
+			ID:           0,
+			User:         types.UserInfo{ID: user.ID, Email: user.Email},
+			FirstName:    user.Email,
+			LastName:     "",
+			Email:        user.Email,
+			CompanyEmail: user.Email,
+			Roles:        roleNames,
+			Status:       "ACTIVE",
+		}, nil
 	}
 
 	user, err := s.userRepo.GetByID(employee.UserID)
