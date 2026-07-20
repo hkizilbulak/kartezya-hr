@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"errors"
+	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/jobs"
@@ -24,18 +27,22 @@ func NewJobHandler(jobService service.JobService, scheduler *jobs.Scheduler) *Jo
 	}
 }
 
-func (h *JobHandler) GetJobs(c *gin.Context) {
-    sortParams := types.SortParams{
-        Sort:      c.DefaultQuery("sort", "id"),
-        Direction: c.DefaultQuery("direction", "ASC"), 
-    }
+type RunJobRequest struct {
+	ReferenceDate string `json:"reference_date"`
+}
 
-    allJobs, err := h.jobService.GetAllJobs(sortParams)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get jobs"})
-        return
-    }
-    c.JSON(http.StatusOK, allJobs)
+func (h *JobHandler) GetJobs(c *gin.Context) {
+	sortParams := types.SortParams{
+		Sort:      c.DefaultQuery("sort", "id"),
+		Direction: c.DefaultQuery("direction", "ASC"),
+	}
+
+	allJobs, err := h.jobService.GetAllJobs(sortParams)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get jobs"})
+		return
+	}
+	c.JSON(http.StatusOK, allJobs)
 }
 
 func (h *JobHandler) GetJobByID(c *gin.Context) {
@@ -96,7 +103,6 @@ func (h *JobHandler) UpdateJob(c *gin.Context) {
 		return
 	}
 
-	// Tell the scheduler to reload this job
 	job, _ := h.jobService.GetJobByID(uint(id))
 	if job != nil {
 		h.scheduler.ReloadJob(job.JobKey)
@@ -119,14 +125,87 @@ func (h *JobHandler) RunJob(c *gin.Context) {
 		return
 	}
 
-	// Trigger the job
-	err = h.scheduler.TriggerJobNow(job.JobKey)
-	if err != nil {
+	userIDValue, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	userID := userIDValue.(uint)
+
+	var req RunJobRequest
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	ctx, buildErr := buildJobExecutionContext(req, userID, job.JobKey)
+	if buildErr != nil {
+		if errors.Is(buildErr, service.ErrPastDateRunNotSupported) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": buildErr.Error()})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": buildErr.Error()})
+		return
+	}
+
+	if err := h.jobService.ValidateReferenceDateRun(job.ID, job.JobKey, ctx.ReferenceDate); err != nil {
+		if errors.Is(err, service.ErrJobAlreadySucceededForReferenceDate) ||
+			errors.Is(err, service.ErrJobAlreadyRunningForReferenceDate) ||
+			errors.Is(err, service.ErrJobReferenceDateConflict) {
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate job run"})
+		return
+	}
+
+	if err := h.scheduler.TriggerJob(job.JobKey, ctx); err != nil {
+		if errors.Is(err, service.ErrJobAlreadySucceededForReferenceDate) ||
+			errors.Is(err, service.ErrJobAlreadyRunningForReferenceDate) ||
+			errors.Is(err, service.ErrJobReferenceDateConflict) {
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to trigger job"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Job triggered successfully"})
+	message := "Job triggered successfully"
+	if ctx.ExecutionType == jobs.ExecutionTypeManualBackfill {
+		message = "Job triggered successfully for reference date " + ctx.ReferenceDate.Format("2006-01-02")
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": message})
+}
+
+func buildJobExecutionContext(req RunJobRequest, userID uint, jobKey string) (jobs.JobExecutionContext, error) {
+	refDateStr := strings.TrimSpace(req.ReferenceDate)
+	if refDateStr == "" {
+		return jobs.JobExecutionContext{
+			ReferenceDate:     jobs.TodayDate(),
+			ExecutionType:     jobs.ExecutionTypeManual,
+			TriggeredByUserID: &userID,
+		}, nil
+	}
+
+	if !jobs.SupportsPastDateRun(jobKey) {
+		return jobs.JobExecutionContext{}, service.ErrPastDateRunNotSupported
+	}
+
+	refDate, err := jobs.ParseReferenceDate(refDateStr)
+	if err != nil {
+		return jobs.JobExecutionContext{}, err
+	}
+
+	if jobs.IsFutureDate(refDate) {
+		return jobs.JobExecutionContext{}, errors.New("reference_date cannot be in the future")
+	}
+
+	return jobs.JobExecutionContext{
+		ReferenceDate:     refDate,
+		ExecutionType:     jobs.ExecutionTypeManualBackfill,
+		TriggeredByUserID: &userID,
+	}, nil
 }
 
 func (h *JobHandler) GetJobHistory(c *gin.Context) {

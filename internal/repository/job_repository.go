@@ -4,6 +4,7 @@ import (
 	"errors"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/types"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -21,6 +22,7 @@ type JobRepository interface {
 	CreateHistory(history *domain.JobHistory) error
 	UpdateHistory(history *domain.JobHistory) error
 	GetHistoryByJobID(jobID uint, limit int) ([]domain.JobHistory, error)
+	HasHistoryForReferenceDate(jobID uint, referenceDate time.Time, statuses []string) (bool, error)
 }
 
 type jobRepository struct {
@@ -98,4 +100,21 @@ func (r *jobRepository) GetHistoryByJobID(jobID uint, limit int) ([]domain.JobHi
 		return nil, err
 	}
 	return history, nil
+}
+
+func (r *jobRepository) HasHistoryForReferenceDate(jobID uint, referenceDate time.Time, statuses []string) (bool, error) {
+	if len(statuses) == 0 {
+		return false, nil
+	}
+
+	dateOnly := time.Date(referenceDate.Year(), referenceDate.Month(), referenceDate.Day(), 0, 0, 0, 0, time.UTC)
+
+	var count int64
+	err := r.db.Model(&domain.JobHistory{}).
+		Where("job_id = ? AND reference_date = ? AND status IN ?", jobID, dateOnly, statuses).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }

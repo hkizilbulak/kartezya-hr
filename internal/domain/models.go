@@ -38,15 +38,15 @@ type AuditableModel struct {
 // User represents the authentication entity
 type User struct {
 	AuditableModel
-	Email                string       `json:"email" gorm:"uniqueIndex;not null"`
-	Password             string       `json:"-" gorm:"not null"` // Hide password in JSON responses
-	PasswordResetToken   string       `json:"-" gorm:"size:255"` // Token for password reset
-	PasswordResetExpires *time.Time   `json:"-"`                 // Expiration time for reset token
+	Email                string     `json:"email" gorm:"uniqueIndex;not null"`
+	Password             string     `json:"-" gorm:"not null"` // Hide password in JSON responses
+	PasswordResetToken   string     `json:"-" gorm:"size:255"` // Token for password reset
+	PasswordResetExpires *time.Time `json:"-"`                 // Expiration time for reset token
 
 	// Relationships
-	UserRoles            []UserRole   `json:"user_roles,omitempty"`
-	Employee             *Employee    `json:"employee,omitempty" gorm:"foreignKey:UserID"`
-	UserSetting          *UserSetting `json:"user_setting,omitempty" gorm:"foreignKey:UserID"`
+	UserRoles   []UserRole   `json:"user_roles,omitempty"`
+	Employee    *Employee    `json:"employee,omitempty" gorm:"foreignKey:UserID"`
+	UserSetting *UserSetting `json:"user_setting,omitempty" gorm:"foreignKey:UserID"`
 }
 
 // Role represents system roles
@@ -343,9 +343,9 @@ type AuditLog struct {
 
 // Constants for roles
 const (
-	RoleAdmin    = "ADMIN"
-	RoleEmployee = "EMPLOYEE"
-	RoleHR       = "HR"
+	RoleAdmin     = "ADMIN"
+	RoleEmployee  = "EMPLOYEE"
+	RoleHR        = "HR"
 	RoleFinancial = "FINANCIAL"
 )
 
@@ -611,14 +611,17 @@ func (Job) TableName() string {
 
 // JobHistory logs the execution of a scheduled job
 type JobHistory struct {
-	ID             uint       `json:"id" gorm:"primaryKey"`
-	JobID          uint       `json:"job_id" gorm:"not null;index"`
-	StartTime      time.Time  `json:"start_time" gorm:"not null;index"`
-	EndTime        *time.Time `json:"end_time"`
-	ProcessedCount int        `json:"processed_count" gorm:"default:0"`
-	Status         string     `json:"status" gorm:"size:20;not null;index"` // SUCCESS, FAILED, RUNNING, TIMEOUT
-	ErrorSummary   string     `json:"error_summary" gorm:"type:text"`
-	ExecutionNode  string     `json:"execution_node" gorm:"size:255"`
+	ID                uint       `json:"id" gorm:"primaryKey"`
+	JobID             uint       `json:"job_id" gorm:"not null;index"`
+	StartTime         time.Time  `json:"start_time" gorm:"not null;index"`
+	EndTime           *time.Time `json:"end_time"`
+	ProcessedCount    int        `json:"processed_count" gorm:"default:0"`
+	Status            string     `json:"status" gorm:"size:20;not null;index"` // SUCCESS, FAILED, RUNNING, TIMEOUT
+	ErrorSummary      string     `json:"error_summary" gorm:"type:text"`
+	ExecutionNode     string     `json:"execution_node" gorm:"size:255"`
+	ReferenceDate     *time.Time `json:"reference_date" gorm:"type:date;index"`
+	ExecutionType     string     `json:"execution_type" gorm:"size:20;default:scheduled"`
+	TriggeredByUserID *uint      `json:"triggered_by_user_id"`
 
 	// Relationships
 	Job Job `json:"job,omitempty" gorm:"foreignKey:JobID"`
@@ -683,29 +686,29 @@ func (MailRecipient) TableName() string {
 // UserSetting represents user specific settings and consent statuses
 type UserSetting struct {
 	AuditableModel
-	UserID                uint       `json:"user_id" gorm:"uniqueIndex;not null"`
-	
+	UserID uint `json:"user_id" gorm:"uniqueIndex;not null"`
+
 	// Consent States for the 4 Documents
-	PhotoConsent          string     `json:"photo_consent" gorm:"not null;size:20;default:'PENDING'"`      // "PENDING", "APPROVED", "REJECTED"
-	KvkkText              string     `json:"kvkk_text" gorm:"not null;size:20;default:'PENDING'"`          // "PENDING", "READ"
-	PrivacyPolicy         string     `json:"privacy_policy" gorm:"not null;size:20;default:'PENDING'"`      // "PENDING", "READ"
-	AntiBriberyPolicy     string     `json:"anti_bribery_policy" gorm:"not null;size:20;default:'PENDING'"`  // "PENDING", "READ"
-	
+	PhotoConsent      string `json:"photo_consent" gorm:"not null;size:20;default:'PENDING'"`       // "PENDING", "APPROVED", "REJECTED"
+	KvkkText          string `json:"kvkk_text" gorm:"not null;size:20;default:'PENDING'"`           // "PENDING", "READ"
+	PrivacyPolicy     string `json:"privacy_policy" gorm:"not null;size:20;default:'PENDING'"`      // "PENDING", "READ"
+	AntiBriberyPolicy string `json:"anti_bribery_policy" gorm:"not null;size:20;default:'PENDING'"` // "PENDING", "READ"
+
 	// Timestamps
-	PhotoConsentAt        *time.Time `json:"photo_consent_at"`
-	KvkkTextAt            *time.Time `json:"kvkk_text_at"`
-	PrivacyPolicyAt       *time.Time `json:"privacy_policy_at"`
-	AntiBriberyPolicyAt   *time.Time `json:"anti_bribery_policy_at"`
-	KvkkLastPostponedAt   *time.Time `json:"kvkk_last_postponed_at"`
+	PhotoConsentAt      *time.Time `json:"photo_consent_at"`
+	KvkkTextAt          *time.Time `json:"kvkk_text_at"`
+	PrivacyPolicyAt     *time.Time `json:"privacy_policy_at"`
+	AntiBriberyPolicyAt *time.Time `json:"anti_bribery_policy_at"`
+	KvkkLastPostponedAt *time.Time `json:"kvkk_last_postponed_at"`
 
 	// Deprecated (Kept for backward compatibility)
-	KvkkStatus            string     `json:"kvkk_status" gorm:"size:20;default:'PENDING'"`
-	KvkkApproved          bool       `json:"kvkk_approved" gorm:"not null;default:false"`
-	KvkkApprovedAt        *time.Time `json:"kvkk_approved_at"`
-	KvkkRejectedAt        *time.Time `json:"kvkk_rejected_at"`
+	KvkkStatus     string     `json:"kvkk_status" gorm:"size:20;default:'PENDING'"`
+	KvkkApproved   bool       `json:"kvkk_approved" gorm:"not null;default:false"`
+	KvkkApprovedAt *time.Time `json:"kvkk_approved_at"`
+	KvkkRejectedAt *time.Time `json:"kvkk_rejected_at"`
 
-	PromotionEmailAllowed bool       `json:"promotion_email_allowed" gorm:"not null;default:true"`
-	PromotionSmsAllowed   bool       `json:"promotion_sms_allowed" gorm:"not null;default:true"`
+	PromotionEmailAllowed bool `json:"promotion_email_allowed" gorm:"not null;default:true"`
+	PromotionSmsAllowed   bool `json:"promotion_sms_allowed" gorm:"not null;default:true"`
 }
 
 // TableName returns the table name for UserSetting
@@ -718,7 +721,7 @@ type KvkkLog struct {
 	ID           uint      `json:"id" gorm:"primaryKey"`
 	UserID       uint      `json:"user_id" gorm:"not null;index"`
 	DocumentType string    `json:"document_type" gorm:"not null;size:50;default:'ALL'"` // "PHOTO_CONSENT", "KVKK_TEXT", "PRIVACY_POLICY", "ANTI_BRIBERY_POLICY", "ALL"
-	Action       string    `json:"action" gorm:"not null;size:20"`        // "APPROVED", "REJECTED", "READ", "REMIND_LATER"
+	Action       string    `json:"action" gorm:"not null;size:20"`                      // "APPROVED", "REJECTED", "READ", "REMIND_LATER"
 	ClientIP     string    `json:"client_ip" gorm:"size:45"`
 	UserAgent    string    `json:"user_agent" gorm:"type:text"`
 	CreatedAt    time.Time `json:"created_at" gorm:"not null"`

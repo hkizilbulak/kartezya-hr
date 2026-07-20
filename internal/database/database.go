@@ -121,8 +121,8 @@ func (d *Database) Migrate() error {
 		&domain.FAQ{},              // FAQ Management
 		&domain.RequestType{},
 		&domain.OtherRequest{},
-		&domain.MailConfiguration{}, // Mail Configuration Module
-		&domain.MailRecipient{},     // Mail Configuration Module
+		&domain.MailConfiguration{},      // Mail Configuration Module
+		&domain.MailRecipient{},          // Mail Configuration Module
 		&domain.PortalContract{},         // Portal Contract Approval Tracking
 		&domain.EmployeePortalContract{}, // Portal Contract Approval Tracking Pivot
 		// Note: AuditLog is excluded - it's created by schema.sql
@@ -130,6 +130,13 @@ func (d *Database) Migrate() error {
 
 	if err != nil {
 		return fmt.Errorf("auto-migration failed: %w", err)
+	}
+
+	// Partial unique indexes are not managed by GORM AutoMigrate.
+	// This bootstrap is idempotent and uses the configured DB table prefix
+	// so test and production follow the same code path.
+	if err := EnsureJobHistoryReferenceDateUniqueIndex(d.DB); err != nil {
+		return fmt.Errorf("job history index migration failed: %w", err)
 	}
 
 	seedPortalContracts(d.DB)

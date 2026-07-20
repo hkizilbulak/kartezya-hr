@@ -42,7 +42,7 @@ type contractStatusRow struct {
 }
 
 // Run fetches contracts by target statuses, builds an Excel, and sends the report email.
-func (j *ContractStatusInfoJob) Run() (int, error) {
+func (j *ContractStatusInfoJob) Run(_ JobExecutionContext) (int, error) {
 	log.Println("[ContractStatusInfoJob] Starting contract status report job...")
 
 	targetStatuses := []string{

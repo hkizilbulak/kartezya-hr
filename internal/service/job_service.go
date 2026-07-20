@@ -10,6 +10,13 @@ import (
 	"kartezya-hr/internal/types"
 )
 
+var (
+	ErrJobAlreadySucceededForReferenceDate = errors.New("Bu görev seçilen tarih için daha önce başarıyla çalıştırılmış.")
+	ErrJobAlreadyRunningForReferenceDate   = errors.New("Bu görev seçilen tarih için halen çalışıyor.")
+	ErrJobReferenceDateConflict            = errors.New("Bu görev seçilen tarih için daha önce başarıyla çalıştırılmış veya halen çalışıyor.")
+	ErrPastDateRunNotSupported             = errors.New("Bu görev geçmiş tarih için çalıştırılamaz.")
+)
+
 type JobService interface {
 	SeedJobs() error
 	GetAllJobs(sortParams types.SortParams) ([]domain.Job, error)
@@ -18,8 +25,9 @@ type JobService interface {
 	GetJobByKey(key string) (*domain.Job, error)
 	UpdateJob(id uint, job *domain.Job, userID uint) error
 	GetHistory(jobID uint, limit int) ([]domain.JobHistory, error)
-	LogJobStart(jobID uint) (*domain.JobHistory, error)
+	LogJobStart(jobID uint, referenceDate *time.Time, executionType string, triggeredByUserID *uint) (*domain.JobHistory, error)
 	LogJobEnd(history *domain.JobHistory, status string, processedCount int, errSummary string) error
+	ValidateReferenceDateRun(jobID uint, jobKey string, referenceDate time.Time) error
 }
 
 type jobService struct {
@@ -130,14 +138,31 @@ func (s *jobService) GetHistory(jobID uint, limit int) ([]domain.JobHistory, err
 	return s.jobRepo.GetHistoryByJobID(jobID, limit)
 }
 
-func (s *jobService) LogJobStart(jobID uint) (*domain.JobHistory, error) {
+func (s *jobService) LogJobStart(jobID uint, referenceDate *time.Time, executionType string, triggeredByUserID *uint) (*domain.JobHistory, error) {
 	history := &domain.JobHistory{
-		JobID:     jobID,
-		StartTime: time.Now(),
-		Status:    "RUNNING",
+		JobID:             jobID,
+		StartTime:         time.Now(),
+		Status:            "RUNNING",
+		ExecutionType:     executionType,
+		TriggeredByUserID: triggeredByUserID,
+	}
+
+	if executionType == "" {
+		history.ExecutionType = "scheduled"
+	}
+
+	// Only persist reference_date when provided. Jobs without duplicate-date
+	// semantics (e.g. cleanup) keep NULL so the partial unique index does not
+	// block repeated same-day normal runs.
+	if referenceDate != nil {
+		refDate := time.Date(referenceDate.Year(), referenceDate.Month(), referenceDate.Day(), 0, 0, 0, 0, time.UTC)
+		history.ReferenceDate = &refDate
 	}
 
 	if err := s.jobRepo.CreateHistory(history); err != nil {
+		if repository.IsUniqueViolation(err) {
+			return nil, ErrJobReferenceDateConflict
+		}
 		return nil, err
 	}
 	return history, nil
@@ -156,4 +181,28 @@ func (s *jobService) LogJobEnd(history *domain.JobHistory, status string, proces
 	history.ErrorSummary = errSummary
 
 	return s.jobRepo.UpdateHistory(history)
+}
+
+func (s *jobService) ValidateReferenceDateRun(jobID uint, jobKey string, referenceDate time.Time) error {
+	if jobKey != "leave_balance_job" && jobKey != "work_day_report_job" {
+		return nil
+	}
+
+	hasRunning, err := s.jobRepo.HasHistoryForReferenceDate(jobID, referenceDate, []string{"RUNNING"})
+	if err != nil {
+		return err
+	}
+	if hasRunning {
+		return ErrJobAlreadyRunningForReferenceDate
+	}
+
+	hasSuccess, err := s.jobRepo.HasHistoryForReferenceDate(jobID, referenceDate, []string{"SUCCESS"})
+	if err != nil {
+		return err
+	}
+	if hasSuccess {
+		return ErrJobAlreadySucceededForReferenceDate
+	}
+
+	return nil
 }
