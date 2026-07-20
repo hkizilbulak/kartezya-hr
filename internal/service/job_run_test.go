@@ -40,8 +40,8 @@ func (s *stubJobRepoForRun) CreateHistory(history *domain.JobHistory) error {
 	return nil
 }
 func (s *stubJobRepoForRun) UpdateHistory(history *domain.JobHistory) error { return nil }
-func (s *stubJobRepoForRun) GetHistoryByJobID(jobID uint, limit int) ([]domain.JobHistory, error) {
-	return nil, nil
+func (s *stubJobRepoForRun) GetHistoryByJobID(jobID uint, limit, offset int, sortParams types.SortParams) ([]domain.JobHistory, int64, error) {
+	return nil, 0, nil
 }
 func (s *stubJobRepoForRun) HasHistoryForReferenceDate(jobID uint, referenceDate time.Time, statuses []string) (bool, error) {
 	for _, st := range statuses {

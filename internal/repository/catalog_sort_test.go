@@ -101,6 +101,45 @@ func TestJobOrderClause(t *testing.T) {
 	}
 }
 
+func TestJobHistoryOrderClause(t *testing.T) {
+	if got := buildJobHistoryOrderClause("start_time", "ASC"); got != "start_time ASC" {
+		t.Fatalf("got %s", got)
+	}
+	if got := buildJobHistoryOrderClause("end_time", "desc"); got != "end_time DESC" {
+		t.Fatalf("got %s", got)
+	}
+	if got := buildJobHistoryOrderClause("processed_count", "ASC"); got != "processed_count ASC" {
+		t.Fatalf("got %s", got)
+	}
+	if got := buildJobHistoryOrderClause("status", "DESC"); got != "status DESC" {
+		t.Fatalf("got %s", got)
+	}
+	if got := buildJobHistoryOrderClause("id", "ASC"); got != "id ASC" {
+		t.Fatalf("got %s", got)
+	}
+	if got := buildJobHistoryOrderClause("hack; DROP TABLE x", "nope"); got != "start_time DESC" {
+		t.Fatalf("invalid should default start_time DESC, got %s", got)
+	}
+	if strings.Contains(buildJobHistoryOrderClause("id; DROP TABLE x", "ASC"), "DROP") {
+		t.Fatal("raw input leaked into ORDER BY")
+	}
+}
+
+func TestNormalizeJobHistorySortParams(t *testing.T) {
+	got := NormalizeJobHistorySortParams(types.SortParams{Sort: "invalid_field", Direction: "wrong"})
+	if got.Sort != "start_time" || got.Direction != "DESC" {
+		t.Fatalf("invalid input: got %+v", got)
+	}
+	got = NormalizeJobHistorySortParams(types.SortParams{})
+	if got.Sort != "start_time" || got.Direction != "DESC" {
+		t.Fatalf("empty input: got %+v", got)
+	}
+	got = NormalizeJobHistorySortParams(types.SortParams{Sort: "processed_count", Direction: "asc"})
+	if got.Sort != "processed_count" || got.Direction != "ASC" {
+		t.Fatalf("valid input: got %+v", got)
+	}
+}
+
 func TestCompanyDepartmentJobPositionOrderClause(t *testing.T) {
 	if got := buildCompanyOrderClause("email", "DESC"); got != "email DESC" {
 		t.Fatalf("got %s", got)

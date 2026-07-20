@@ -427,6 +427,11 @@ The application provides a health check endpoint:
 ```bash
 curl http://localhost:8080/health
 ```
+## DB Backup
+
+```bash
+pg_dump -h yamanote.proxy.rlwy.net -p 54606 -U postgres -d railway -f "railway_yedek-$(date +'%d-%m-%Y-%H%M').sql"
+```
 
 ## Contributing
 
