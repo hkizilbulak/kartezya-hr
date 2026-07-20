@@ -16,12 +16,16 @@ func NewLeaveBalanceJob(db *gorm.DB) *LeaveBalanceJob {
 	return &LeaveBalanceJob{db: db}
 }
 
-// Run executes the leave balance update job
-func (j *LeaveBalanceJob) Run() (int, error) {
-	log.Println("[LeaveBalanceJob] Starting annual leave balance update...")
+// Run executes the leave balance update job for employees whose hire anniversary falls on the reference date.
+func (j *LeaveBalanceJob) Run(ctx JobExecutionContext) (int, error) {
+	refDate := ctx.ReferenceDate
+	log.Printf("[LeaveBalanceJob] Starting annual leave balance update for reference date %s...", refDate.Format("2006-01-02"))
 
 	query := `
-WITH calc AS (
+WITH ref AS (
+    SELECT ?::date AS ref_date
+),
+calc AS (
     SELECT
         e.id AS employee_id,
         CASE
@@ -34,20 +38,22 @@ WITH calc AS (
         SELECT
             id,
             hire_date,
-            EXTRACT(YEAR FROM AGE(CURRENT_DATE, hire_date))::INTEGER AS years_of_service
+            EXTRACT(YEAR FROM AGE(ref.ref_date, hire_date))::INTEGER AS years_of_service
         FROM hr_employees
+        CROSS JOIN ref
         WHERE deleted = false
           AND (
-              (EXTRACT(MONTH FROM hire_date) = EXTRACT(MONTH FROM CURRENT_DATE)
-                  AND EXTRACT(DAY FROM hire_date) = EXTRACT(DAY FROM CURRENT_DATE))
+              (EXTRACT(MONTH FROM hire_date) = EXTRACT(MONTH FROM ref.ref_date)
+                  AND EXTRACT(DAY FROM hire_date) = EXTRACT(DAY FROM ref.ref_date))
               OR
               (EXTRACT(MONTH FROM hire_date) = 2
                   AND EXTRACT(DAY FROM hire_date) = 29
-                  AND EXTRACT(MONTH FROM CURRENT_DATE) = 2
-                  AND EXTRACT(DAY FROM CURRENT_DATE) = 28
-                  AND EXTRACT(YEAR FROM CURRENT_DATE)::INTEGER % 4 != 0)
+                  AND EXTRACT(MONTH FROM ref.ref_date) = 2
+                  AND EXTRACT(DAY FROM ref.ref_date) = 28
+                  AND EXTRACT(YEAR FROM ref.ref_date)::INTEGER % 4 != 0)
           )
     ) e
+    CROSS JOIN ref
     WHERE (
         CASE
             WHEN years_of_service BETWEEN 1 AND 5 THEN 14
@@ -95,7 +101,7 @@ LEFT JOIN updated u ON u.employee_id = calc.employee_id
 WHERE u.employee_id IS NULL;
 `
 
-	result := j.db.Exec(query)
+	result := j.db.Exec(query, refDate)
 	if result.Error != nil {
 		log.Printf("[LeaveBalanceJob] Error: %v", result.Error)
 		return 0, result.Error

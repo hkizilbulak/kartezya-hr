@@ -2,6 +2,7 @@ package service
 
 import (
 	"testing"
+	"time"
 
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/types"
@@ -44,6 +45,9 @@ func (s *stubJobRepoForHistory) GetHistoryByJobID(jobID uint, limit, offset int,
 		return nil, 0, s.err
 	}
 	return s.rows, s.total, nil
+}
+func (s *stubJobRepoForHistory) HasHistoryForReferenceDate(jobID uint, referenceDate time.Time, statuses []string) (bool, error) {
+	return false, nil
 }
 
 func TestGetHistoryDefaultsAndPagination(t *testing.T) {

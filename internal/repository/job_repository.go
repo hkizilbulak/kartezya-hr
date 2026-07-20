@@ -2,6 +2,8 @@ package repository
 
 import (
 	"errors"
+	"time"
+
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/types"
 
@@ -21,6 +23,7 @@ type JobRepository interface {
 	CreateHistory(history *domain.JobHistory) error
 	UpdateHistory(history *domain.JobHistory) error
 	GetHistoryByJobID(jobID uint, limit, offset int, sortParams types.SortParams) ([]domain.JobHistory, int64, error)
+	HasHistoryForReferenceDate(jobID uint, referenceDate time.Time, statuses []string) (bool, error)
 }
 
 type jobRepository struct {
@@ -111,4 +114,21 @@ func (r *jobRepository) GetHistoryByJobID(jobID uint, limit, offset int, sortPar
 		return nil, 0, err
 	}
 	return history, total, nil
+}
+
+func (r *jobRepository) HasHistoryForReferenceDate(jobID uint, referenceDate time.Time, statuses []string) (bool, error) {
+	if len(statuses) == 0 {
+		return false, nil
+	}
+
+	dateOnly := time.Date(referenceDate.Year(), referenceDate.Month(), referenceDate.Day(), 0, 0, 0, 0, time.UTC)
+
+	var count int64
+	err := r.db.Model(&domain.JobHistory{}).
+		Where("job_id = ? AND reference_date = ? AND status IN ?", jobID, dateOnly, statuses).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }

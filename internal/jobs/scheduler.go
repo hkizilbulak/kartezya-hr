@@ -3,6 +3,7 @@ package jobs
 import (
 	"log"
 	"os"
+	"time"
 
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/service"
@@ -10,8 +11,6 @@ import (
 	"github.com/robfig/cron/v3"
 	"gorm.io/gorm"
 )
-
-type JobFunc func() (int, error)
 
 // Scheduler manages all scheduled jobs
 type Scheduler struct {
@@ -59,7 +58,6 @@ func NewScheduler(db *gorm.DB, documentService service.DocumentService, jobServi
 func (s *Scheduler) Start() {
 	log.Println("[Scheduler] Starting scheduled jobs...")
 
-	// Seed jobs if not present
 	if err := s.jobService.SeedJobs(); err != nil {
 		log.Printf("[Scheduler] Error seeding jobs: %v", err)
 	}
@@ -74,7 +72,6 @@ func (s *Scheduler) Start() {
 		s.scheduleJob(job)
 	}
 
-	// Start the cron scheduler
 	s.cron.Start()
 	log.Println("[Scheduler] All active jobs started successfully")
 }
@@ -86,13 +83,16 @@ func (s *Scheduler) scheduleJob(job domain.Job) {
 		return
 	}
 
-	// Remove existing if any
 	if entryID, ok := s.entryIDs[job.JobKey]; ok {
 		s.cron.Remove(entryID)
 	}
 
 	wrapper := func() {
-		s.executeJob(job.ID, job.JobKey, jobFunc)
+		ctx := JobExecutionContext{
+			ReferenceDate: TodayDate(),
+			ExecutionType: ExecutionTypeScheduled,
+		}
+		s.executeJob(job.ID, job.JobKey, jobFunc, ctx)
 	}
 
 	entryID, err := s.cron.AddFunc(job.CronExpression, wrapper)
@@ -104,19 +104,35 @@ func (s *Scheduler) scheduleJob(job domain.Job) {
 	}
 }
 
-func (s *Scheduler) executeJob(jobID uint, jobKey string, jobFunc JobFunc) {
-	log.Printf("[Scheduler] Executing job: %s", jobKey)
+// historyReferenceDateForJob returns a persisted reference_date only for jobs that
+// participate in duplicate-date protection. Other jobs keep NULL so repeated
+// same-day normal runs are not blocked by the partial unique index.
+func historyReferenceDateForJob(jobKey string, ctx JobExecutionContext) *time.Time {
+	if RequiresDuplicateReferenceDateCheck(jobKey) || ctx.ExecutionType == ExecutionTypeManualBackfill {
+		ref := time.Date(ctx.ReferenceDate.Year(), ctx.ReferenceDate.Month(), ctx.ReferenceDate.Day(), 0, 0, 0, 0, time.Local)
+		return &ref
+	}
+	return nil
+}
 
-	history, err := s.jobService.LogJobStart(jobID)
+func (s *Scheduler) executeJob(jobID uint, jobKey string, jobFunc JobFunc, ctx JobExecutionContext) {
+	log.Printf("[Scheduler] Executing job: %s (reference_date=%s, type=%s)",
+		jobKey, ctx.ReferenceDate.Format("2006-01-02"), ctx.ExecutionType)
+
+	history, err := s.jobService.LogJobStart(jobID, historyReferenceDateForJob(jobKey, ctx), ctx.ExecutionType, ctx.TriggeredByUserID)
 	if err != nil {
 		log.Printf("[Scheduler] Failed to log job start for %s: %v", jobKey, err)
 		return
 	}
 
+	s.runJobWithHistory(jobID, jobKey, jobFunc, ctx, history)
+}
+
+func (s *Scheduler) runJobWithHistory(jobID uint, jobKey string, jobFunc JobFunc, ctx JobExecutionContext, history *domain.JobHistory) {
 	hostname, _ := os.Hostname()
 	history.ExecutionNode = hostname
 
-	processedCount, err := jobFunc()
+	processedCount, err := jobFunc(ctx)
 
 	status := "SUCCESS"
 	errSummary := ""
@@ -158,14 +174,16 @@ func (s *Scheduler) ReloadJob(jobKey string) {
 	}
 }
 
-// TriggerJobNow runs the specified job immediately (does not affect cron schedule)
-func (s *Scheduler) TriggerJobNow(jobKey string) error {
+// TriggerJob runs the specified job immediately with the given execution context.
+// RUNNING history is inserted BEFORE the job goroutine starts. If insert fails
+// (including unique violation), the job is not started.
+func (s *Scheduler) TriggerJob(jobKey string, ctx JobExecutionContext) error {
 	job, err := s.jobService.GetJobByKey(jobKey)
 	if err != nil {
 		return err
 	}
 	if job == nil {
-		return log.Output(2, "[Scheduler] Job not found for trigger") // Not a real error but handled by handler anyway
+		return log.Output(2, "[Scheduler] Job not found for trigger")
 	}
 
 	jobFunc, exists := s.registry[jobKey]
@@ -173,10 +191,15 @@ func (s *Scheduler) TriggerJobNow(jobKey string) error {
 		return log.Output(2, "[Scheduler] Job function not found for trigger")
 	}
 
-	log.Printf("[Scheduler] Manually triggering job: %s", jobKey)
+	log.Printf("[Scheduler] Manually triggering job: %s (reference_date=%s, type=%s)",
+		jobKey, ctx.ReferenceDate.Format("2006-01-02"), ctx.ExecutionType)
 
-	// Run in background
-	go s.executeJob(job.ID, jobKey, jobFunc)
+	history, err := s.jobService.LogJobStart(job.ID, historyReferenceDateForJob(jobKey, ctx), ctx.ExecutionType, ctx.TriggeredByUserID)
+	if err != nil {
+		return err
+	}
+
+	go s.runJobWithHistory(job.ID, jobKey, jobFunc, ctx, history)
 
 	return nil
 }

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"log"
-	"time"
 
 	"kartezya-hr/internal/service"
 	"kartezya-hr/internal/types"
@@ -31,22 +30,16 @@ func NewWorkDayReportJob(
 	}
 }
 
-// Run generates the previous month's work-day report and sends it via REPORT_EMAIL_WORK_DAY.
-func (j *WorkDayReportJob) Run() (int, error) {
+// Run generates the previous month's work-day report relative to the reference date and sends it via email.
+func (j *WorkDayReportJob) Run(ctx JobExecutionContext) (int, error) {
 	log.Println("[WorkDayReportJob] Starting work day report job...")
 
-	// ── 1. Previous month date range ───────────────────────────────────────
-	now := time.Now()
-	firstOfThisMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.Local)
-	startDate := firstOfThisMonth.AddDate(0, -1, 0) // first day of prev month
-	endDate := firstOfThisMonth.AddDate(0, 0, -1)   // last day of prev month
+	startDate, endDate := PreviousMonthRange(ctx.ReferenceDate)
+	monthLabel := startDate.Format("01.2006")
 
-	monthLabel := startDate.Format("01.2006") // e.g. "06.2026"
+	log.Printf("[WorkDayReportJob] Reporting period: %s — %s (reference_date=%s)",
+		startDate.Format("2006-01-02"), endDate.Format("2006-01-02"), ctx.ReferenceDate.Format("2006-01-02"))
 
-	log.Printf("[WorkDayReportJob] Reporting period: %s — %s",
-		startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
-
-	// ── 2. Fetch report data ────────────────────────────────────────────────
 	isActive := true
 	filter := &types.WorkDayReportFilter{
 		StartDate: startDate,
@@ -64,19 +57,16 @@ func (j *WorkDayReportJob) Run() (int, error) {
 		return 0, nil
 	}
 
-	// ── 3. Calculate totals ─────────────────────────────────────────────────
 	var totalUsedLeave float64
 	for _, row := range report.Rows {
 		totalUsedLeave += row.UsedLeaveDays
 	}
 
-	// ── 4. Build Excel ──────────────────────────────────────────────────────
 	excelBytes, err := j.buildExcel(report, monthLabel, totalUsedLeave)
 	if err != nil {
 		return 0, fmt.Errorf("failed to build excel: %w", err)
 	}
 
-	// ── 5. Build HTML body ──────────────────────────────────────────────────
 	body := fmt.Sprintf(
 		"<p>Merhaba <strong>%s</strong> dönemine ait aylık çalışma günü raporu ektedir.</p>"+
 			"<table border='1' cellpadding='6' cellspacing='0' style='border-collapse:collapse;'>"+
@@ -89,7 +79,6 @@ func (j *WorkDayReportJob) Run() (int, error) {
 		len(report.Rows),
 	)
 
-	// ── 6. Resolve recipients ───────────────────────────────────────────────
 	toList, ccList, bccList, templateCode, cfgErr := j.mailConfigService.ResolveRecipients("REPORT_EMAIL_WORK_DAY")
 	if cfgErr != nil || len(toList) == 0 {
 		log.Printf("[WorkDayReportJob] REPORT_EMAIL_WORK_DAY config not found or empty, skipping email: %v", cfgErr)
@@ -106,7 +95,6 @@ func (j *WorkDayReportJob) Run() (int, error) {
 		"body":    body,
 	}
 
-	// ── 6. Send email ───────────────────────────────────────────────────────
 	filename := fmt.Sprintf("calisma_gunu_raporu_%s.xlsx", startDate.Format("200601"))
 	if err := j.emailService.SendReportEmail(
 		toList, ccList, bccList,
@@ -131,7 +119,6 @@ func (j *WorkDayReportJob) buildExcel(report *types.WorkDayReportResponse, month
 	sheet := "Çalışma Günü Raporu"
 	f.SetSheetName("Sheet1", sheet)
 
-	// Header style
 	headerStyle, _ := f.NewStyle(&excelize.Style{
 		Font: &excelize.Font{Bold: true, Color: "FFFFFF"},
 		Fill: excelize.Fill{Type: "pattern", Color: []string{"4F81BD"}, Pattern: 1},
@@ -165,14 +152,12 @@ func (j *WorkDayReportJob) buildExcel(report *types.WorkDayReportResponse, month
 		}
 	}
 
-	// Column widths
 	colWidths := []float64{28, 12, 16, 14, 22, 22, 22}
 	for i, w := range colWidths {
 		col, _ := excelize.ColumnNumberToName(i + 1)
 		f.SetColWidth(sheet, col, col, w)
 	}
 
-	// Summary sheet
 	sumSheet := "Özet"
 	f.NewSheet(sumSheet)
 
