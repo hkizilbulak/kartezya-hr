@@ -2,7 +2,7 @@
 
 > Son güncelleme: 2026-07-22  
 > Kapsam: Backend (`kartezya-hr`) + Frontend (`kartezya-hr-fe`)  
-> Bu doküman read-only analiz bulgularının kalıcı kaydıdır.
+> Bu doküman analiz, karar ve ölçüm kaydıdır. Runtime instruction değildir; her taskta otomatik context'e alınmamalıdır. Normatif kurallar için repo `AGENTS.md` esas alınır.
 
 ---
 
@@ -10,12 +10,14 @@
 
 Token israfının asıl kaynağı kısa prompt yazmamak değil; **projede araçtan bağımsız AI talimatının eksikliği**, **her task'ta aynı bilginin yeniden anlatılması**, **generated/büyük dosyaların context'e girmesi** ve **her görevin aynı ağır agent sürecinden geçmesidir**.
 
-**İlk uygulama (bu branch):**
+**İlk uygulama:**
 
 - Her iki repo: kısa `AGENTS.md`
-- Her iki repo: `.cursorignore` (AI context exclude)
+- Her iki repo: `.cursorignore` (AI context exclude; Cursor'a özgü)
 - Backend: `.agent/instructions.md` sadeleştirildi (adaptör)
 - Backend: `docs/AI_CODING_GUIDE.md` ve bu rapor
+
+`AGENTS.md` ortak normatif kaynaktır; otomatik yükleme/uygulama araçlara göre değişir. Araç yüklemiyorsa kullanıcı context'e eklemeli veya kısa adaptör kullanmalıdır.
 
 **Pilot hedef aralığı:** Tipik tasklarda **%40–70**'e kadar context/token azaltımı potansiyeli (araç ve task tipine göre değişir). Kesin sonuç değildir; 5–10 gerçek task ile doğrulanacaktır.
 
@@ -38,7 +40,7 @@ Kalite/güvenlik kaybı olmadan tasarruf mümkündür; yüksek riskli tasklarda 
 
 ## 3. Mevcut sorunlar
 
-1. **AI talimat boşluğu (analiz öncesi):** Frontend'de araçtan bağımsız talimat bulunmuyordu; backend'de tek dosya ve kırık `tasks/` referansları vardı. Bu branch ile ilk altyapı oluşturuldu.
+1. **AI talimat boşluğu (analiz öncesi):** Frontend'de araçtan bağımsız talimat bulunmuyordu; backend'de tek dosya ve kırık `tasks/` referansları vardı. İlk uygulama ile altyapı oluşturuldu.
 2. **Stale dokümantasyon:** README ve `project_analysis.md` eski ADMIN/EMPLOYEE modelini anlatıyor; canlı kod capability tabanlı.
 3. **Generated context:** Swagger üçlüsü (analiz sırasında ~873 KB tracked) gereksiz index yükü.
 4. **Build/dep context:** FE `node_modules` ve `.next` (analiz sırasında sırasıyla ~3 GB / ~900 MB) diskte; gitignore var ama AI ignore eksikti.
@@ -65,7 +67,7 @@ Kalite/güvenlik kaybı olmadan tasarruf mümkündür; yüksek riskli tasklarda 
 ## 5. Önerilen talimat mimarisi
 
 ```
-AGENTS.md (kısa SoT, repo başına)
+AGENTS.md (kısa SoT, repo başına; araç otomatik yüklemiyorsa context'e eklenir)
     ↓
 docs/AI_CODING_GUIDE.md (workflow + şablonlar)
     ↓
@@ -74,8 +76,9 @@ Modül dokümanları (role matrix, schema — ihtiyaç halinde)
 İnce araç adaptörleri (ileride: Copilot, CLAUDE, .cursor/rules)
 ```
 
-**Tek source of truth:** Root `AGENTS.md`  
-**Kural tekrarı yasak:** Adaptörler pointer only (~20–40 satır).
+- **Tek source of truth:** Root `AGENTS.md` (ortak normatif kaynak; otomatik uygulama araçlara göre değişir)
+- **Kural tekrarı yasak:** Adaptörler pointer only (~20–40 satır)
+- **Bu rapor:** Analiz/ölçüm kaydı; runtime instruction değildir; her taskta açılmaz
 
 ---
 
@@ -92,10 +95,10 @@ Modül dokümanları (role matrix, schema — ihtiyaç halinde)
 
 - Secrets, `node_modules/`, `.next/`, `out/`, `dist/`, coverage
 - `server`, `.build-log.txt`, `*.tsbuildinfo`
-- `public/images/`, `public/fonts/` (büyük assetler)
+- `public/**` altında PNG/JPG/JPEG/WEBP/GIF/ICO ve font binary uzantıları (woff/woff2/ttf/otf) varsayılan context dışında; SVG bilinçli olarak erişilebilir bırakıldı
 - **Dışlanmayan:** `app/`, `components/`, `lib/`, `services/`, `routes/`, `package-lock.json`
 
-**Git ignore ≠ AI ignore:** Aynı amaçta değildir. AI araçlarının `.gitignore` ve özel ignore dosyalarına davranışı araç ve sürüme göre değişebilir. Tracked generated/binary içerik için araç özel exclude gerekebilir.
+**Git ignore ≠ AI ignore:** Aynı amaçta değildir. `.cursorignore` Cursor'a özgüdür; diğer AI araçlarında eşdeğer exclude/index ayarı gerekir. AI araçlarının `.gitignore` ve özel ignore dosyalarına davranışı araç ve sürüme göre değişebilir. Tracked generated/binary içerik için araç özel exclude gerekebilir.
 
 ---
 
@@ -118,7 +121,7 @@ Detay: `docs/AI_CODING_GUIDE.md`
 - Önce arama, sonra yalnız hit dosyaları
 - Yeni task → yeni oturum
 - Başarılı test: kısa PASS; hata: ilgili blok
-- Final rapor: 4–6 madde
+- Final rapor: risk bazlı (düşük 2–4; orta 4–6; yüksek daha ayrıntılı)
 - 10 prompt şablonu: `docs/AI_CODING_GUIDE.md` §14
 
 ---
@@ -163,13 +166,13 @@ Task başına kaydedilecek metrikler:
 
 ---
 
-## 11. Hızlı kazanımlar (uygulandı)
+## 11. Hızlı kazanımlar (ilk uygulama)
 
 - [x] `AGENTS.md` (her iki repo)
-- [x] `.cursorignore` (her iki repo)
+- [x] `.cursorignore` (her iki repo; Cursor'a özgü)
 - [x] `.agent/instructions.md` adaptör
 - [x] `docs/AI_CODING_GUIDE.md`
-- [x] Bu rapor
+- [x] Bu rapor (analiz/ölçüm; runtime instruction değil)
 
 ---
 
@@ -193,6 +196,7 @@ Task başına kaydedilecek metrikler:
 | Güvenlik kuralı atlama | Yüksek risk → plan zorunlu |
 | Source kodun ignore edilmesi | internal/app/schema asla ignore değil |
 | Talimat drift | Tek SoT (`AGENTS.md`) |
+| AGENTS yüklenmemesi | Araç otomatik yüklemiyorsa context'e ekle / kısa adaptör |
 | Çok kısa belirsiz prompt | Şablon zorunlu alanlar |
 | Test kapsamını aşırı azaltma | Yüksek riskte test azaltılmaz |
 
@@ -201,10 +205,10 @@ Task başına kaydedilecek metrikler:
 ## 14. Uygulama roadmap'i
 
 ```
-Hafta 1  → AGENTS.md + ignore + adaptör + rehber (TAMAMLANDI)
-Hafta 2  → Ekip prompt şablonu benimsenmesi + ölçüm başlangıcı
-Hafta 3  → Stale docs güncelleme + gitignore (server binary)
-Hafta 4  → Ölçüm karşılaştırma + araç adaptörleri (ihtiyaç halinde)
+Başlangıç → AGENTS.md + ignore + adaptör + rehber (ilk uygulama)
+Pilot     → Ekip prompt şablonu benimsenmesi + ölçüm başlangıcı
+Sonraki   → Stale docs güncelleme + gitignore (server binary)
+İleride   → Ölçüm karşılaştırma + araç adaptörleri (ihtiyaç halinde)
 ```
 
 ---
@@ -232,8 +236,9 @@ Auth/role tasklarında yaşayan kod esas alınmalıdır. Sonradan güncellenmesi
 
 ## İlgili dosyalar
 
-- `AGENTS.md` — kısa kurallar (backend)
+- `AGENTS.md` — kısa kurallar (backend); normatif SoT
 - `docs/AI_CODING_GUIDE.md` — workflow ve şablonlar
-- `.cursorignore` — AI context exclude
+- `docs/AI_TOKEN_OPTIMIZATION.md` — bu rapor (analiz/ölçüm; runtime instruction değil)
+- `.cursorignore` — AI context exclude (Cursor)
 - `.agent/instructions.md` — agent adaptörü
 - Frontend repo: `AGENTS.md`, `.cursorignore`

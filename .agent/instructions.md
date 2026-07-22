@@ -11,7 +11,7 @@ Bu dosya yalnızca agent araçlarına özel operasyonel notlar içerir. Kurallar
 - **Subagent (destekleniyorsa):** Büyük keşif işlerini alt görevlere böl; ana context penceresini temiz tut.
 - **Doğrulama:** Task bitmeden ilgili test/lint çalıştır; başarıda kısa PASS özeti ver.
 - **Basitlik:** Obvious fix'lerde over-engineering yapma; kök nedeni bul, geçici yama bırakma.
-- **Otonom bug fix:** Hata raporunda log/test çıktısını okuyup çöz; gereksiz kullanıcı onayı isteme.
+- **Otonom bug fix:** Hata raporunda log/test çıktısını okuyup çöz. Kapsamı net düşük/orta riskli buglarda gereksiz kullanıcı onayı isteme. Auth, capability, migration, data delete, job, concurrency veya production DB gibi yüksek riskli tasklarda plan + kullanıcı onayı zorunludur; bu kural root `AGENTS.md` risk sınıflandırmasını zayıflatmaz.
 
 ## Detaylı rehber
 

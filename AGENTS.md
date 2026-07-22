@@ -2,6 +2,8 @@
 
 Araçtan bağımsız AI coding kuralları. Uzun mimari ve endpoint listeleri burada değil; aşağıdaki referans dosyalarına bak.
 
+Bu dosya her AI aracında otomatik yüklenmeyebilir; yüklenmiyorsa kullanıcı veya ekip task context'ine eklemelidir.
+
 ## A. Proje özeti
 
 - **Dil:** Go 1.25
@@ -41,20 +43,33 @@ HTTP Request → Handler → Service → Repository → PostgreSQL
 - **Yüksek risk:** veri silme, unique index değişikliği, concurrency, production DB, cron/job (`internal/jobs/`).
 - Transaction ve partial failure davranışını değerlendir; migration etkisini AutoMigrate + schema birlikte düşün.
 
-## E. Git güvenliği
+## E. Production-first
+
+- Her değişiklik production'a deploy edilebilecek şekilde tasarlanmalı; yalnız local'de çalışan geçici çözüm bırakma.
+- Host, port, URL, DB prefix, SSL mode, credential, storage path, callback URL ve benzeri değerleri hardcode etme; config/environment kullan.
+- Local `.env`, config defaultları ve `.env.example` değerlerini production gerçeği sanma.
+- Raw SQL dahil tablo adlarında `domain.GetTableName()` veya config prefix kullan; mevcut `hr_` / `hr_test_` hardcode örneklerini kopyalama.
+- AutoMigrate ve `schema/` etkisini production deploy ile birlikte değerlendir; prod şemasını sessizce değiştiren varsayımlara güvenme.
+- Job/cron tasklarında birden fazla production instance varsay; duplicate execution, distributed locking, unique constraint ve race condition risklerini değerlendir.
+- Local'de başarılı çözümün production'da veri kaybı, güvenlik açığı, platform bağımlılığı veya concurrency problemi üretip üretmeyeceğini kontrol et.
+
+## F. Git güvenliği
 
 - `main` / `master` üzerinde değişiklik yapma.
 - Açık talimat olmadan commit, push veya PR oluşturma.
 - Açık talimat olmadan pull, fetch, merge veya rebase yapma.
+- History değiştiren, veri kaybına yol açabilecek veya geri dönüşü zor Git işlemleri (amend, force push, reset --hard, clean, branch silme, stash pop/drop, restore/checkout ile dosya kaybı, cherry-pick/revert) açık kullanıcı izni olmadan yapılmaz.
 - Task kapsamı dışı dosyaya dokunma.
 
-## F. Güvenlik
+## G. Güvenlik
 
 - `.env` ve secret içeriğini okuma veya değiştirme.
+- `.env.example` yalnız key/config şemasını anlamak için kullanılabilir; örnek değerler production gerçeği veya güvenli credential sayılmaz.
+- Prompt, terminal veya dosya içinde secret/token/credential görülürse tekrar edilmez, loglanmaz veya başka dosyaya kopyalanmaz; raporda redakte edilir.
 - Token, credential veya kişisel veriyi loglama veya çıktıya yazma.
 - Gerçek servis, API veya veritabanı çağrısı yapma.
 
-## G. Task risk seviyeleri
+## H. Task risk seviyeleri
 
 | Seviye | Örnek | Yaklaşım |
 |---|---|---|
@@ -64,7 +79,7 @@ HTTP Request → Handler → Service → Repository → PostgreSQL
 
 Auth, migration, delete, job, concurrency ve production DB tasklarında plan olmadan kod yazma.
 
-## H. Doğrulama
+## I. Doğrulama
 
 - Değişen Go dosyalarında `gofmt`.
 - İlgili paket testi: `go test ./internal/<paket>/...`
@@ -72,16 +87,18 @@ Auth, migration, delete, job, concurrency ve production DB tasklarında plan olm
 - `git diff --check`
 - Başarılı testlerde uzun log yerine kısa PASS özeti ver.
 
-## I. Referanslar (ihtiyaç halinde aç)
+## J. Referanslar (ihtiyaç halinde aç)
 
 | Konu | Dosya |
 |---|---|
 | Capability / API erişim matrisi | `BACKEND_API_ROLE_MATRIX.md` |
+| Config / environment yükleme | `internal/config/config.go` |
+| Environment anahtar şablonu | `.env.example` |
 | Proje yapısı ve modüller | `docs/project_analysis.md` |
 | API sözleşmesi / pagination | `API_DOCUMENTATION.md` |
 | DB şeması | `schema/schema.sql` |
 | Cron / job | `JOB_MANAGEMENT.md` |
 | Detaylı AI workflow | `docs/AI_CODING_GUIDE.md` |
-| Token optimizasyon analizi | `docs/AI_TOKEN_OPTIMIZATION.md` |
+| Token optimizasyon analizi | `docs/AI_TOKEN_OPTIMIZATION.md` (analiz kaydı; her taskta açma) |
 
 > **Stale uyarı:** `README.md` ve `docs/project_analysis.md` içindeki eski ADMIN/EMPLOYEE anlatımları güncel olmayabilir. Auth tasklarında yaşayan kod ve capability kaynaklarını esas al.

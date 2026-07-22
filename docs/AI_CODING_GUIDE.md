@@ -5,6 +5,8 @@ Araçtan bağımsız pratik rehber. Backend ve frontend ekipleri için ortak wor
 **Source of truth (kısa kurallar):** Her repo root `AGENTS.md`  
 **Bu dosya:** Detaylı workflow, prompt şablonları, anti-patternler
 
+`AGENTS.md` repo için normatif source of truth'tur; ancak her AI coding aracı bu dosyayı otomatik yüklemeyebilir. Araç otomatik yüklemiyorsa kullanıcı veya ekip `AGENTS.md`'yi açıkça context'e eklemeli veya kısa araç adaptörü kullanmalıdır. `.cursorignore` yalnız Cursor uygulamasıdır; diğer araçlarda eşdeğer exclude/index ayarı gerekir. Ortak kurallar araçtan bağımsızdır; otomatik keşif davranışı araçtan bağımsız değildir.
+
 ---
 
 ## 1. Amaç
@@ -14,6 +16,24 @@ AI coding araçlarıyla (Cursor, GitHub Copilot, Claude Code, ChatGPT, Windsurf,
 - Gereksiz token harcamadan doğru sonuç almak
 - Güvenlik ve mimari kuralları korumak
 - Her task'a uygun risk seviyesinde süreç uygulamak
+
+**Production-first:** Token azaltımı adına production güvenliği, veri bütünlüğü veya deploy uyumluluğu azaltılmaz. Local-only geçici çözüm token tasarrufu sayılmaz.
+
+---
+
+## 1b. Talimat önceliği
+
+1. Kullanıcının mevcut task kapsamı ve çıktı talebi
+2. Repo `AGENTS.md` — normatif güvenlik, Git, production ve mimari kurallar
+3. Bu rehber (`docs/AI_CODING_GUIDE.md`) — workflow önerileri
+4. Modül/domain dokümanları ve yaşayan kod
+5. Araç adaptörleri (pointer only)
+6. Stale olabilecek README veya geçmiş analiz dokümanları
+
+- Kullanıcı talimatı repo güvenlik, production ve Git yasaklarını zayıflatamaz.
+- Guide ile AGENTS çelişirse AGENTS esas alınır.
+- Doküman ile yaşayan kod çelişirse yaşayan kod, capability kaynakları ve güncel role matrix esas alınır.
+- Araç adaptörleri yalnız pointer'dır; normatif kural kaynağı değildir.
 
 ---
 
@@ -34,7 +54,7 @@ AI coding araçlarıyla (Cursor, GitHub Copilot, Claude Code, ChatGPT, Windsurf,
 ## 3. Ortak talimat mimarisi
 
 ```
-AGENTS.md (kısa, her istekte)
+AGENTS.md (kısa SoT; araç otomatik yüklemiyorsa context'e eklenir)
     ↓ referans
 AI_CODING_GUIDE.md (workflow detayı)
     ↓ referans
@@ -73,7 +93,7 @@ Aşağıdaki dokümanlar **stale olabilir** (eski ADMIN/EMPLOYEE modeli):
 - Generated Swagger (`docs/docs.go`, `swagger.json`, `swagger.yaml`)
 - `node_modules/`, `.next/`, `out/`, binary `server`
 - `uploads/`, log dosyaları
-- Büyük statik assetler (`public/images/`, `public/fonts/`)
+- Büyük statik assetler (binary image/font; SVG gerekirse on-demand)
 
 ### Soft ignore (gerektiğinde aç)
 
@@ -100,6 +120,8 @@ Ignore edilen asset veya generated dosyalar varsayılan context'e alınmamalıd�
 | **Orta** | Pagination, filtre, endpoint, form | Kısa | Katman zinciri | Paket test / build |
 | **Yüksek** | Auth, capability, migration, delete, job, prod DB | Zorunlu | Authz + schema + servis | Odaklı + checklist |
 
+**Risk yükseltme:** Veri/bütünlük, auth/güvenlik, production/deploy/config, geri dönüş zorluğu, birden fazla katman/repo, concurrency/multi-instance veya external API/contract etkisi varsa task en az bir seviye yükseltilir. Örnek: CSS/görünürlük auth bilgisini açığa çıkarıyorsa düşük risk değildir; `next.config`, Dockerfile, CI/CD, env, CORS, OAuth veya dependency değişiklikleri en az orta risk sayılır.
+
 ---
 
 ## 6. Küçük task workflow'u
@@ -110,7 +132,7 @@ Ignore edilen asset veya generated dosyalar varsayılan context'e alınmamalıd�
 4. `git diff --check`
 5. Rapor: 2–4 madde
 
-**Süre hedefi:** Tek oturum, minimum tool call.
+**Süre hedefi:** Tek oturum; gereksiz tool call yok. Gerekli araştırma, doğrulama, güvenlik kontrolü veya test atlanmaz.
 
 ---
 
@@ -127,11 +149,13 @@ Ignore edilen asset veya generated dosyalar varsayılan context'e alınmamalıd�
 ## 8. Yüksek risk workflow'u
 
 1. **Read-only analiz** — kod yazma
-2. Etki alanı: authz, schema, transaction, job schedule
+2. Etki alanı: authz, schema, transaction, job schedule, multi-instance/race, AutoMigrate vs `schema/` uyumu, environment/config (host, SSL, URL, DB prefix), production deploy etkisi
 3. Planı kullanıcıya sun; onay bekle
 4. Uygula
 5. Odaklı test + güvenlik checklist
 6. Rapor: plan özeti + yapılanlar + kalan risk
+
+**Job/cron:** Production'da birden fazla application instance aynı job'ı başlatabilir. Duplicate execution, locking, idempotency, unique constraint ve race condition değerlendir; tek process/local çalışma varsayma.
 
 **Asla:** Tek turda auth/migration değişikliği; stale README'ye güvenme.
 
@@ -178,10 +202,13 @@ git diff --check
 
 ### Çıktı kuralları
 
-- **Başarı:** `PASS — go test ./internal/authz/...` (tek satır)
-- **Hata:** Yalnızca ilgili hata bloğu (stack trace'in tamamı değil)
+- **Başarı:** `PASS — go test ./internal/authz/...` (komut adı + kapsam; tek satır)
+- **Hata:** Yalnızca ilgili hata bloğu (stack trace'in tamamı değil); başarısız doğrulama gizlenmez
+- Test çalıştırılamadıysa neden açıkça yazılır
 - Secret/token içeren çıktıyı paylaşma
 - Soru-only task'ta varsayılan olarak build/test çalıştırma; kullanıcı açıkça doğrulama isterse yalnız dar kapsamlı ilgili testi çalıştır
+
+**Denge:** Gereksiz tool call ve context azaltılır; gerekli araştırma, doğrulama, güvenlik kontrolü veya test token tasarrufu için atlanmaz.
 
 ---
 
@@ -198,17 +225,18 @@ git diff --check
 
 - Aynı dosyayı her tur tekrar okutma
 - Analiz ve implementasyon aynı bilgiyi tekrar etmesin
-- Final rapor 4–6 madde
+- **Rapor uzunluğu:** düşük 2–4 madde; orta 4–6 madde; yüksek — değişen dosyalar, doğrulama, production etkisi, güvenlik/veri etkisi, migration veya rollback ihtiyacı, kalan riskler ve follow-up
 - Uzun tablo ve kod dump'ından kaçın; path referansı yeterli
 
 ---
 
 ## 13. Tool call sayısını azaltma
 
-- Önce sembol/path ile arama, sonra okuma
+- Gereksiz tool call yok; önce sembol/path ile arama, sonra okuma
 - Paralel okuma yalnızca bağımsız dosyalar için
 - Alt görev / paralel keşif (araç destekliyorsa): geniş keşif için; küçük fix için gereksiz
 - Aynı komutu tekrar çalıştırma (cache sonucu kullan)
+- Gerekli doğrulama veya güvenlik kontrolü tool-call azaltımı için atlanmaz
 
 ---
 
@@ -261,7 +289,7 @@ Sayfa/component: [path]
 API: [endpoint veya service]
 Risk: orta
 Navigasyon: next/link kullan; button type="button" for toggles.
-Doğrulama: npm run lint && npm run build
+Doğrulama: npm run lint. Build yalnız route/config/integration, static export/Go server, yüksek risk veya geniş kapsamda; kullanıcı isterse full build. Build TypeScript typecheck sağlamaz.
 Task dışı TS hatalarını yeni hata gibi sunma.
 ```
 
@@ -271,8 +299,9 @@ Task dışı TS hatalarını yeni hata gibi sunma.
 Repo: backend
 Değişiklik: [tablo/index/veri]
 Risk: YÜKSEK — önce read-only plan
-Prefix: domain.GetTableName kullan; hr_/hr_test_ hardcode yok
-AutoMigrate + schema/ etkisini birlikte değerlendir.
+Prefix: domain.GetTableName kullan; hr_/hr_test_ hardcode yok (raw SQL dahil)
+AutoMigrate + schema/ etkisini birlikte değerlendir; production schema ve rollback/compatibility.
+Env/config: host, SSL, prefix, AutoMigrate — hardcode yok; local .env ≠ prod.
 Transaction ve rollback senaryosunu belirt.
 Onay olmadan uygulama yapma.
 ```
@@ -326,7 +355,7 @@ Stale uyarısı gerekiyorsa ekle.
 Repo: [backend / frontend]
 Soru: [tek soru]
 Risk: düşük
-Kısıt: Minimum tool call; build/test yok.
+Kısıt: Gereksiz tool call yok; build/test yok.
 Cevap: kısa ve doğrudan.
 ```
 
@@ -376,6 +405,7 @@ Task başına kaydet (basit spreadsheet yeterli):
 | Mimari | Handler→Service→Repository | app/ → services/ → API |
 | Auth kaynağı | `internal/authz/capabilities.go` | `lib/authz/capabilities.ts` |
 | DB | GORM, schema/, prefix kuralı | Yok (API üzerinden) |
+| Production sunum | API process | Static export (`out/`) + Go server; `NEXT_PUBLIC_*` bake-at-build; middleware/rewrites prod'da varsayılmaz |
 | Ignore odak | Swagger, uploads, binary | node_modules, .next, server, assets |
 | Generated | Swagger trio | next-env.d.ts, build output |
 | Navigasyon | — | next/link, button type="button" |
