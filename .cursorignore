@@ -1,0 +1,29 @@
+# AI context ignore — Kartezya HR Backend
+# Cursor formatı; benzer exclude kuralları diğer AI araçlarına uyarlanabilir.
+# Source kod (internal/, schema/, authz) bilinçli olarak dışlanmadı.
+
+# Secrets — .env.example referans için açık bırakıldı
+.env
+.env.*
+!.env.example
+
+# Kullanıcı yüklemeleri ve binary çıktılar (root)
+uploads/
+/kartezya-hr
+/main
+*.exe
+*.test
+
+# Log, temp, coverage
+*.log
+logs/
+tmp/
+temp/
+coverage/
+
+# Generated Swagger — varsayılan context dışı; contract taskında on-demand aç
+docs/docs.go
+docs/swagger.json
+docs/swagger.yaml
+
+# go.sum bilinçli olarak ignore edilmedi (dependency taskları için gerekebilir)
