@@ -47,6 +47,7 @@ func (j *ContractStatusInfoJob) Run(_ JobExecutionContext) (int, error) {
 
 	targetStatuses := []string{
 		domain.ContractStatusPendingProposal,
+		domain.ContractStatusProposalSent,
 		domain.ContractStatusPendingApproval,
 		domain.ContractStatusPendingRevision,
 		domain.ContractStatusProposalRevision,
@@ -70,6 +71,7 @@ func (j *ContractStatusInfoJob) Run(_ JobExecutionContext) (int, error) {
 	// ── 2. Count by status ─────────────────────────────────────────────────
 	statusLabels := map[string]string{
 		domain.ContractStatusPendingProposal:  "Teklif Aşamasında",
+		domain.ContractStatusProposalSent:     "Teklif İletildi",
 		domain.ContractStatusProposalRevision: "Teklif Revizyon",
 		domain.ContractStatusPendingRevision:  "Revizyon Bekleniyor",
 		domain.ContractStatusPendingApproval:  "Onay Bekleniyor",
@@ -98,6 +100,7 @@ func (j *ContractStatusInfoJob) Run(_ JobExecutionContext) (int, error) {
 
 	orderedStatuses := []string{
 		domain.ContractStatusPendingProposal,
+		domain.ContractStatusProposalSent,
 		domain.ContractStatusProposalRevision,
 		domain.ContractStatusPendingRevision,
 		domain.ContractStatusPendingApproval,
@@ -156,6 +159,7 @@ func (j *ContractStatusInfoJob) buildExcel(contracts []domain.Contract, statusLa
 
 	orderedStatuses := []string{
 		domain.ContractStatusPendingProposal,
+		domain.ContractStatusProposalSent,
 		domain.ContractStatusProposalRevision,
 		domain.ContractStatusPendingRevision,
 		domain.ContractStatusPendingApproval,
