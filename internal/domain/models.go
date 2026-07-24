@@ -367,6 +367,7 @@ const (
 // Contract status constants
 const (
 	ContractStatusPendingProposal  = "PENDING_PROPOSAL"  // teklif onay bekleniyor
+	ContractStatusProposalSent     = "PROPOSAL_SENT"      // teklif iletildi
 	ContractStatusProposalRevision = "PROPOSAL_REVISION" // teklif revize bekleniyor
 	ContractStatusPendingRevision  = "PENDING_REVISION"  // revize bekleniyor
 	ContractStatusPendingApproval  = "PENDING_APPROVAL"  // onay bekleniyor
