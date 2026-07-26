@@ -123,6 +123,7 @@ type EmployeeWorkInfoLookup struct {
 	DepartmentName string `json:"department_name"`
 	Manager        string `json:"manager"`
 	JobTitle       string `json:"job_title"`
+	PersonnelNo    string `json:"personnel_no"`
 }
 
 // Work Information response DTO with related entity names
