@@ -1,6 +1,7 @@
 # AI context ignore — Kartezya HR Backend
-# Cursor formatı; benzer exclude kuralları diğer AI araçlarına uyarlanabilir.
-# Source kod (internal/, schema/, authz) bilinçli olarak dışlanmadı.
+# Cursor-only discovery/context filter; not a hard security or permission boundary.
+# Other tools need their own exclusion (e.g. .geminiignore). Explicit reads may bypass.
+# Source (internal/, schema/, authz) intentionally not excluded.
 
 # Secrets — .env.example referans için açık bırakıldı
 .env

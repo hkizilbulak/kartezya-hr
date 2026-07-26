@@ -1,11 +1,13 @@
 # AI Coding Rehberi — Kartezya HR
 
+This is an on-demand reference. Do not load it for every task.
+
 Araçtan bağımsız pratik rehber. Backend ve frontend ekipleri için ortak workflow; repo farkları açıkça belirtilmiştir.
 
 **Source of truth (kısa kurallar):** Her repo root `AGENTS.md`  
-**Bu dosya:** Detaylı workflow, prompt şablonları, anti-patternler
+**Bu dosya:** Detaylı workflow, prompt şablonları, anti-patternler — yalnızca high-risk, cross-layer, production-impacting veya workflow/validation belirsiz tasklarda aç; mümkünse yalnız ilgili bölümü oku.
 
-`AGENTS.md` repo için normatif source of truth'tur; ancak her AI coding aracı bu dosyayı otomatik yüklemeyebilir. Araç otomatik yüklemiyorsa kullanıcı veya ekip `AGENTS.md`'yi açıkça context'e eklemeli veya kısa araç adaptörü kullanmalıdır. `.cursorignore` yalnız Cursor uygulamasıdır; diğer araçlarda eşdeğer exclude/index ayarı gerekir. Ortak kurallar araçtan bağımsızdır; otomatik keşif davranışı araçtan bağımsız değildir.
+`AGENTS.md` repo için normatif source of truth'tur; ancak her AI coding aracı bu dosyayı otomatik yüklemeyebilir. Araç otomatik yüklemiyorsa kullanıcı veya ekip `AGENTS.md`'yi açıkça context'e eklemeli veya kısa araç adaptörü kullanmalıdır. `.cursorignore` yalnız Cursor; `.geminiignore` yalnız Gemini discovery filtresidir — hard security deny değildir. Ortak kurallar araçtan bağımsızdır; otomatik keşif davranışı araçtan bağımsız değildir.
 
 ---
 
@@ -55,15 +57,15 @@ AI coding araçlarıyla (Cursor, GitHub Copilot, Claude Code, ChatGPT, Windsurf,
 
 ```
 AGENTS.md (kısa SoT; araç otomatik yüklemiyorsa context'e eklenir)
-    ↓ referans
-AI_CODING_GUIDE.md (workflow detayı)
+    ↓ koşullu referans
+AI_CODING_GUIDE.md (workflow detayı; her taskta yükleme)
     ↓ referans
 Modül dokümanları (ihtiyaç halinde)
     ↓ ince pointer
-Araç adaptörleri (.agent/, .cursor/rules/, CLAUDE.md — ileride)
+Araç adaptörleri (CLAUDE.md, GEMINI.md, .github/copilot-instructions.md, .agent/instructions.md)
 ```
 
-**Kural tekrarı:** Normatif ve tam kural metni `AGENTS.md` içindedir. Bu rehber workflow bağlamında kısa özet, açıklama ve prompt şablonları içerebilir. Adaptör dosyaları kuralları tam metin olarak kopyalamamalıdır.
+**Kural tekrarı:** Normatif ve tam kural metni `AGENTS.md` içindedir. Bu rehber workflow bağlamında kısa özet, açıklama ve prompt şablonları içerebilir. Adaptör dosyaları 1–3 satır pointer/import düzeyindedir; kuralları kopyalamaz.
 
 ### Stale doküman uyarısı
 
@@ -422,12 +424,18 @@ Ayrı task olarak ele alınmalı (bu rehberde güncellenmedi):
 
 ---
 
-## İleride eklenebilecek araç adaptörleri
+## Araç adaptörleri
 
-Gereksiz dosya çoğaltmadan, ihtiyaç oldukça:
+Mevcut (pointer only):
 
-- `.github/copilot-instructions.md` — AGENTS.md pointer (~30 satır)
-- `CLAUDE.md` — AGENTS.md pointer
-- `.cursor/rules/*.mdc` — modül bazlı kısa kurallar
+- `CLAUDE.md` — `@AGENTS.md` (Claude Code import; sürüm davranışına bağlı)
+- `GEMINI.md` — doğal dil pointer (`AGENTS.md`)
+- `.github/copilot-instructions.md` — `AGENTS.md` pointer
+- Backend `.agent/instructions.md` — `AGENTS.md` pointer
 
-Her adaptör yalnızca pointer içermeli; kuralları kopyalamamalı.
+İhtiyaç oldukça eklenebilir (destek doğrulanmadan oluşturma):
+
+- `.cursor/rules/*.mdc` — gerçek path-specific ihtiyaç varsa
+- Diğer araç adaptörleri — resmi mekanizma doğrulandıktan sonra
+
+Her adaptör yalnızca pointer/import içermeli; kuralları kopyalamamalı. Hayalî ignore dosyası (ör. doğrulanmamış `.copilotignore`) oluşturma.

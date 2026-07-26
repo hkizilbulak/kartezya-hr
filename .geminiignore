@@ -1,0 +1,27 @@
+# Gemini context ignore — Kartezya HR Backend
+# Discovery/context filter only; not a hard security deny.
+# Source (internal/, schema/), tests, go.sum, .env.example, AGENTS.md and AI docs stay available.
+
+# Secrets — .env.example kept for schema reference
+.env
+.env.*
+!.env.example
+
+# Local uploads and compiled binaries (root)
+uploads/
+/kartezya-hr
+/main
+*.exe
+*.test
+
+# Log, temp, coverage
+*.log
+logs/
+tmp/
+temp/
+coverage/
+
+# Generated Swagger — open on-demand for contract tasks
+docs/docs.go
+docs/swagger.json
+docs/swagger.yaml
