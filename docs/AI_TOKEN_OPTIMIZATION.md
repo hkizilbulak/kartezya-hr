@@ -1,11 +1,12 @@
 # AI Token Optimizasyonu — Kartezya HR
 
-This document is an analysis and measurement record, not a runtime coding instruction.
-Do not load it during normal coding tasks.
+Bu belge bir analiz ve ölçüm kaydıdır; runtime coding talimatı değildir. Normal kodlama görevlerinde yüklenmemelidir.
 
 > Son güncelleme: 2026-07-26
 > Kapsam: Backend (`kartezya-hr`) + Frontend (`kartezya-hr-fe`)
 > Normatif kurallar için repo `AGENTS.md` esas alınır. Bu dosya yalnız AI instruction architecture, token measurement, tool compatibility, optimization veya management reporting tasklarında açılır.
+>
+> **Dil politikası:** Makine/AI odaklı normatif dosyalar (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`, `.agent/instructions.md`, ignore yorumları) İngilizcedir. İnsan odaklı rehber ve bu ölçüm kaydı (`docs/AI_CODING_GUIDE.md`, `docs/AI_TOKEN_OPTIMIZATION.md`) Türkçedir.
 
 ---
 
@@ -13,15 +14,19 @@ Do not load it during normal coding tasks.
 
 Token israfının asıl kaynağı kısa prompt yazmamak değil; **projede araçtan bağımsız AI talimatının eksikliği**, **her task'ta aynı bilginin yeniden anlatılması**, **generated/büyük dosyaların context'e girmesi** ve **her görevin aynı ağır agent sürecinden geçmesidir**.
 
-**Uygulanan mimari (2026-07):**
+**Uygulanan mimari (2026-07, nihai):**
 
-- Her iki repo: kısa `AGENTS.md` (tek normative SoT)
-- Her iki repo: `.cursorignore` (Cursor discovery filtresi)
-- Her iki repo: `.geminiignore` (Gemini discovery filtresi)
-- İnce adaptörler: `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`; backend `.agent/instructions.md`
-- Backend: `docs/AI_CODING_GUIDE.md` (koşullu) ve bu rapor (analiz kaydı)
+- Her iki repo: kısa İngilizce `AGENTS.md` (tek normative SoT)
+- Her iki repo: `.cursorignore` (Cursor discovery filtresi; İngilizce yorum)
+- Her iki repo: `.geminiignore` (Gemini discovery filtresi; İngilizce yorum)
+- İnce adaptörler (İngilizce, yalnız pointer/import):
+  - `CLAUDE.md` → `@AGENTS.md`
+  - `GEMINI.md` → `@./AGENTS.md` (Gemini CLI relative import)
+  - `.github/copilot-instructions.md` → kısa `AGENTS.md` pointer (repo-wide uyumluluk katmanı; birkaç Copilot yüzeyi `AGENTS.md`'yi doğrudan destekler)
+  - Backend `.agent/instructions.md` → `AGENTS.md` pointer
+- Backend: `docs/AI_CODING_GUIDE.md` (koşullu, Türkçe) ve bu rapor (analiz kaydı, Türkçe)
 
-`AGENTS.md` ortak normatif kaynaktır; otomatik yükleme/uygulama araçlara göre değişir. Araç yüklemiyorsa kullanıcı context'e eklemeli veya kısa adaptör kullanmalıdır. “Tüm AI araçlarında kesin çalışır” iddiası yapılmaz.
+`AGENTS.md` ortak normatif kaynaktır; otomatik yükleme/uygulama araçlara göre değişir. Araç yüklemiyorsa kullanıcı context'e eklemeli veya kısa adaptör kullanmalıdır. “Tüm AI araçlarında kesin çalışır” iddiası yapılmaz. Yerelde CLI bulunmayan araçlar (Claude Code, Gemini CLI, Copilot) için runtime smoke testleri hâlâ gereklidir.
 
 **Pilot hedef aralığı (tahmin / hipotez):** Tipik tasklarda **%40–70**'e kadar context/token azaltımı *potansiyeli* (araç ve task tipine göre değişir). **Ölçülmemiş**; kesin sonuç değildir. 5–10 gerçek task ile doğrulanmalıdır.
 
@@ -71,17 +76,18 @@ Hedef: Cursor, Copilot, Claude Code, Gemini, Codex ve benzeri araçlarda ortak S
 ## 5. Önerilen / uygulanan talimat mimarisi
 
 ```
-AGENTS.md (kısa SoT, repo başına)
-    ↓ koşullu
-docs/AI_CODING_GUIDE.md (workflow; her taskta değil)
+AGENTS.md (kısa SoT, repo başına; İngilizce; HER contextte)
+    ↓ koşullu (yalnız tetikleyicide; her taskta değil)
+docs/AI_CODING_GUIDE.md (workflow; Türkçe)
     ↓ referans
 Modül dokümanları (role matrix, schema — ihtiyaç halinde)
-    ↓ ince pointer
-Adaptörler: CLAUDE.md, GEMINI.md, .github/copilot-instructions.md, .agent/instructions.md
+    ↓ ince pointer/import
+Adaptörler: CLAUDE.md (@AGENTS.md), GEMINI.md (@./AGENTS.md), .github/copilot-instructions.md, .agent/instructions.md
 ```
 
 - **Tek source of truth:** Root `AGENTS.md` (otomatik uygulama araçlara göre değişir)
-- **Kural tekrarı yasak:** Adaptörler 1–3 satır pointer/import
+- **Kural tekrarı yasak:** Adaptörler 1–3 satır pointer/import; normatif kural kopyalanmaz
+- **Dil:** Makine odaklı dosyalar İngilizce; insan odaklı rehber ve bu rapor Türkçe. Aynı içerik paralel iki dilde tutulmaz.
 - **Bu rapor:** Analiz/ölçüm kaydı; runtime instruction değildir; normal coding taskta açılmaz
 - **Frontend:** Kendi `AGENTS.md` tek başına yeterlidir; backend docs yalnız multi-root + gerekirse opsiyonel
 
@@ -132,19 +138,21 @@ Detay: `docs/AI_CODING_GUIDE.md` (koşullu)
 
 ## 9. Ölçüm planı
 
-Task / context başına kaydedilecek metrikler:
+Task / context başına kaydedilecek pilot metrikler:
 
+- Yeni context sayısı
+- Context başına toplam input tokenı
 - Context başına otomatik instruction tokenı
-- Toplam input tokenı
-- Koşullu guide açılma oranı (`AI_CODING_GUIDE` / bu rapor)
 - Açılan dosya sayısı
-- Cache-hit oranı (araç raporluyorsa)
-- First-attempt success rate
-- Rework count
-- Validation failure rate
-- Reverted AI changes
+- Guide açılma oranı (`AI_CODING_GUIDE` / bu rapor)
+- İlk denemede başarı oranı
+- Yeniden çalışma (rework) sayısı
+- Agent tool-call sayısı
+- Validation failure oranı
+- Geri alınan AI değişikliği sayısı
 - Başlangıç promptu için harcanan geliştirici süresi
-- Tool call / tur sayısı (opsiyonel)
+- Ortalama konuşma/context uzunluğu
+- Cache-hit oranı (araç raporluyorsa)
 
 **Yöntem:** 5–10 gerçek task baseline → optimizasyon sonrası karşılaştırma. Senaryo yüzdeleri hipotezdir.
 
@@ -217,6 +225,39 @@ Task / context başına kaydedilecek metrikler:
 
 ---
 
+## 13b. Eklenmeyecek sistemler (yalnız kayıt)
+
+Aşağıdakiler bu projede **uygulanmadı**; yalnızca gelecekte, ölçülen ölçek veya tekrar eden başarısızlık kalıpları haklı çıkarırsa değerlendirilecek seçeneklerdir:
+
+- RAG / vector database
+- Dahili AI gateway
+- Semantic response cache
+- Prompt sıkıştırma / LLMLingua
+- Model routing
+- Path-specific rules
+- Paylaşılan (shared) multi-root AGENTS dosyası
+
+Gerekçeler: bakım maliyeti, erişim-kontrol karmaşıklığı, cache bayatlaması, secret/kod sızma riski, yanlış semantic-cache eşleşmesi, araç kilidi (lock-in), kritik prompt anlamının kaybı olasılığı ve mevcut ticari araçların indexing/retrieval/edit planlamayı zaten dahili yapması.
+
+---
+
+## 13c. Repo dışı olgunluk adımları (follow-up; bu görevde uygulanmadı)
+
+Aşağıdakiler repo dosyalarıyla çözülemez; org/admin veya CI süreci gerektirir. Repo kanıtı olmadan “mevcut” sayılmaz:
+
+- Main branch koruması
+- Zorunlu PR ve review
+- CI'da backend testleri
+- CI'da frontend lint/typecheck/build
+- Secret scanning
+- Migration kontrolleri
+- Copilot organization/repository content exclusion
+- Claude/Gemini permission policy'leri
+- Gerçek 2–4 haftalık kullanım pilotu
+- Araç bazlı runtime smoke testleri
+
+---
+
 ## 14. Uygulama roadmap'i
 
 ```
@@ -226,6 +267,22 @@ Pilot     → Ekip prompt şablonu + ölçüm baseline
 Sonraki   → Stale docs + gitignore (server binary) + org Copilot exclusion
 İleride   → Ölçüm karşılaştırma + doğrulanmış ek araç adaptörleri
 ```
+
+---
+
+## 14b. Instruction token tahmini (chars/4; yalnız yaklaşık)
+
+`chars/4` kaba bir tahmindir; gerçek sonuç tokenizer'a göre değişir. İngilizce metin genelde tokenizer'da Türkçeden daha verimli tokenize olur; bu nedenle chars/4 İngilizce için gerçek token sayısını olduğundan yüksek gösterebilir.
+
+| Dosya | Önceki (Türkçe) ~tok | Yeni (İngilizce) ~tok | Fark | % |
+|---|---:|---:|---:|---:|
+| BE `AGENTS.md` | ~1390 | ~1500 | +110 | ~+8% |
+| FE `AGENTS.md` | ~1510 | ~1647 | +137 | ~+9% |
+| Multi-root (BE+FE) | ~2900 | ~3147 | +247 | ~+9% |
+
+Not: Türkçeden İngilizceye geçişte anlam eşdeğerliği ve tüm `must/must not` modaliteleri korunduğu için karakter sayısı hafif arttı; sırf tahmini düşürmek için kritik kural kaldırılmadı. Referans baseline (sıkıştırma öncesi Türkçe): BE ~2014, FE ~2130 (≈4144 multi-root).
+
+Adaptör maliyeti (chars/4): `CLAUDE.md`/`GEMINI.md` ~3; `.github/copilot-instructions.md` ~39; `.agent/instructions.md` ~38. Import genişlerse Claude/Gemini efektif maliyeti ≈ adapter + `AGENTS.md`.
 
 ---
 

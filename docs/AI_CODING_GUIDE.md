@@ -1,11 +1,11 @@
 # AI Coding Rehberi — Kartezya HR
 
-This is an on-demand reference. Do not load it for every task.
+Bu belge isteğe bağlı/koşullu bir rehberdir. Her görevde otomatik olarak yüklenmemelidir. Yeni görev başladığında gereksiz eski context taşınmamalıdır.
 
 Araçtan bağımsız pratik rehber. Backend ve frontend ekipleri için ortak workflow; repo farkları açıkça belirtilmiştir.
 
 **Source of truth (kısa kurallar):** Her repo root `AGENTS.md`  
-**Bu dosya:** Detaylı workflow, prompt şablonları, anti-patternler — yalnızca high-risk, cross-layer, production-impacting veya workflow/validation belirsiz tasklarda aç; mümkünse yalnız ilgili bölümü oku.
+**Bu dosya:** Detaylı workflow, prompt şablonları, anti-patternler — yalnızca `AGENTS.md` M/L bölümünde tanımlı tetikleyiciler geçerliyse aç; mümkünse yalnız ilgili bölümü oku.
 
 `AGENTS.md` repo için normatif source of truth'tur; ancak her AI coding aracı bu dosyayı otomatik yüklemeyebilir. Araç otomatik yüklemiyorsa kullanıcı veya ekip `AGENTS.md`'yi açıkça context'e eklemeli veya kısa araç adaptörü kullanmalıdır. `.cursorignore` yalnız Cursor; `.geminiignore` yalnız Gemini discovery filtresidir — hard security deny değildir. Ortak kurallar araçtan bağımsızdır; otomatik keşif davranışı araçtan bağımsız değildir.
 
@@ -56,16 +56,29 @@ AI coding araçlarıyla (Cursor, GitHub Copilot, Claude Code, ChatGPT, Windsurf,
 ## 3. Ortak talimat mimarisi
 
 ```
-AGENTS.md (kısa SoT; araç otomatik yüklemiyorsa context'e eklenir)
-    ↓ koşullu referans
-AI_CODING_GUIDE.md (workflow detayı; her taskta yükleme)
+AGENTS.md (kısa SoT; HER contextte)
+    ↓ koşullu referans (yalnız tetikleyicide; her taskta DEĞİL)
+AI_CODING_GUIDE.md (workflow detayı)
     ↓ referans
 Modül dokümanları (ihtiyaç halinde)
     ↓ ince pointer
 Araç adaptörleri (CLAUDE.md, GEMINI.md, .github/copilot-instructions.md, .agent/instructions.md)
 ```
 
+**Yükleme sıklığı (net):**
+- `AGENTS.md`: her contextte (kısa, normatif SoT).
+- Bu rehber (`AI_CODING_GUIDE.md`): yalnız tetikleyici koşulda; her taskta yüklenmez.
+- `AI_TOKEN_OPTIMIZATION.md`: yalnız optimizasyon/ölçüm işinde.
+
 **Kural tekrarı:** Normatif ve tam kural metni `AGENTS.md` içindedir. Bu rehber workflow bağlamında kısa özet, açıklama ve prompt şablonları içerebilir. Adaptör dosyaları 1–3 satır pointer/import düzeyindedir; kuralları kopyalamaz.
+
+### Context yaşam döngüsü
+
+- Görev değiştiğinde yeni context aç; tamamlanmış görev geçmişini yeni göreve taşıma.
+- Aynı görev devam ediyorsa önce kısa bir durum özeti oluştur.
+- Yeni contexte yalnız şunları aktar: aktif branch, görev amacı, mevcut değişiklikler, doğrulanmış kararlar ve bilinen engeller.
+- Büyük loglar, tam terminal çıktıları ve eski konuşmalar otomatik olarak taşınmamalıdır.
+- Bu çalışma standardı `AGENTS.md` içine eklenmez; çünkü her contextte token tüketir. Yeri bu rehberdir (koşullu).
 
 ### Stale doküman uyarısı
 
@@ -426,11 +439,11 @@ Ayrı task olarak ele alınmalı (bu rehberde güncellenmedi):
 
 ## Araç adaptörleri
 
-Mevcut (pointer only):
+Mevcut (yalnız pointer/import; İngilizce):
 
-- `CLAUDE.md` — `@AGENTS.md` (Claude Code import; sürüm davranışına bağlı)
-- `GEMINI.md` — doğal dil pointer (`AGENTS.md`)
-- `.github/copilot-instructions.md` — `AGENTS.md` pointer
+- `CLAUDE.md` — `@AGENTS.md` (Claude Code import; runtime davranışı yerelde doğrulanmalı)
+- `GEMINI.md` — `@./AGENTS.md` (Gemini CLI relative import)
+- `.github/copilot-instructions.md` — `AGENTS.md` pointer (repo-wide uyumluluk katmanı)
 - Backend `.agent/instructions.md` — `AGENTS.md` pointer
 
 İhtiyaç oldukça eklenebilir (destek doğrulanmadan oluşturma):
