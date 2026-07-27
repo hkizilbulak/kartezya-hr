@@ -197,6 +197,7 @@ var jobHistorySortAllowlist = map[string]bool{
 	"end_time":        true,
 	"processed_count": true,
 	"status":          true,
+	"reference_date":  true,
 }
 
 const jobHistoryDefaultSort = "start_time"

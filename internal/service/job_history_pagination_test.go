@@ -208,7 +208,7 @@ func TestGetHistoryAllowedSortKeysPassedThrough(t *testing.T) {
 	repo := &stubJobRepoForHistory{}
 	svc := NewJobService(repo, nil)
 
-	keys := []string{"start_time", "end_time", "processed_count", "status", "id"}
+	keys := []string{"start_time", "end_time", "processed_count", "status", "id", "reference_date"}
 	for _, key := range keys {
 		_, err := svc.GetHistory(1, 1, 10, types.SortParams{Sort: key, Direction: "ASC"})
 		if err != nil {
