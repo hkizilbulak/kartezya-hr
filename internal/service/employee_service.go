@@ -735,6 +735,7 @@ func (s *employeeService) ListEmployees(limit, offset int, isAdmin bool) ([]*typ
 				DepartmentName: latestWorkInfo.Department.Name,
 				Manager:        latestWorkInfo.Department.Manager,
 				JobTitle:       latestWorkInfo.JobPosition.Title,
+				PersonnelNo:    latestWorkInfo.PersonnelNo,
 			}
 		}
 
@@ -849,6 +850,7 @@ func (s *employeeService) ListEmployeesWithFilters(limit, offset int, sortField,
 				DepartmentName: latestWorkInfo.Department.Name,
 				Manager:        latestWorkInfo.Department.Manager,
 				JobTitle:       latestWorkInfo.JobPosition.Title,
+				PersonnelNo:    latestWorkInfo.PersonnelNo,
 			}
 		}
 
