@@ -1,0 +1,30 @@
+# AI context ignore — Kartezya HR Backend
+# Cursor-only discovery/context filter; not a hard security or permission boundary.
+# Other tools need their own exclusion (e.g. .geminiignore). Explicit reads may bypass.
+# Source (internal/, schema/, authz) intentionally not excluded.
+
+# Secrets — .env.example referans için açık bırakıldı
+.env
+.env.*
+!.env.example
+
+# Kullanıcı yüklemeleri ve binary çıktılar (root)
+uploads/
+/kartezya-hr
+/main
+*.exe
+*.test
+
+# Log, temp, coverage
+*.log
+logs/
+tmp/
+temp/
+coverage/
+
+# Generated Swagger — varsayılan context dışı; contract taskında on-demand aç
+docs/docs.go
+docs/swagger.json
+docs/swagger.yaml
+
+# go.sum bilinçli olarak ignore edilmedi (dependency taskları için gerekebilir)
