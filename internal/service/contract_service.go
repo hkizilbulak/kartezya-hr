@@ -68,8 +68,7 @@ func (s *contractService) CreateContract(req types.ContractRequest, createdBy st
 
 	if len(req.TargetEmployeeIDs) > 0 {
 		if err := s.syncTargetEmployees(contract.ID, req.TargetEmployeeIDs, createdBy); err != nil {
-			// Log error but don't fail contract creation
-			fmt.Printf("Error syncing target employees for contract %d: %v\n", contract.ID, err)
+			return nil, err
 		}
 	}
 
@@ -185,7 +184,7 @@ func (s *contractService) UpdateContract(id uint, req types.ContractRequest, mod
 	}
 
 	if err := s.syncTargetEmployees(id, req.TargetEmployeeIDs, modifiedBy); err != nil {
-		fmt.Printf("Error syncing target employees for contract %d: %v\n", id, err)
+		return err
 	}
 
 	s.auditService.CreateAuditLog("Contract", id, domain.AuditActionUpdate, existing, updated, modifiedBy)
@@ -224,14 +223,30 @@ func (s *contractService) syncTargetEmployees(contractID uint, targetEmployeeIDs
 
 	// Add new assignments
 	for id := range targetMap {
-		if !existingMap[id] {
-			ec := &domain.EmployeeContract{
-				ContractID: contractID,
-				EmployeeID: id,
+		if existingMap[id] {
+			continue
+		}
+
+		existingRecord, err := s.employeeContractRepo.GetByContractAndEmployeeIncludingDeleted(contractID, id)
+		if err != nil {
+			return err
+		}
+
+		if existingRecord != nil {
+			if existingRecord.Deleted {
+				if err := s.employeeContractRepo.ReviveByContractAndEmployee(contractID, id, modifiedBy); err != nil {
+					return err
+				}
 			}
-			if err := s.employeeContractRepo.Create(ec, modifiedBy); err != nil {
-				return err
-			}
+			continue
+		}
+
+		ec := &domain.EmployeeContract{
+			ContractID: contractID,
+			EmployeeID: id,
+		}
+		if err := s.employeeContractRepo.Create(ec, modifiedBy); err != nil {
+			return err
 		}
 	}
 
