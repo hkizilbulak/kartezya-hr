@@ -114,6 +114,12 @@ func TestJobHistoryOrderClause(t *testing.T) {
 	if got := buildJobHistoryOrderClause("status", "DESC"); got != "status DESC" {
 		t.Fatalf("got %s", got)
 	}
+	if got := buildJobHistoryOrderClause("reference_date", "ASC"); got != "reference_date ASC" {
+		t.Fatalf("got %s", got)
+	}
+	if got := buildJobHistoryOrderClause("reference_date", "desc"); got != "reference_date DESC" {
+		t.Fatalf("got %s", got)
+	}
 	if got := buildJobHistoryOrderClause("id", "ASC"); got != "id ASC" {
 		t.Fatalf("got %s", got)
 	}
@@ -137,6 +143,10 @@ func TestNormalizeJobHistorySortParams(t *testing.T) {
 	got = NormalizeJobHistorySortParams(types.SortParams{Sort: "processed_count", Direction: "asc"})
 	if got.Sort != "processed_count" || got.Direction != "ASC" {
 		t.Fatalf("valid input: got %+v", got)
+	}
+	got = NormalizeJobHistorySortParams(types.SortParams{Sort: "reference_date", Direction: "DESC"})
+	if got.Sort != "reference_date" || got.Direction != "DESC" {
+		t.Fatalf("reference_date input: got %+v", got)
 	}
 }
 
