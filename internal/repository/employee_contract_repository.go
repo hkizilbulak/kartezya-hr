@@ -11,9 +11,11 @@ import (
 type EmployeeContractRepository interface {
 	Create(contract *domain.EmployeeContract, createdBy string) error
 	GetByID(id uint) (*domain.EmployeeContract, error)
+	GetByContractAndEmployeeIncludingDeleted(contractID uint, employeeID uint) (*domain.EmployeeContract, error)
 	GetByEmployeeID(employeeID uint, page int, limit int) ([]*domain.EmployeeContract, int64, error)
 	GetAll(limit, offset int, sortParams types.SortParams) ([]*domain.EmployeeContract, int64, error)
 	CheckExists(employeeID uint, contractID uint) (bool, error)
+	ReviveByContractAndEmployee(contractID uint, employeeID uint, modifiedBy string) error
 	Update(contract *domain.EmployeeContract, modifiedBy string) error
 	Delete(id uint, deletedBy string) error
 	DeleteByContractAndEmployee(contractID uint, employeeID uint, deletedBy string) error
@@ -38,6 +40,20 @@ func (r *employeeContractRepository) GetByID(id uint) (*domain.EmployeeContract,
 	var contract domain.EmployeeContract
 	err := r.db.Preload("Employee").Where("deleted = ?", false).First(&contract, id).Error
 	return &contract, err
+}
+
+func (r *employeeContractRepository) GetByContractAndEmployeeIncludingDeleted(contractID uint, employeeID uint) (*domain.EmployeeContract, error) {
+	var contract domain.EmployeeContract
+	err := r.db.
+		Where("contract_id = ? AND employee_id = ?", contractID, employeeID).
+		First(&contract).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &contract, nil
 }
 
 func (r *employeeContractRepository) GetByEmployeeID(employeeID uint, page int, limit int) ([]*domain.EmployeeContract, int64, error) {
@@ -120,6 +136,15 @@ func (r *employeeContractRepository) Update(contract *domain.EmployeeContract, m
 	}
 
 	return r.db.Where("deleted = ?", false).Model(contract).Updates(updates).Error
+}
+
+func (r *employeeContractRepository) ReviveByContractAndEmployee(contractID uint, employeeID uint, modifiedBy string) error {
+	return r.db.Model(&domain.EmployeeContract{}).
+		Where("contract_id = ? AND employee_id = ? AND deleted = ?", contractID, employeeID, true).
+		Updates(map[string]interface{}{
+			"deleted":     false,
+			"modified_by": modifiedBy,
+		}).Error
 }
 
 func (r *employeeContractRepository) Delete(id uint, deletedBy string) error {
