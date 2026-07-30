@@ -36,6 +36,22 @@ func TestEmployeeGradeModelIncludesStatusField(t *testing.T) {
 	}
 }
 
+func TestSelectActiveEmployeeGradeID_PrefersExistingStatusActive(t *testing.T) {
+	asOf := time.Date(2026, 7, 15, 0, 0, 0, 0, time.UTC)
+	openNewer := EmployeeGradeActiveCandidate{
+		ID: 2, StartDate: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC),
+		CreatedAt: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC),
+	}
+	markedActiveOlder := EmployeeGradeActiveCandidate{
+		ID: 1, StartDate: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+		CreatedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+		Status:    EmployeeGradeStatusActive,
+	}
+	if SelectActiveEmployeeGradeID([]EmployeeGradeActiveCandidate{openNewer, markedActiveOlder}, asOf) != 1 {
+		t.Fatal("existing status=ACTIVE must win over newer open unmarked row")
+	}
+}
+
 func TestSelectActiveEmployeeGradeID_Deterministic(t *testing.T) {
 	asOf := time.Date(2024, 7, 15, 12, 0, 0, 0, time.UTC)
 	closedEnd := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)

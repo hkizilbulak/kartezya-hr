@@ -9,15 +9,18 @@ type EmployeeGradeActiveCandidate struct {
 	StartDate time.Time
 	EndDate   *time.Time
 	CreatedAt time.Time
+	// Status is optional pre-migration; empty means unknown / not yet backfilled.
+	Status EmployeeGradeStatus
 }
 
 // SelectActiveEmployeeGradeID picks the winning ACTIVE row for one employee.
 // Priority (stable / deterministic):
-//  1. end_date IS NULL
-//  2. CURRENT_DATE inside [start_date, end_date] (open end counts as in range)
-//  3. start_date DESC
-//  4. created_at DESC
-//  5. id DESC
+//  1. status = ACTIVE (when Status is set)
+//  2. end_date IS NULL
+//  3. asOf inside [start_date, end_date] (open end counts as in range)
+//  4. start_date DESC
+//  5. created_at DESC
+//  6. id DESC
 //
 // Returns 0 when candidates is empty.
 func SelectActiveEmployeeGradeID(candidates []EmployeeGradeActiveCandidate, asOf time.Time) uint {
@@ -39,6 +42,12 @@ func SelectActiveEmployeeGradeID(candidates []EmployeeGradeActiveCandidate, asOf
 // employeeGradeActiveCandidateLess reports whether a should rank before b
 // (i.e. a is a better ACTIVE candidate).
 func employeeGradeActiveCandidateLess(a, b EmployeeGradeActiveCandidate, asOfDay time.Time) bool {
+	aStatusActive := a.Status == EmployeeGradeStatusActive
+	bStatusActive := b.Status == EmployeeGradeStatusActive
+	if aStatusActive != bStatusActive {
+		return aStatusActive
+	}
+
 	aOpen := a.EndDate == nil
 	bOpen := b.EndDate == nil
 	if aOpen != bOpen {

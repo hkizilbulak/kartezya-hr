@@ -3,7 +3,6 @@ package database
 import (
 	"fmt"
 	"log"
-	"strings"
 
 	"kartezya-hr/internal/domain"
 
@@ -80,29 +79,13 @@ func BuildAddEmployeeGradeStatusColumnSQL(tableName string) string {
 	)
 }
 
-// BuildEmployeeGradeStatusBackfillSQL assigns exactly one ACTIVE row per employee
-// among deleted=false rows, demotes the rest to INACTIVE, and fills missing end_dates.
-//
-// Active selection ORDER BY (must stay aligned with domain.SelectActiveEmployeeGradeID):
-//
-//	end_date IS NULL, in-range for CURRENT_DATE, start_date DESC, created_at DESC, id DESC
-//
-// INACTIVE end_date fill: next chronological start_date - 1 day when valid, else start_date.
-// Soft-deleted rows are forced INACTIVE (never counted by the partial unique index).
-//
-// employees.grade_id is intentionally not modified in this migration phase.
-func BuildEmployeeGradeStatusBackfillSQL(tableName string) string {
-	t := quoteIdent(tableName)
+// BuildEmployeeGradeActiveSelectionOrderBySQL is the shared deterministic ORDER BY
+// used by status backfill ROW_NUMBER. Must stay aligned with
+// domain.SelectActiveEmployeeGradeID.
+func BuildEmployeeGradeActiveSelectionOrderBySQL() string {
 	active := string(domain.EmployeeGradeStatusActive)
-	inactive := string(domain.EmployeeGradeStatusInactive)
-
 	return fmt.Sprintf(`
-WITH ranked AS (
-	SELECT
-		id,
-		ROW_NUMBER() OVER (
-			PARTITION BY employee_id
-			ORDER BY
+				CASE WHEN status = '%s' AND end_date IS NULL THEN 0 ELSE 1 END,
 				CASE WHEN end_date IS NULL THEN 0 ELSE 1 END,
 				CASE
 					WHEN start_date <= CURRENT_DATE
@@ -111,7 +94,37 @@ WITH ranked AS (
 				END,
 				start_date DESC,
 				created_at DESC,
-				id DESC
+				id DESC`, active)
+}
+
+// BuildEmployeeGradeStatusBackfillSQL assigns exactly one ACTIVE row per employee
+// among deleted=false rows, demotes the rest to INACTIVE, and fills missing end_dates.
+//
+// Active selection ORDER BY (must stay aligned with domain.SelectActiveEmployeeGradeID):
+//
+//	status=ACTIVE+open, end_date IS NULL, in-range for CURRENT_DATE,
+//	start_date DESC, created_at DESC, id DESC
+//
+// INACTIVE end_date fill: next chronological start_date - 1 day when valid, else start_date.
+// Soft-deleted rows are forced INACTIVE (never counted by the partial unique index).
+//
+// employees.grade_id is intentionally not modified in this migration phase.
+//
+// Run ONLY from schema/migrate_employee_grade_status.sql after diagnostics — not from
+// application AutoMigrate startup (see EnsureEmployeeGradeStatusConstraints).
+func BuildEmployeeGradeStatusBackfillSQL(tableName string) string {
+	t := quoteIdent(tableName)
+	active := string(domain.EmployeeGradeStatusActive)
+	inactive := string(domain.EmployeeGradeStatusInactive)
+	orderBy := BuildEmployeeGradeActiveSelectionOrderBySQL()
+
+	return fmt.Sprintf(`
+WITH ranked AS (
+	SELECT
+		id,
+		ROW_NUMBER() OVER (
+			PARTITION BY employee_id
+			ORDER BY %s
 		) AS rn
 	FROM %s
 	WHERE deleted = false
@@ -161,7 +174,7 @@ SET
 	end_date = p.new_end_date
 FROM prepared p
 WHERE eg.id = p.id
-`, t, t, inactive, active, inactive, t, t)
+`, orderBy, t, t, inactive, active, inactive, t, t)
 }
 
 // BuildEmployeeGradeStatusNotNullDefaultSQL locks status after backfill.
@@ -207,21 +220,91 @@ func BuildAddEmployeeGradeStatusEndDateCheckConstraintSQL(tableName string) stri
 	)
 }
 
-type employeeGradeActiveDuplicate struct {
-	EmployeeID uint
-	Cnt        int64
+// BuildEmployeeGradeMigrationPrecheckSQL returns a PostgreSQL DO block that aborts
+// the transaction when critical anomalies exist. Must run AFTER status column exists
+// (nullable OK) and BEFORE deterministic backfill.
+//
+// Blockers:
+//   - orphan employee_id / grade_id
+//   - NULL start_date
+//   - end_date < start_date
+//   - closed-interval overlaps (both end_dates set)
+//
+// Non-blockers (auto-fixed by backfill): multiple open ends, missing status.
+func BuildEmployeeGradeMigrationPrecheckSQL(egTable, employeesTable, gradesTable string) string {
+	eg := quoteIdent(egTable)
+	emp := quoteIdent(employeesTable)
+	grades := quoteIdent(gradesTable)
+
+	return fmt.Sprintf(`
+DO $precheck$
+BEGIN
+	-- Orphan employee_id
+	IF EXISTS (
+		SELECT 1 FROM %s eg
+		LEFT JOIN %s e ON e.id = eg.employee_id
+		WHERE e.id IS NULL
+	) THEN
+		RAISE EXCEPTION 'employee_grade_status precheck BLOCKER: orphan employee_id on %s';
+	END IF;
+
+	-- Orphan grade_id
+	IF EXISTS (
+		SELECT 1 FROM %s eg
+		LEFT JOIN %s g ON g.id = eg.grade_id
+		WHERE g.id IS NULL
+	) THEN
+		RAISE EXCEPTION 'employee_grade_status precheck BLOCKER: orphan grade_id on %s';
+	END IF;
+
+	-- NULL start_date (defensive; column is normally NOT NULL)
+	IF EXISTS (
+		SELECT 1 FROM %s WHERE start_date IS NULL
+	) THEN
+		RAISE EXCEPTION 'employee_grade_status precheck BLOCKER: NULL start_date on %s';
+	END IF;
+
+	-- Invalid dates
+	IF EXISTS (
+		SELECT 1 FROM %s
+		WHERE end_date IS NOT NULL AND end_date < start_date
+	) THEN
+		RAISE EXCEPTION 'employee_grade_status precheck BLOCKER: end_date < start_date on %s';
+	END IF;
+
+	-- Closed-interval overlaps (both ends set) — ambiguous history, do not auto-fix
+	IF EXISTS (
+		SELECT 1
+		FROM %s a
+		JOIN %s b
+			ON a.employee_id = b.employee_id
+			AND a.id < b.id
+			AND a.deleted = false
+			AND b.deleted = false
+			AND a.end_date IS NOT NULL
+			AND b.end_date IS NOT NULL
+			AND a.start_date <= b.end_date
+			AND b.start_date <= a.end_date
+	) THEN
+		RAISE EXCEPTION 'employee_grade_status precheck BLOCKER: overlapping closed date ranges on %s — run diagnose_employee_grade_migration.sql';
+	END IF;
+END
+$precheck$;
+`,
+		eg, emp, egTable,
+		eg, grades, egTable,
+		eg, egTable,
+		eg, egTable,
+		eg, eg, egTable,
+	)
 }
 
-type employeeGradeInvariantViolation struct {
-	ID     uint
-	Status string
-	Reason string
-}
-
-// EnsureEmployeeGradeStatusConstraints is the single source of truth for
-// employee-grade status column backfill, CHECKs, and the partial unique index.
-// Called from Migrate() when DB_AUTO_MIGRATE is enabled. Do not also apply
-// schema/migrate_employee_grade_status.sql on the same database.
+// EnsureEmployeeGradeStatusConstraints prepares ONLY the status column for
+// AutoMigrate startups (idempotent ADD COLUMN).
+//
+// Data backfill, CHECK constraints, and partial unique indexes MUST be applied
+// via schema/migrate_employee_grade_status.sql after diagnostics — never run
+// full data migration on application boot.
 //
 // Does not drop or rewrite employees.grade_id (later phase).
 func EnsureEmployeeGradeStatusConstraints(db *gorm.DB) error {
@@ -231,7 +314,7 @@ func EnsureEmployeeGradeStatusConstraints(db *gorm.DB) error {
 
 	dialect := db.Dialector.Name()
 	if dialect != "postgres" {
-		return fmt.Errorf("employee grade status migration requires postgres dialect, got %s", dialect)
+		return fmt.Errorf("employee grade status schema ensure requires postgres dialect, got %s", dialect)
 	}
 
 	tableName := ResolveEmployeeGradeTableName()
@@ -239,126 +322,45 @@ func EnsureEmployeeGradeStatusConstraints(db *gorm.DB) error {
 		return fmt.Errorf("resolved employee grade table name is empty")
 	}
 
-	log.Printf("[Migrate] Ensuring employee grade status model on table %s", tableName)
+	log.Printf("[Migrate] Ensuring employee grade status COLUMN only on table %s (backfill is manual SQL)", tableName)
 
 	if err := db.Exec(BuildAddEmployeeGradeStatusColumnSQL(tableName)).Error; err != nil {
 		return fmt.Errorf("failed to add status column on %s: %w", tableName, err)
 	}
 
-	if err := db.Exec(BuildEmployeeGradeStatusBackfillSQL(tableName)).Error; err != nil {
-		return fmt.Errorf("failed to backfill employee grade status on %s: %w", tableName, err)
-	}
-
-	if err := db.Exec(BuildEmployeeGradeStatusNotNullDefaultSQL(tableName)).Error; err != nil {
-		return fmt.Errorf("failed to set status NOT NULL on %s: %w", tableName, err)
-	}
-
-	if err := assertEmployeeGradeStatusInvariants(db, tableName); err != nil {
-		return err
-	}
-
-	if err := assertNoDuplicateActiveEmployeeGrades(db, tableName); err != nil {
-		return err
-	}
-
-	if err := db.Exec(BuildAddEmployeeGradeDatesCheckConstraintSQL(tableName)).Error; err != nil {
-		return fmt.Errorf("failed to add dates CHECK on %s: %w", tableName, err)
-	}
-
-	if err := db.Exec(BuildAddEmployeeGradeStatusEndDateCheckConstraintSQL(tableName)).Error; err != nil {
-		return fmt.Errorf("failed to add status/end_date CHECK on %s: %w", tableName, err)
-	}
-
-	if err := db.Exec(BuildCreateEmployeeGradeActiveUniqueIndexSQL(tableName)).Error; err != nil {
-		return fmt.Errorf("failed to create active employee grade unique index on %s: %w", tableName, err)
-	}
-
-	if err := db.Exec(BuildCreateEmployeeGradeActiveGradeIDIndexSQL(tableName)).Error; err != nil {
-		return fmt.Errorf("failed to create active grade_id lookup index on %s: %w", tableName, err)
-	}
-
-	log.Printf("[Migrate] Employee grade status constraints ensured on %s", tableName)
+	log.Printf("[Migrate] Employee grade status column ensured on %s — run schema/migrate_employee_grade_status.sql for backfill/constraints", tableName)
 	return nil
 }
 
-func assertNoDuplicateActiveEmployeeGrades(db *gorm.DB, tableName string) error {
-	query := fmt.Sprintf(`
-SELECT employee_id, COUNT(*) AS cnt
-FROM %s
-WHERE status = ? AND deleted = false
-GROUP BY employee_id
-HAVING COUNT(*) > 1
-ORDER BY employee_id
-`, quoteIdent(tableName))
-
-	var duplicates []employeeGradeActiveDuplicate
-	if err := db.Raw(query, domain.EmployeeGradeStatusActive).Scan(&duplicates).Error; err != nil {
-		return fmt.Errorf("failed to check duplicate ACTIVE employee grades on %s: %w", tableName, err)
-	}
-	if len(duplicates) == 0 {
-		return nil
-	}
-
-	sampleLimit := 5
-	if len(duplicates) < sampleLimit {
-		sampleLimit = len(duplicates)
-	}
-	samples := make([]string, 0, sampleLimit)
-	for i := 0; i < sampleLimit; i++ {
-		d := duplicates[i]
-		samples = append(samples, fmt.Sprintf("employee_id=%d count=%d", d.EmployeeID, d.Cnt))
-	}
-	return fmt.Errorf(
-		"cannot create unique index on %s: found %d employees with multiple ACTIVE grades after backfill; clean data manually. samples: %s",
-		tableName,
-		len(duplicates),
-		strings.Join(samples, "; "),
-	)
-}
-
-func assertEmployeeGradeStatusInvariants(db *gorm.DB, tableName string) error {
-	query := fmt.Sprintf(`
-SELECT id, status::text AS status,
-	CASE
-		WHEN end_date IS NOT NULL AND end_date < start_date THEN 'end_date_before_start_date'
-		WHEN status = ? AND (end_date IS NOT NULL OR deleted = true) THEN 'active_requires_null_end_date_and_not_deleted'
-		WHEN status = ? AND end_date IS NULL THEN 'inactive_requires_end_date'
-		WHEN status IS NULL OR status NOT IN (?, ?) THEN 'invalid_status'
-		ELSE 'ok'
-	END AS reason
-FROM %s
-WHERE
-	(end_date IS NOT NULL AND end_date < start_date)
-	OR (status = ? AND (end_date IS NOT NULL OR deleted = true))
-	OR (status = ? AND end_date IS NULL)
-	OR (status IS NULL OR status NOT IN (?, ?))
-ORDER BY id
-LIMIT 20
-`, quoteIdent(tableName))
-
+// BuildEmployeeGradePostBackfillAssertSQL fails the transaction if backfill left
+// duplicate ACTIVE rows or status/end_date invariant violations.
+func BuildEmployeeGradePostBackfillAssertSQL(tableName string) string {
+	t := quoteIdent(tableName)
 	active := string(domain.EmployeeGradeStatusActive)
 	inactive := string(domain.EmployeeGradeStatusInactive)
+	return fmt.Sprintf(`
+DO $assert$
+BEGIN
+	IF EXISTS (
+		SELECT 1
+		FROM %s
+		WHERE status = '%s' AND deleted = false
+		GROUP BY employee_id
+		HAVING COUNT(*) > 1
+	) THEN
+		RAISE EXCEPTION 'employee_grade_status assert: multiple ACTIVE grades remain on %s';
+	END IF;
 
-	var violations []employeeGradeInvariantViolation
-	if err := db.Raw(
-		query,
-		active, inactive, active, inactive,
-		active, inactive, active, inactive,
-	).Scan(&violations).Error; err != nil {
-		return fmt.Errorf("failed to validate employee grade status invariants on %s: %w", tableName, err)
-	}
-	if len(violations) == 0 {
-		return nil
-	}
-
-	samples := make([]string, 0, len(violations))
-	for _, v := range violations {
-		samples = append(samples, fmt.Sprintf("id=%d status=%s reason=%s", v.ID, v.Status, v.Reason))
-	}
-	return fmt.Errorf(
-		"employee grade status invariants violated on %s after backfill (%d shown): %s",
-		tableName,
-		len(violations),
-		strings.Join(samples, "; "),
-	)
+	IF EXISTS (
+		SELECT 1 FROM %s
+		WHERE (end_date IS NOT NULL AND end_date < start_date)
+		   OR (status = '%s' AND (end_date IS NOT NULL OR deleted = true))
+		   OR (status = '%s' AND end_date IS NULL)
+		   OR (status IS NULL OR status NOT IN ('%s', '%s'))
+	) THEN
+		RAISE EXCEPTION 'employee_grade_status assert: status/end_date invariants still violated on %s';
+	END IF;
+END
+$assert$;
+`, t, active, tableName, t, active, inactive, active, inactive, tableName)
 }
