@@ -86,16 +86,13 @@ type Employee struct {
 	DateOfBirth              *time.Time `json:"date_of_birth"`
 	HireDate                 *time.Time `json:"hire_date"`
 	LeaveDate                *time.Time `json:"leave_date"`
-	TotalGap                 float64    `json:"total_gap"`
 	MaritalStatus            string     `json:"marital_status" gorm:"size:20"`
 	EmergencyContact         string     `json:"emergency_contact" gorm:"size:15"`
 	EmergencyContactName     string     `json:"emergency_contact_name" gorm:"size:20"`
 	EmergencyContactRelation string     `json:"emergency_contact_relation" gorm:"size:20"`
 	GradeID                  *int64     `json:"grade_id" gorm:"index"` // legacy DB column; API reads ACTIVE EmployeeGrade instead
-	ContractNo               string     `json:"contract_no" gorm:"size:255"`
 	ProfessionStartDate      *time.Time `json:"profession_start_date"`
 	Note                     string     `json:"note" gorm:"type:text"`
-	MotherName               string     `json:"mother_name" gorm:"size:255"`
 	FatherName               string     `json:"father_name" gorm:"size:255"`
 	Nationality              string     `json:"nationality" gorm:"size:100"`
 	IdentityNo               string     `json:"identity_no" gorm:"size:50"`

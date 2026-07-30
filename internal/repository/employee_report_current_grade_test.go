@@ -14,6 +14,28 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestGradeReportExperienceSQL_NoTotalGap(t *testing.T) {
+	expr := gradeReportExperienceExprSQL()
+	for _, want := range []string{
+		"AGE(CURRENT_DATE, e.profession_start_date)",
+		"EXTRACT(YEAR FROM AGE",
+		"EXTRACT(MONTH FROM AGE",
+		"/ 12.0",
+	} {
+		if !strings.Contains(expr, want) {
+			t.Fatalf("experience expr missing %q:\n%s", want, expr)
+		}
+	}
+	for _, forbidden := range []string{
+		"total_gap",
+		"COALESCE",
+	} {
+		if strings.Contains(expr, forbidden) {
+			t.Fatalf("experience expr must not contain %q:\n%s", forbidden, expr)
+		}
+	}
+}
+
 func TestBuildActiveCurrentGradeSelectSQL_UsesActiveNotDateWindow(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Database.TablePrefix = "hr"

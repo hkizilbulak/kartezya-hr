@@ -735,16 +735,13 @@ func (r *employeeRepository) Update(employee *domain.Employee, modifiedBy string
 		"date_of_birth":              employee.DateOfBirth,
 		"hire_date":                  employee.HireDate,
 		"leave_date":                 employee.LeaveDate,
-		"total_gap":                  employee.TotalGap,
 		"marital_status":             employee.MaritalStatus,
 		"emergency_contact":          employee.EmergencyContact,
 		"emergency_contact_name":     employee.EmergencyContactName,
 		"emergency_contact_relation": employee.EmergencyContactRelation,
 		// grade_id intentionally omitted: current grade lives on hr_employee_grades (ACTIVE).
-		"contract_no":           employee.ContractNo,
 		"profession_start_date": employee.ProfessionStartDate,
 		"note":                  employee.Note,
-		"mother_name":           employee.MotherName,
 		"father_name":           employee.FatherName,
 		"nationality":           employee.Nationality,
 		"identity_no":           employee.IdentityNo,
@@ -1183,9 +1180,19 @@ func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, com
 	return rows, err
 }
 
+// gradeReportExperienceExprSQL returns fractional years of experience from
+// profession_start_date AGE only (years + months/12). It does not subtract total_gap.
+func gradeReportExperienceExprSQL() string {
+	return `(
+                    EXTRACT(YEAR FROM AGE(CURRENT_DATE, e.profession_start_date))
+                        +
+                    EXTRACT(MONTH FROM AGE(CURRENT_DATE, e.profession_start_date)) / 12.0
+                    )`
+}
+
 // GetGradeReportData executes the grade report SQL query.
 // current_grade is ACTIVE EmployeeGrade SoT (not date-window history).
-// total_gap / experience formulas are unchanged.
+// Experience is AGE(profession_start_date) only — no total_gap subtraction.
 func (r *employeeRepository) GetGradeReportData(companyID *uint, departmentIDs []uint, isActive *bool) ([]types.GradeReportRow, error) {
 	var rows []types.GradeReportRow
 
@@ -1195,6 +1202,7 @@ func (r *employeeRepository) GetGradeReportData(companyID *uint, departmentIDs [
 	companies := domain.GetTableName("hr_companies")
 	departments := domain.GetTableName("hr_departments")
 	currentGradeSelect := buildActiveCurrentGradeSelectSQL()
+	experienceExpr := gradeReportExperienceExprSQL()
 
 	query := fmt.Sprintf(`
 WITH experience_calc AS (
@@ -1205,17 +1213,11 @@ WITH experience_calc AS (
         e.hire_date,
         e.leave_date,
         e.profession_start_date,
-        COALESCE(e.total_gap,0) AS total_gap,
 
         CASE
             WHEN e.profession_start_date IS NULL THEN 0
             ELSE
-                (
-                    EXTRACT(YEAR FROM AGE(CURRENT_DATE, e.profession_start_date))
-                        +
-                    EXTRACT(MONTH FROM AGE(CURRENT_DATE, e.profession_start_date)) / 12.0
-                    )
-                    - COALESCE(e.total_gap,0)
+                %s
             END AS total_experience,
 
         -- rapor için text format
@@ -1288,7 +1290,6 @@ SELECT
     t.manager,
     t.start_date AS team_start_date,
     e.profession_start_date,
-    e.total_gap,
     e.total_experience_text,
     cg.current_grade,
     eg.expected_grade
@@ -1298,7 +1299,7 @@ JOIN experience_calc e ON e.id = eg.id
 LEFT JOIN current_grade cg ON cg.employee_id = e.id
 LEFT JOIN team_info t ON t.employee_id = e.id
 WHERE 1=1`,
-		employees, grades, currentGradeSelect, workInfo, companies, departments)
+		experienceExpr, employees, grades, currentGradeSelect, workInfo, companies, departments)
 
 	// Build dynamic parameters list
 	params := []interface{}{}

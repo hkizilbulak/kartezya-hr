@@ -110,17 +110,14 @@ type EmployeeResponse struct {
 	DateOfBirth              *string                       `json:"date_of_birth"`
 	HireDate                 *string                       `json:"hire_date"`
 	LeaveDate                *string                       `json:"leave_date,omitempty"`
-	TotalGap                 float64                       `json:"total_gap"`
 	MaritalStatus            string                        `json:"marital_status"`
 	EmergencyContact         string                        `json:"emergency_contact"`
 	EmergencyContactName     string                        `json:"emergency_contact_name"`
 	EmergencyContactRelation string                        `json:"emergency_contact_relation"`
 	GradeID                  *int64                        `json:"grade_id"` // compatibility: ACTIVE EmployeeGrade.grade_id
 	CurrentEmployeeGrade     *CurrentEmployeeGradeResponse `json:"current_employee_grade,omitempty"`
-	ContractNo               string                        `json:"contract_no"`
 	ProfessionStartDate      *string                       `json:"profession_start_date"`
 	Note                     string                        `json:"note"`
-	MotherName               string                        `json:"mother_name"`
 	FatherName               string                        `json:"father_name"`
 	Nationality              string                        `json:"nationality"`
 	IdentityNo               string                        `json:"identity_no"`
@@ -328,17 +325,14 @@ type EmployeeDetailResponse struct {
 	DateOfBirth              *string                       `json:"date_of_birth"`
 	HireDate                 *string                       `json:"hire_date"`
 	LeaveDate                *string                       `json:"leave_date,omitempty"`
-	TotalGap                 float64                       `json:"total_gap"`
 	MaritalStatus            string                        `json:"marital_status"`
 	EmergencyContact         string                        `json:"emergency_contact"`
 	EmergencyContactName     string                        `json:"emergency_contact_name"`
 	EmergencyContactRelation string                        `json:"emergency_contact_relation"`
 	GradeID                  *int64                        `json:"grade_id"` // compatibility: ACTIVE EmployeeGrade.grade_id
 	CurrentEmployeeGrade     *CurrentEmployeeGradeResponse `json:"current_employee_grade,omitempty"`
-	ContractNo               string                        `json:"contract_no"`
 	ProfessionStartDate      *string                       `json:"profession_start_date"`
 	Note                     string                        `json:"note"`
-	MotherName               string                        `json:"mother_name"`
 	FatherName               string                        `json:"father_name"`
 	Nationality              string                        `json:"nationality"`
 	IdentityNo               string                        `json:"identity_no"`
@@ -525,7 +519,6 @@ type GradeReportRow struct {
 	Manager             string  `json:"manager"`
 	TeamStartDate       *string `json:"team_start_date"`
 	ProfessionStartDate *string `json:"profession_start_date"`
-	TotalGap            float64 `json:"total_gap"`
 	TotalExperienceText string  `json:"total_experience_text"`
 	CurrentGrade        string  `json:"current_grade"`
 	ExpectedGrade       string  `json:"expected_grade"`

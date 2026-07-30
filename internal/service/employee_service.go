@@ -12,11 +12,11 @@ import (
 )
 
 type EmployeeService interface {
-	CreateEmployee(email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalGap float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, createdBy string, roles []string) (*domain.Employee, error)
+	CreateEmployee(email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, professionStartDate, note, fatherName, nationality, identityNo string, createdBy string, roles []string) (*domain.Employee, error)
 	GetEmployeeByID(id uint) (*types.EmployeeDetailResponse, error)
 	GetEmployeeByUserID(userID uint) (*types.EmployeeDetailResponse, error)
-	UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalGap float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo, status string, modifiedBy string, requestingUserID uint, actorRoles []string, roles []string) error
-	UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, professionStartDate string, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, motherName, fatherName, nationality, identityNo string) error
+	UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, professionStartDate, note, fatherName, nationality, identityNo, status string, modifiedBy string, requestingUserID uint, actorRoles []string, roles []string) error
+	UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, professionStartDate string, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, fatherName, nationality, identityNo string) error
 	DeleteEmployee(id uint, deletedBy string, actorRoles []string) error
 	EmployeeUserHasAdminRole(employeeID uint) (bool, error)
 	ListEmployees(limit, offset int, isAdmin bool) ([]*types.EmployeeResponse, error)
@@ -56,7 +56,7 @@ func NewEmployeeService(employeeRepo repository.EmployeeRepository, userRepo rep
 	}
 }
 
-func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalGap float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo string, createdBy string, roles []string) (*domain.Employee, error) {
+func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, professionStartDate, note, fatherName, nationality, identityNo string, createdBy string, roles []string) (*domain.Employee, error) {
 	creationRole, err := ValidateEmployeeCreationRoles(roles)
 	if err != nil {
 		return nil, err
@@ -92,16 +92,13 @@ func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastNam
 		DateOfBirth:              dateOfBirthPtr,
 		HireDate:                 hireDatePtr,
 		LeaveDate:                leaveDatePtr,
-		TotalGap:                 totalGap,
 		MaritalStatus:            maritalStatus,
 		EmergencyContact:         emergencyContact,
 		EmergencyContactName:     emergencyContactName,
 		EmergencyContactRelation: emergencyContactRelation,
 		// GradeID is not written on employees; assign via EmployeeGrade lifecycle.
-		ContractNo:          contractNo,
 		ProfessionStartDate: professionStartDatePtr,
 		Note:                note,
-		MotherName:          motherName,
 		FatherName:          fatherName,
 		Nationality:         nationality,
 		IdentityNo:          identityNo,
@@ -297,17 +294,14 @@ func (s *employeeService) GetEmployeeByID(id uint) (*types.EmployeeDetailRespons
 		DateOfBirth:              dateOfBirthStr,
 		HireDate:                 hireDateStr,
 		LeaveDate:                leaveDateStr,
-		TotalGap:                 employee.TotalGap,
 		MaritalStatus:            employee.MaritalStatus,
 		EmergencyContact:         employee.EmergencyContact,
 		EmergencyContactName:     employee.EmergencyContactName,
 		EmergencyContactRelation: employee.EmergencyContactRelation,
 		GradeID:                  computedGradeID,
 		CurrentEmployeeGrade:     currentGrade,
-		ContractNo:               employee.ContractNo,
 		ProfessionStartDate:      professionStartDateStr,
 		Note:                     employee.Note,
-		MotherName:               employee.MotherName,
 		FatherName:               employee.FatherName,
 		Nationality:              employee.Nationality,
 		IdentityNo:               employee.IdentityNo,
@@ -430,17 +424,14 @@ func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeDetai
 		DateOfBirth:              dateOfBirthStr,
 		HireDate:                 hireDateStr,
 		LeaveDate:                leaveDateStr,
-		TotalGap:                 employee.TotalGap,
 		MaritalStatus:            employee.MaritalStatus,
 		EmergencyContact:         employee.EmergencyContact,
 		EmergencyContactName:     employee.EmergencyContactName,
 		EmergencyContactRelation: employee.EmergencyContactRelation,
 		GradeID:                  computedGradeID,
 		CurrentEmployeeGrade:     currentGrade,
-		ContractNo:               employee.ContractNo,
 		ProfessionStartDate:      professionStartDateStr,
 		Note:                     employee.Note,
-		MotherName:               employee.MotherName,
 		FatherName:               employee.FatherName,
 		Nationality:              employee.Nationality,
 		IdentityNo:               employee.IdentityNo,
@@ -450,7 +441,7 @@ func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeDetai
 	}, nil
 }
 
-func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, totalGap float64, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, contractNo, professionStartDate, note, motherName, fatherName, nationality, identityNo, status string, modifiedBy string, requestingUserID uint, actorRoles []string, roles []string) error {
+func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName, lastName, phone, address, state, city, gender, dateOfBirth, hireDate, leaveDate string, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation string, gradeID *int64, professionStartDate, note, fatherName, nationality, identityNo, status string, modifiedBy string, requestingUserID uint, actorRoles []string, roles []string) error {
 	// Get existing employee for authorization check and audit trail
 	existingEmployee, err := s.employeeRepo.GetByID(id)
 	if err != nil {
@@ -584,17 +575,14 @@ func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName
 	updatedEmployee.DateOfBirth = dateOfBirthPtr
 	updatedEmployee.HireDate = hireDatePtr
 	updatedEmployee.LeaveDate = leaveDatePtr
-	updatedEmployee.TotalGap = totalGap
 	updatedEmployee.MaritalStatus = maritalStatus
 	updatedEmployee.EmergencyContact = emergencyContact
 	updatedEmployee.EmergencyContactName = emergencyContactName
 	updatedEmployee.EmergencyContactRelation = emergencyContactRelation
 	// Do not write employees.grade_id; grade changes go through EmployeeGrade assign.
 	_ = gradeID
-	updatedEmployee.ContractNo = contractNo
 	updatedEmployee.ProfessionStartDate = professionStartDatePtr
 	updatedEmployee.Note = note
-	updatedEmployee.MotherName = motherName
 	updatedEmployee.FatherName = fatherName
 	updatedEmployee.Nationality = nationality
 	updatedEmployee.IdentityNo = identityNo
@@ -623,7 +611,7 @@ func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName
 	return nil
 }
 
-func (s *employeeService) UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, professionStartDate string, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, motherName, fatherName, nationality, identityNo string) error {
+func (s *employeeService) UpdateMyProfile(userID uint, email, phone, address, state, city, gender, dateOfBirth string, professionStartDate string, maritalStatus, emergencyContact, emergencyContactName, emergencyContactRelation, fatherName, nationality, identityNo string) error {
 	// Get employee by user ID
 	employee, err := s.employeeRepo.GetByUserID(userID)
 	if err != nil {
@@ -647,7 +635,6 @@ func (s *employeeService) UpdateMyProfile(userID uint, email, phone, address, st
 	updatedEmployee.EmergencyContact = emergencyContact
 	updatedEmployee.EmergencyContactName = emergencyContactName
 	updatedEmployee.EmergencyContactRelation = emergencyContactRelation
-	updatedEmployee.MotherName = motherName
 	updatedEmployee.FatherName = fatherName
 	updatedEmployee.Nationality = nationality
 	updatedEmployee.IdentityNo = identityNo
@@ -793,17 +780,14 @@ func (s *employeeService) ListEmployees(limit, offset int, isAdmin bool) ([]*typ
 			DateOfBirth:              dateOfBirthStr,
 			HireDate:                 hireDateStr,
 			LeaveDate:                leaveDateStr,
-			TotalGap:                 employee.TotalGap,
 			MaritalStatus:            employee.MaritalStatus,
 			EmergencyContact:         employee.EmergencyContact,
 			EmergencyContactName:     employee.EmergencyContactName,
 			EmergencyContactRelation: employee.EmergencyContactRelation,
 			GradeID:                  computedGradeID,
 			CurrentEmployeeGrade:     currentGrade,
-			ContractNo:               employee.ContractNo,
 			ProfessionStartDate:      professionStartDateStr,
 			Note:                     employee.Note,
-			MotherName:               employee.MotherName,
 			FatherName:               employee.FatherName,
 			Nationality:              employee.Nationality,
 			IdentityNo:               employee.IdentityNo,
@@ -911,17 +895,14 @@ func (s *employeeService) ListEmployeesWithFilters(limit, offset int, sortField,
 			DateOfBirth:              dateOfBirthStr,
 			HireDate:                 hireDateStr,
 			LeaveDate:                leaveDateStr,
-			TotalGap:                 employee.TotalGap,
 			MaritalStatus:            employee.MaritalStatus,
 			EmergencyContact:         employee.EmergencyContact,
 			EmergencyContactName:     employee.EmergencyContactName,
 			EmergencyContactRelation: employee.EmergencyContactRelation,
 			GradeID:                  computedGradeID,
 			CurrentEmployeeGrade:     currentGrade,
-			ContractNo:               employee.ContractNo,
 			ProfessionStartDate:      professionStartDateStr,
 			Note:                     employee.Note,
-			MotherName:               employee.MotherName,
 			FatherName:               employee.FatherName,
 			Nationality:              employee.Nationality,
 			IdentityNo:               employee.IdentityNo,
