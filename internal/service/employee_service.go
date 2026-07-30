@@ -97,15 +97,17 @@ func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastNam
 		EmergencyContact:         emergencyContact,
 		EmergencyContactName:     emergencyContactName,
 		EmergencyContactRelation: emergencyContactRelation,
-		GradeID:                  gradeID,
-		ContractNo:               contractNo,
-		ProfessionStartDate:      professionStartDatePtr,
-		Note:                     note,
-		MotherName:               motherName,
-		FatherName:               fatherName,
-		Nationality:              nationality,
-		IdentityNo:               identityNo,
+		// GradeID is not written on employees; assign via EmployeeGrade lifecycle.
+		ContractNo:          contractNo,
+		ProfessionStartDate: professionStartDatePtr,
+		Note:                note,
+		MotherName:          motherName,
+		FatherName:          fatherName,
+		Nationality:         nationality,
+		IdentityNo:          identityNo,
 	}
+
+	_ = gradeID // request may still send grade_id; ignored for employees.grade_id
 
 	// Check if an employee with the same company email already exists and is active
 	existingEmployee, err := s.employeeRepo.GetByCompanyEmail(companyEmail)
@@ -278,6 +280,8 @@ func (s *employeeService) GetEmployeeByID(id uint) (*types.EmployeeDetailRespons
 		Email: user.Email,
 	}
 
+	computedGradeID, currentGrade := mapCurrentEmployeeGrade(employee)
+
 	return &types.EmployeeDetailResponse{
 		ID:                       employee.ID,
 		User:                     userInfo,
@@ -298,7 +302,8 @@ func (s *employeeService) GetEmployeeByID(id uint) (*types.EmployeeDetailRespons
 		EmergencyContact:         employee.EmergencyContact,
 		EmergencyContactName:     employee.EmergencyContactName,
 		EmergencyContactRelation: employee.EmergencyContactRelation,
-		GradeID:                  employee.GradeID,
+		GradeID:                  computedGradeID,
+		CurrentEmployeeGrade:     currentGrade,
 		ContractNo:               employee.ContractNo,
 		ProfessionStartDate:      professionStartDateStr,
 		Note:                     employee.Note,
@@ -408,6 +413,8 @@ func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeDetai
 		Email: user.Email,
 	}
 
+	computedGradeID, currentGrade := mapCurrentEmployeeGrade(employee)
+
 	return &types.EmployeeDetailResponse{
 		ID:                       employee.ID,
 		User:                     userInfo,
@@ -428,7 +435,8 @@ func (s *employeeService) GetEmployeeByUserID(userID uint) (*types.EmployeeDetai
 		EmergencyContact:         employee.EmergencyContact,
 		EmergencyContactName:     employee.EmergencyContactName,
 		EmergencyContactRelation: employee.EmergencyContactRelation,
-		GradeID:                  employee.GradeID,
+		GradeID:                  computedGradeID,
+		CurrentEmployeeGrade:     currentGrade,
 		ContractNo:               employee.ContractNo,
 		ProfessionStartDate:      professionStartDateStr,
 		Note:                     employee.Note,
@@ -581,7 +589,8 @@ func (s *employeeService) UpdateEmployee(id uint, email, companyEmail, firstName
 	updatedEmployee.EmergencyContact = emergencyContact
 	updatedEmployee.EmergencyContactName = emergencyContactName
 	updatedEmployee.EmergencyContactRelation = emergencyContactRelation
-	updatedEmployee.GradeID = gradeID
+	// Do not write employees.grade_id; grade changes go through EmployeeGrade assign.
+	_ = gradeID
 	updatedEmployee.ContractNo = contractNo
 	updatedEmployee.ProfessionStartDate = professionStartDatePtr
 	updatedEmployee.Note = note
@@ -767,6 +776,8 @@ func (s *employeeService) ListEmployees(limit, offset int, isAdmin bool) ([]*typ
 			Email: user.Email,
 		}
 
+		computedGradeID, currentGrade := mapCurrentEmployeeGrade(employee)
+
 		responses[i] = &types.EmployeeResponse{
 			ID:                       employee.ID,
 			User:                     userInfo,
@@ -787,7 +798,8 @@ func (s *employeeService) ListEmployees(limit, offset int, isAdmin bool) ([]*typ
 			EmergencyContact:         employee.EmergencyContact,
 			EmergencyContactName:     employee.EmergencyContactName,
 			EmergencyContactRelation: employee.EmergencyContactRelation,
-			GradeID:                  employee.GradeID,
+			GradeID:                  computedGradeID,
+			CurrentEmployeeGrade:     currentGrade,
 			ContractNo:               employee.ContractNo,
 			ProfessionStartDate:      professionStartDateStr,
 			Note:                     employee.Note,
@@ -882,6 +894,8 @@ func (s *employeeService) ListEmployeesWithFilters(limit, offset int, sortField,
 			Email: user.Email,
 		}
 
+		computedGradeID, currentGrade := mapCurrentEmployeeGrade(employee)
+
 		responses[i] = &types.EmployeeResponse{
 			ID:                       employee.ID,
 			User:                     userInfo,
@@ -902,7 +916,8 @@ func (s *employeeService) ListEmployeesWithFilters(limit, offset int, sortField,
 			EmergencyContact:         employee.EmergencyContact,
 			EmergencyContactName:     employee.EmergencyContactName,
 			EmergencyContactRelation: employee.EmergencyContactRelation,
-			GradeID:                  employee.GradeID,
+			GradeID:                  computedGradeID,
+			CurrentEmployeeGrade:     currentGrade,
 			ContractNo:               employee.ContractNo,
 			ProfessionStartDate:      professionStartDateStr,
 			Note:                     employee.Note,
@@ -1003,6 +1018,35 @@ func (s *employeeService) assignRolesToUser(userID uint, roleNames []string, cre
 
 	fmt.Printf("Successfully assigned all %d roles to user %d\n", successCount, userID)
 	return nil
+}
+
+// mapCurrentEmployeeGrade derives compatibility grade_id and current_employee_grade
+// from the preloaded ACTIVE EmployeeGrade row (never from employees.grade_id).
+func mapCurrentEmployeeGrade(employee *domain.Employee) (*int64, *types.CurrentEmployeeGradeResponse) {
+	if employee == nil || employee.CurrentEmployeeGrade == nil {
+		return nil, nil
+	}
+	eg := employee.CurrentEmployeeGrade
+	if eg.Deleted || eg.Status != domain.EmployeeGradeStatusActive {
+		return nil, nil
+	}
+
+	gradeID := int64(eg.GradeID)
+	resp := &types.CurrentEmployeeGradeResponse{
+		ID:         eg.ID,
+		EmployeeID: eg.EmployeeID,
+		GradeID:    eg.GradeID,
+		StartDate:  eg.StartDate,
+		EndDate:    eg.EndDate,
+		Status:     string(eg.Status),
+	}
+	if eg.Grade.ID != 0 && !eg.Grade.Deleted {
+		resp.Grade = &types.GradeLookup{
+			ID:   eg.Grade.ID,
+			Name: eg.Grade.Name,
+		}
+	}
+	return &gradeID, resp
 }
 
 // updateUserRoles updates roles for a user (deletes old roles and assigns new ones)

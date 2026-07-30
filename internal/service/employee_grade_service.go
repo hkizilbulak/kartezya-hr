@@ -8,6 +8,8 @@ import (
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/repository"
 	"kartezya-hr/internal/types"
+
+	"gorm.io/gorm"
 )
 
 type EmployeeGradeService interface {
@@ -35,49 +37,106 @@ func NewEmployeeGradeService(employeeGradeRepo repository.EmployeeGradeRepositor
 	}
 }
 
+// CreateEmployeeGrade assigns a new ACTIVE grade inside a transaction.
+// Request end_date is ignored: assignment always creates ACTIVE with end_date NULL.
+// Any previous ACTIVE row for the employee is closed (INACTIVE, end_date = start-1 day).
 func (s *employeeGradeService) CreateEmployeeGrade(employeeID, gradeID uint, startDate, endDate, createdBy string) (*domain.EmployeeGrade, error) {
-	// Parse date fields
-	var startDatePtr time.Time
-	var endDatePtr *time.Time
+	_ = endDate // client end_date is ignored for assign lifecycle (backward-compatible request field)
 
-	if parsed, err := time.Parse("2006-01-02", startDate); err != nil {
-		return nil, fmt.Errorf("invalid start date format: %v", err)
-	} else {
-		startDatePtr = parsed
+	startDateParsed, err := parseDate(startDate)
+	if err != nil || startDateParsed == nil {
+		return nil, domain.ErrEmployeeGradeInvalidStartDate
 	}
+	startDay := dateOnlyUTC(*startDateParsed)
 
-	if endDate != "" {
-		if parsed, err := time.Parse("2006-01-02", endDate); err != nil {
-			return nil, fmt.Errorf("invalid end date format: %v", err)
-		} else {
-			endDatePtr = &parsed
+	if _, err := s.employeeRepo.GetByID(employeeID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, domain.ErrEmployeeGradeEmployeeNotFound
 		}
+		return nil, fmt.Errorf("failed to get employee: %w", err)
 	}
 
-	// Create employee grade
-	employeeGrade := &domain.EmployeeGrade{
-		EmployeeID: employeeID,
-		GradeID:    gradeID,
-		StartDate:  startDatePtr,
-		EndDate:    endDatePtr,
+	if _, err := s.gradeRepo.GetByID(int64(gradeID)); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, domain.ErrEmployeeGradeGradeNotFound
+		}
+		return nil, fmt.Errorf("failed to get grade: %w", err)
 	}
 
-	// Create the employee grade
-	if err := s.employeeGradeRepo.Create(employeeGrade, createdBy); err != nil {
-		return nil, fmt.Errorf("failed to create employee grade: %v", err)
+	var created *domain.EmployeeGrade
+	var closedBefore *domain.EmployeeGrade
+	var closedAfter *domain.EmployeeGrade
+
+	err = s.employeeGradeRepo.Transaction(func(txRepo repository.EmployeeGradeRepository) error {
+		exists, err := txRepo.ExistsByEmployeeGradeStartDate(employeeID, gradeID, startDay)
+		if err != nil {
+			return fmt.Errorf("failed to check duplicate employee grade: %w", err)
+		}
+		if exists {
+			return domain.ErrEmployeeGradeDuplicateAssignment
+		}
+
+		active, err := txRepo.GetActiveByEmployeeIDForUpdate(employeeID)
+		if err != nil {
+			return fmt.Errorf("failed to lock active employee grade: %w", err)
+		}
+
+		if active != nil {
+			endDay, err := domain.ActiveGradeCloseEndDate(active.StartDate, startDay)
+			if err != nil {
+				return err
+			}
+
+			before := *active
+			closedBefore = &before
+
+			if err := txRepo.CloseActiveAsInactive(active.ID, endDay, createdBy); err != nil {
+				return fmt.Errorf("failed to close active employee grade: %w", err)
+			}
+
+			after := *active
+			after.Status = domain.EmployeeGradeStatusInactive
+			after.EndDate = &endDay
+			after.ModifiedBy = createdBy
+			closedAfter = &after
+		}
+
+		employeeGrade := &domain.EmployeeGrade{
+			EmployeeID: employeeID,
+			GradeID:    gradeID,
+			StartDate:  startDay,
+			EndDate:    nil,
+			Status:     domain.EmployeeGradeStatusActive,
+		}
+
+		if err := txRepo.Create(employeeGrade, createdBy); err != nil {
+			if repository.IsUniqueViolation(err) {
+				return domain.ErrEmployeeGradeActiveConflict
+			}
+			return fmt.Errorf("failed to create employee grade: %w", err)
+		}
+
+		created = employeeGrade
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	// Audit the creation
-	if err := s.auditService.CreateAuditLog("EmployeeGrade", employeeGrade.ID, domain.AuditActionCreate, nil, employeeGrade, createdBy); err != nil {
-		// Log error but don't fail the operation
+	// Audit after commit (audit service is not transaction-aware).
+	if closedBefore != nil && closedAfter != nil {
+		_ = s.auditService.CreateAuditLog("EmployeeGrade", closedBefore.ID, domain.AuditActionUpdate, closedBefore, closedAfter, createdBy)
+	}
+	if created != nil {
+		_ = s.auditService.CreateAuditLog("EmployeeGrade", created.ID, domain.AuditActionCreate, nil, created, createdBy)
 	}
 
-	return employeeGrade, nil
+	return created, nil
 }
 
 func (s *employeeGradeService) GetEmployeeGradeByID(id uint) (*types.EmployeeGradeResponse, error) {
 	if id == 0 {
-		return nil, errors.New("invalid employee grade ID")
+		return nil, domain.ErrEmployeeGradeNotFound
 	}
 
 	employeeGrade, err := s.employeeGradeRepo.GetByID(id)
@@ -85,29 +144,10 @@ func (s *employeeGradeService) GetEmployeeGradeByID(id uint) (*types.EmployeeGra
 		return nil, err
 	}
 
-	return &types.EmployeeGradeResponse{
-		ID:         employeeGrade.ID,
-		CreatedAt:  employeeGrade.CreatedAt,
-		UpdatedAt:  employeeGrade.UpdatedAt,
-		Deleted:    employeeGrade.Deleted,
-		CreatedBy:  employeeGrade.CreatedBy,
-		ModifiedBy: employeeGrade.ModifiedBy,
-		StartDate:  employeeGrade.StartDate,
-		EndDate:    employeeGrade.EndDate,
-		Employee: types.EmployeeLookup{
-			ID:        employeeGrade.Employee.ID,
-			FirstName: employeeGrade.Employee.FirstName,
-			LastName:  employeeGrade.Employee.LastName,
-		},
-		Grade: types.GradeLookup{
-			ID:   employeeGrade.Grade.ID,
-			Name: employeeGrade.Grade.Name,
-		},
-	}, nil
+	return toEmployeeGradeResponse(employeeGrade), nil
 }
 
 func (s *employeeGradeService) GetEmployeeGradeByUserID(userID uint) ([]*types.EmployeeGradeWithNames, error) {
-	// Get employee grade records for the user
 	employeeGrades, err := s.employeeGradeRepo.GetByUserID(userID)
 	if err != nil {
 		return nil, err
@@ -116,7 +156,6 @@ func (s *employeeGradeService) GetEmployeeGradeByUserID(userID uint) ([]*types.E
 	var result []*types.EmployeeGradeWithNames
 
 	for _, employeeGrade := range employeeGrades {
-		// Get grade name
 		grade, err := s.gradeRepo.GetByID(int64(employeeGrade.GradeID))
 		if err != nil {
 			return nil, fmt.Errorf("failed to get grade: %v", err)
@@ -125,7 +164,6 @@ func (s *employeeGradeService) GetEmployeeGradeByUserID(userID uint) ([]*types.E
 		var startDateStr string
 		var endDateStr *string
 
-		// Check if StartDate is not zero value
 		if !employeeGrade.StartDate.IsZero() {
 			startDateStr = employeeGrade.StartDate.Format(time.RFC3339)
 		}
@@ -135,12 +173,12 @@ func (s *employeeGradeService) GetEmployeeGradeByUserID(userID uint) ([]*types.E
 			endDateStr = &dateStr
 		}
 
-		// Create DTO with related entity names
 		employeeGradeDTO := &types.EmployeeGradeWithNames{
 			ID:        employeeGrade.ID,
 			GradeName: grade.Name,
 			StartDate: startDateStr,
 			EndDate:   endDateStr,
+			Status:    string(employeeGrade.Status),
 		}
 
 		result = append(result, employeeGradeDTO)
@@ -149,87 +187,91 @@ func (s *employeeGradeService) GetEmployeeGradeByUserID(userID uint) ([]*types.E
 	return result, nil
 }
 
+// UpdateEmployeeGrade allows limited correction of INACTIVE history rows only.
+// ACTIVE rows must be changed via CreateEmployeeGrade (assign). employee_id is immutable.
 func (s *employeeGradeService) UpdateEmployeeGrade(id uint, employeeID, gradeID uint, startDate, endDate, modifiedBy string, requestingUserID uint, isAdmin bool) error {
-	// Get existing employee grade for audit trail
 	existingEmployeeGrade, err := s.employeeGradeRepo.GetByID(id)
 	if err != nil {
 		return err
 	}
 
-	// Authorization check: Non-admin users can only update their own employee grades
 	if !isAdmin {
-		// Get the employee record associated with the grade to get the UserID
 		employee, err := s.employeeRepo.GetByID(existingEmployeeGrade.EmployeeID)
 		if err != nil {
 			return fmt.Errorf("failed to get employee for authorization: %v", err)
 		}
-
 		if employee.UserID != requestingUserID {
 			return errors.New("unauthorized to update this employee grade")
 		}
 	}
 
-	// Parse date fields
-	var startDatePtr time.Time
-	var endDatePtr *time.Time
-
-	if parsed, err := time.Parse("2006-01-02", startDate); err != nil {
-		return fmt.Errorf("invalid start date format: %v", err)
-	} else {
-		startDatePtr = parsed
+	if existingEmployeeGrade.Status == domain.EmployeeGradeStatusActive {
+		return domain.ErrEmployeeGradeActiveUpdateForbidden
 	}
 
-	if endDate != "" {
-		if parsed, err := time.Parse("2006-01-02", endDate); err != nil {
-			return fmt.Errorf("invalid end date format: %v", err)
-		} else {
-			endDatePtr = &parsed
+	if employeeID != existingEmployeeGrade.EmployeeID {
+		return domain.ErrEmployeeGradeEmployeeImmutable
+	}
+
+	startDateParsed, err := parseDate(startDate)
+	if err != nil || startDateParsed == nil {
+		return domain.ErrEmployeeGradeInvalidStartDate
+	}
+	startDay := dateOnlyUTC(*startDateParsed)
+
+	if endDate == "" {
+		return domain.ErrEmployeeGradeInactiveRequiresEndDate
+	}
+	endDateParsed, err := parseDate(endDate)
+	if err != nil || endDateParsed == nil {
+		return fmt.Errorf("%w: invalid end date format", domain.ErrEmployeeGradeInactiveRequiresEndDate)
+	}
+	endDay := dateOnlyUTC(*endDateParsed)
+	if endDay.Before(startDay) {
+		return domain.ErrEmployeeGradeEndBeforeStart
+	}
+
+	if _, err := s.gradeRepo.GetByID(int64(gradeID)); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.ErrEmployeeGradeGradeNotFound
 		}
+		return fmt.Errorf("failed to get grade: %w", err)
 	}
 
-	// Create updated employee grade object
 	employeeGrade := &domain.EmployeeGrade{
-		EmployeeID: employeeID,
+		EmployeeID: existingEmployeeGrade.EmployeeID,
 		GradeID:    gradeID,
-		StartDate:  startDatePtr,
-		EndDate:    endDatePtr,
+		StartDate:  startDay,
+		EndDate:    &endDay,
+		Status:     domain.EmployeeGradeStatusInactive,
 	}
-
-	// Set the ID after creating the struct
 	employeeGrade.ID = id
 
-	// Update employee grade
 	if err := s.employeeGradeRepo.Update(employeeGrade, modifiedBy); err != nil {
 		return err
 	}
 
-	// Get updated employee grade for audit
 	updatedEmployeeGrade, _ := s.employeeGradeRepo.GetByID(id)
-
-	// Audit the update
-	if err := s.auditService.CreateAuditLog("EmployeeGrade", id, domain.AuditActionUpdate, existingEmployeeGrade, updatedEmployeeGrade, modifiedBy); err != nil {
-		// Log error but don't fail the operation
-	}
+	_ = s.auditService.CreateAuditLog("EmployeeGrade", id, domain.AuditActionUpdate, existingEmployeeGrade, updatedEmployeeGrade, modifiedBy)
 
 	return nil
 }
 
 func (s *employeeGradeService) DeleteEmployeeGrade(id uint, deletedBy string) error {
-	// Get existing employee grade for audit trail
 	existingEmployeeGrade, err := s.employeeGradeRepo.GetByID(id)
 	if err != nil {
 		return err
 	}
 
-	// Delete the employee grade
+	if existingEmployeeGrade.Status == domain.EmployeeGradeStatusActive {
+		return domain.ErrEmployeeGradeActiveCannotDelete
+	}
+
 	if err := s.employeeGradeRepo.Delete(id, deletedBy); err != nil {
 		return err
 	}
 
-	// Audit the deletion
-	if err := s.auditService.CreateAuditLog("EmployeeGrade", id, domain.AuditActionDelete, existingEmployeeGrade, nil, deletedBy); err != nil {
-		// Log error but don't fail the operation
-	}
+	_ = s.auditService.CreateAuditLog("EmployeeGrade", id, domain.AuditActionDelete, existingEmployeeGrade, nil, deletedBy)
 
 	return nil
 }
@@ -242,7 +284,6 @@ func (s *employeeGradeService) GetAllEmployeeGrades(page, limit int, sortParams 
 		limit = 10
 	}
 
-	// Set defaults for sorting
 	if sortParams.Sort == "" {
 		sortParams.Sort = "id"
 	}
@@ -258,25 +299,7 @@ func (s *employeeGradeService) GetAllEmployeeGrades(page, limit int, sortParams 
 
 	employeeGradeResponses := make([]types.EmployeeGradeResponse, len(employeeGrades))
 	for i, employeeGrade := range employeeGrades {
-		employeeGradeResponses[i] = types.EmployeeGradeResponse{
-			ID:         employeeGrade.ID,
-			CreatedAt:  employeeGrade.CreatedAt,
-			UpdatedAt:  employeeGrade.UpdatedAt,
-			Deleted:    employeeGrade.Deleted,
-			CreatedBy:  employeeGrade.CreatedBy,
-			ModifiedBy: employeeGrade.ModifiedBy,
-			StartDate:  employeeGrade.StartDate,
-			EndDate:    employeeGrade.EndDate,
-			Employee: types.EmployeeLookup{
-				ID:        employeeGrade.Employee.ID,
-				FirstName: employeeGrade.Employee.FirstName,
-				LastName:  employeeGrade.Employee.LastName,
-			},
-			Grade: types.GradeLookup{
-				ID:   employeeGrade.Grade.ID,
-				Name: employeeGrade.Grade.Name,
-			},
-		}
+		employeeGradeResponses[i] = *toEmployeeGradeResponse(&employeeGrade)
 	}
 
 	return &PaginatedResponse{
@@ -290,4 +313,52 @@ func (s *employeeGradeService) GetAllEmployeeGrades(page, limit int, sortParams 
 			Direction:  sortParams.Direction,
 		},
 	}, nil
+}
+
+func toEmployeeGradeResponse(employeeGrade *domain.EmployeeGrade) *types.EmployeeGradeResponse {
+	return &types.EmployeeGradeResponse{
+		ID:         employeeGrade.ID,
+		CreatedAt:  employeeGrade.CreatedAt,
+		UpdatedAt:  employeeGrade.UpdatedAt,
+		Deleted:    employeeGrade.Deleted,
+		CreatedBy:  employeeGrade.CreatedBy,
+		ModifiedBy: employeeGrade.ModifiedBy,
+		StartDate:  employeeGrade.StartDate,
+		EndDate:    employeeGrade.EndDate,
+		Status:     string(employeeGrade.Status),
+		Employee: types.EmployeeLookup{
+			ID:        employeeGrade.Employee.ID,
+			FirstName: employeeGrade.Employee.FirstName,
+			LastName:  employeeGrade.Employee.LastName,
+		},
+		Grade: types.GradeLookup{
+			ID:   employeeGrade.Grade.ID,
+			Name: employeeGrade.Grade.Name,
+		},
+	}
+}
+
+func dateOnlyUTC(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+}
+
+// IsEmployeeGradeClientError reports validation / domain errors that should map to HTTP 4xx.
+func IsEmployeeGradeClientError(err error) bool {
+	switch {
+	case errors.Is(err, domain.ErrEmployeeGradeNotFound),
+		errors.Is(err, domain.ErrEmployeeGradeEmployeeNotFound),
+		errors.Is(err, domain.ErrEmployeeGradeGradeNotFound),
+		errors.Is(err, domain.ErrEmployeeGradeInvalidStartDate),
+		errors.Is(err, domain.ErrEmployeeGradeInvalidCloseDate),
+		errors.Is(err, domain.ErrEmployeeGradeDuplicateAssignment),
+		errors.Is(err, domain.ErrEmployeeGradeActiveConflict),
+		errors.Is(err, domain.ErrEmployeeGradeActiveCannotDelete),
+		errors.Is(err, domain.ErrEmployeeGradeActiveUpdateForbidden),
+		errors.Is(err, domain.ErrEmployeeGradeEmployeeImmutable),
+		errors.Is(err, domain.ErrEmployeeGradeInactiveRequiresEndDate),
+		errors.Is(err, domain.ErrEmployeeGradeEndBeforeStart):
+		return true
+	default:
+		return false
+	}
 }

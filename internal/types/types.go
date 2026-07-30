@@ -33,6 +33,17 @@ type GradeLookup struct {
 	Name string `json:"name"`
 }
 
+// CurrentEmployeeGradeResponse is the ACTIVE employee-grade history row for an employee.
+type CurrentEmployeeGradeResponse struct {
+	ID         uint         `json:"id"`
+	EmployeeID uint         `json:"employee_id"`
+	GradeID    uint         `json:"grade_id"`
+	Grade      *GradeLookup `json:"grade,omitempty"`
+	StartDate  time.Time    `json:"start_date"`
+	EndDate    *time.Time   `json:"end_date"`
+	Status     string       `json:"status"`
+}
+
 type RoleLookup struct {
 	ID   uint   `json:"id"`
 	Name string `json:"name"`
@@ -85,36 +96,37 @@ type UserInfo struct {
 
 // Employee response DTO with nested user object
 type EmployeeResponse struct {
-	ID                       uint                    `json:"id"`
-	User                     UserInfo                `json:"user"`
-	FirstName                string                  `json:"first_name"`
-	LastName                 string                  `json:"last_name"`
-	Email                    string                  `json:"email"`
-	CompanyEmail             string                  `json:"company_email"`
-	Phone                    string                  `json:"phone"`
-	Address                  string                  `json:"address"`
-	State                    string                  `json:"state"`
-	City                     string                  `json:"city"`
-	Gender                   string                  `json:"gender"`
-	DateOfBirth              *string                 `json:"date_of_birth"`
-	HireDate                 *string                 `json:"hire_date"`
-	LeaveDate                *string                 `json:"leave_date,omitempty"`
-	TotalGap                 float64                 `json:"total_gap"`
-	MaritalStatus            string                  `json:"marital_status"`
-	EmergencyContact         string                  `json:"emergency_contact"`
-	EmergencyContactName     string                  `json:"emergency_contact_name"`
-	EmergencyContactRelation string                  `json:"emergency_contact_relation"`
-	GradeID                  *int64                  `json:"grade_id"`
-	ContractNo               string                  `json:"contract_no"`
-	ProfessionStartDate      *string                 `json:"profession_start_date"`
-	Note                     string                  `json:"note"`
-	MotherName               string                  `json:"mother_name"`
-	FatherName               string                  `json:"father_name"`
-	Nationality              string                  `json:"nationality"`
-	IdentityNo               string                  `json:"identity_no"`
-	Roles                    []string                `json:"roles"`
-	WorkInformation          *EmployeeWorkInfoLookup `json:"work_information,omitempty"`
-	Status                   string                  `json:"status"`
+	ID                       uint                          `json:"id"`
+	User                     UserInfo                      `json:"user"`
+	FirstName                string                        `json:"first_name"`
+	LastName                 string                        `json:"last_name"`
+	Email                    string                        `json:"email"`
+	CompanyEmail             string                        `json:"company_email"`
+	Phone                    string                        `json:"phone"`
+	Address                  string                        `json:"address"`
+	State                    string                        `json:"state"`
+	City                     string                        `json:"city"`
+	Gender                   string                        `json:"gender"`
+	DateOfBirth              *string                       `json:"date_of_birth"`
+	HireDate                 *string                       `json:"hire_date"`
+	LeaveDate                *string                       `json:"leave_date,omitempty"`
+	TotalGap                 float64                       `json:"total_gap"`
+	MaritalStatus            string                        `json:"marital_status"`
+	EmergencyContact         string                        `json:"emergency_contact"`
+	EmergencyContactName     string                        `json:"emergency_contact_name"`
+	EmergencyContactRelation string                        `json:"emergency_contact_relation"`
+	GradeID                  *int64                        `json:"grade_id"` // compatibility: ACTIVE EmployeeGrade.grade_id
+	CurrentEmployeeGrade     *CurrentEmployeeGradeResponse `json:"current_employee_grade,omitempty"`
+	ContractNo               string                        `json:"contract_no"`
+	ProfessionStartDate      *string                       `json:"profession_start_date"`
+	Note                     string                        `json:"note"`
+	MotherName               string                        `json:"mother_name"`
+	FatherName               string                        `json:"father_name"`
+	Nationality              string                        `json:"nationality"`
+	IdentityNo               string                        `json:"identity_no"`
+	Roles                    []string                      `json:"roles"`
+	WorkInformation          *EmployeeWorkInfoLookup       `json:"work_information,omitempty"`
+	Status                   string                        `json:"status"`
 }
 
 // EmployeeWorkInfoLookup for employee response
@@ -321,7 +333,8 @@ type EmployeeDetailResponse struct {
 	EmergencyContact         string                        `json:"emergency_contact"`
 	EmergencyContactName     string                        `json:"emergency_contact_name"`
 	EmergencyContactRelation string                        `json:"emergency_contact_relation"`
-	GradeID                  *int64                        `json:"grade_id"`
+	GradeID                  *int64                        `json:"grade_id"` // compatibility: ACTIVE EmployeeGrade.grade_id
+	CurrentEmployeeGrade     *CurrentEmployeeGradeResponse `json:"current_employee_grade,omitempty"`
 	ContractNo               string                        `json:"contract_no"`
 	ProfessionStartDate      *string                       `json:"profession_start_date"`
 	Note                     string                        `json:"note"`
@@ -440,6 +453,7 @@ type EmployeeGradeResponse struct {
 	Grade      GradeLookup    `json:"grade"`
 	StartDate  time.Time      `json:"start_date"`
 	EndDate    *time.Time     `json:"end_date"`
+	Status     string         `json:"status"`
 }
 
 // EmployeeGradeWithNames for API responses with names
@@ -449,6 +463,7 @@ type EmployeeGradeWithNames struct {
 	GradeName      string  `json:"grade_name"`
 	StartDate      string  `json:"start_date"`
 	EndDate        *string `json:"end_date"`
+	Status         string  `json:"status"`
 	IsCurrentGrade bool    `json:"is_current_grade"`
 }
 

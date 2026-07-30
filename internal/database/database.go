@@ -132,11 +132,14 @@ func (d *Database) Migrate() error {
 		return fmt.Errorf("auto-migration failed: %w", err)
 	}
 
-	// Partial unique indexes are not managed by GORM AutoMigrate.
-	// This bootstrap is idempotent and uses the configured DB table prefix
+	// Partial unique indexes / CHECK constraints are not managed by GORM AutoMigrate.
+	// These bootstraps are idempotent and use the configured DB table prefix
 	// so test and production follow the same code path.
 	if err := EnsureJobHistoryReferenceDateUniqueIndex(d.DB); err != nil {
 		return fmt.Errorf("job history index migration failed: %w", err)
+	}
+	if err := EnsureEmployeeGradeStatusConstraints(d.DB); err != nil {
+		return fmt.Errorf("employee grade status migration failed: %w", err)
 	}
 
 	seedPortalContracts(d.DB)

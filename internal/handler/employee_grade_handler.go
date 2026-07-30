@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
 	"kartezya-hr/internal/authz"
+	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/service"
 	"kartezya-hr/internal/types"
 
@@ -84,7 +86,14 @@ func (h *EmployeeGradeHandler) CreateEmployeeGrade(c *gin.Context) {
 
 	employeeGrade, err := h.employeeGradeService.CreateEmployeeGrade(req.EmployeeID, req.GradeID, req.StartDate, req.EndDate, email)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+		status := http.StatusInternalServerError
+		if service.IsEmployeeGradeClientError(err) {
+			status = http.StatusBadRequest
+			if errors.Is(err, domain.ErrEmployeeGradeEmployeeNotFound) || errors.Is(err, domain.ErrEmployeeGradeGradeNotFound) {
+				status = http.StatusNotFound
+			}
+		}
+		c.JSON(status, gin.H{
 			"success": false,
 			"error":   err.Error(),
 		})
@@ -281,7 +290,11 @@ func (h *EmployeeGradeHandler) UpdateEmployeeGrade(c *gin.Context) {
 	}
 
 	if err := h.employeeGradeService.UpdateEmployeeGrade(id, req.EmployeeID, req.GradeID, req.StartDate, req.EndDate, email, requestingUserID, hasCapability(roles, authz.CanAccessAdminModules)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+		status := http.StatusInternalServerError
+		if service.IsEmployeeGradeClientError(err) {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{
 			"success": false,
 			"error":   err.Error(),
 		})
@@ -357,7 +370,11 @@ func (h *EmployeeGradeHandler) DeleteEmployeeGrade(c *gin.Context) {
 	}
 
 	if err := h.employeeGradeService.DeleteEmployeeGrade(id, email); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+		status := http.StatusInternalServerError
+		if service.IsEmployeeGradeClientError(err) {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{
 			"success": false,
 			"error":   err.Error(),
 		})

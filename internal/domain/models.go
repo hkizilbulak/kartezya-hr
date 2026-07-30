@@ -91,7 +91,7 @@ type Employee struct {
 	EmergencyContact         string     `json:"emergency_contact" gorm:"size:15"`
 	EmergencyContactName     string     `json:"emergency_contact_name" gorm:"size:20"`
 	EmergencyContactRelation string     `json:"emergency_contact_relation" gorm:"size:20"`
-	GradeID                  *int64     `json:"grade_id" gorm:"index"`
+	GradeID                  *int64     `json:"grade_id" gorm:"index"` // legacy DB column; API reads ACTIVE EmployeeGrade instead
 	ContractNo               string     `json:"contract_no" gorm:"size:255"`
 	ProfessionStartDate      *time.Time `json:"profession_start_date"`
 	Note                     string     `json:"note" gorm:"type:text"`
@@ -102,8 +102,10 @@ type Employee struct {
 	Status                   string     `json:"status" gorm:"size:10;not null;default:'ACTIVE'"`
 
 	// Relationships
-	User                    User                      `json:"user,omitempty"`
-	Grade                   *Grade                    `json:"grade,omitempty"`
+	User  User   `json:"user,omitempty"`
+	Grade *Grade `json:"-" gorm:"foreignKey:GradeID"` // legacy FK; unused by API (kept for AutoMigrate/scan)
+	// CurrentEmployeeGrade is has-one onto hr_employee_grades (FK: employee_id), not a column on employees.
+	CurrentEmployeeGrade    *EmployeeGrade            `json:"-" gorm:"foreignKey:EmployeeID"`
 	EmployeeWorkInformation []EmployeeWorkInformation `json:"employee_work_information,omitempty"`
 	LeaveBalances           []LeaveBalance            `json:"leave_balances,omitempty"`
 	LeaveRequests           []LeaveRequest            `json:"leave_requests,omitempty"`
@@ -287,13 +289,37 @@ type Grade struct {
 	EmployeeGrades []EmployeeGrade `json:"employee_grades,omitempty"`
 }
 
-// EmployeeGrade represents employee grade history
+// EmployeeGradeStatus is the lifecycle status of an employee grade history row.
+// Distinct from Employee.Status (employment ACTIVE/PASSIVE).
+type EmployeeGradeStatus string
+
+const (
+	EmployeeGradeStatusActive   EmployeeGradeStatus = "ACTIVE"
+	EmployeeGradeStatusInactive EmployeeGradeStatus = "INACTIVE"
+)
+
+// EmployeeGradeStatusFromEndDate derives status from end_date (ACTIVE ⇔ end_date IS NULL).
+func EmployeeGradeStatusFromEndDate(endDate *time.Time) EmployeeGradeStatus {
+	if endDate == nil {
+		return EmployeeGradeStatusActive
+	}
+	return EmployeeGradeStatusInactive
+}
+
+// EmployeeGrade represents employee grade history.
+// Invariants (also enforced in DB after migrate_employee_grade_status):
+//   - ACTIVE  ⇒ end_date IS NULL and deleted = false
+//   - INACTIVE ⇒ end_date IS NOT NULL
+//   - at most one ACTIVE row per employee (deleted = false)
+//
+// employees.grade_id is intentionally left in place until a later phase.
 type EmployeeGrade struct {
 	AuditableModel
-	EmployeeID uint       `json:"employee_id" gorm:"not null"`
-	GradeID    uint       `json:"grade_id" gorm:"not null"`
-	StartDate  time.Time  `json:"start_date" gorm:"not null"`
-	EndDate    *time.Time `json:"end_date"`
+	EmployeeID uint                `json:"employee_id" gorm:"not null"`
+	GradeID    uint                `json:"grade_id" gorm:"not null"`
+	StartDate  time.Time           `json:"start_date" gorm:"not null"`
+	EndDate    *time.Time          `json:"end_date"`
+	Status     EmployeeGradeStatus `json:"status" gorm:"size:20;not null;default:'ACTIVE'"`
 
 	// Relationships
 	Employee Employee `json:"employee,omitempty"`
@@ -367,7 +393,7 @@ const (
 // Contract status constants
 const (
 	ContractStatusPendingProposal  = "PENDING_PROPOSAL"  // teklif onay bekleniyor
-	ContractStatusProposalSent     = "PROPOSAL_SENT"      // teklif iletildi
+	ContractStatusProposalSent     = "PROPOSAL_SENT"     // teklif iletildi
 	ContractStatusProposalRevision = "PROPOSAL_REVISION" // teklif revize bekleniyor
 	ContractStatusPendingRevision  = "PENDING_REVISION"  // revize bekleniyor
 	ContractStatusPendingApproval  = "PENDING_APPROVAL"  // onay bekleniyor
