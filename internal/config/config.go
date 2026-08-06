@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -23,11 +22,7 @@ type Config struct {
 }
 
 type DatabaseConfig struct {
-	Host        string
-	Port        int
-	User        string
-	Password    string
-	Name        string
+	URL         string
 	SSLMode     string
 	Debug       bool
 	TablePrefix string
@@ -101,10 +96,6 @@ func Load() *Config {
 		log.Println("No .env file found, using environment variables")
 	}
 
-	port, err := strconv.Atoi(getEnv("DB_PORT", "5432"))
-	if err != nil {
-		log.Fatal("Invalid DB_PORT")
-	}
 
 	expiryHours, err := strconv.Atoi(getEnv("JWT_EXPIRY_HOURS", "24"))
 	if err != nil {
@@ -118,11 +109,7 @@ func Load() *Config {
 
 	return &Config{
 		Database: DatabaseConfig{
-			Host:        getEnv("DB_HOST", "localhost"),
-			Port:        port,
-			User:        getEnv("DB_USER", "postgres"),
-			Password:    getEnv("DB_PASSWORD", "postgres"),
-			Name:        getEnv("DB_NAME", "kartezya_hr"),
+			URL:         getEnv("DATABASE_URL", ""),
 			SSLMode:     getEnv("DB_SSLMODE", "disable"),
 			Debug:       getEnv("DB_DEBUG", "false") == "true",
 			TablePrefix: getEnv("DB_TABLE_PREFIX", "hr"),
@@ -179,14 +166,7 @@ func Load() *Config {
 }
 
 func (c *Config) GetDatabaseDSN() string {
-	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		c.Database.Host,
-		c.Database.Port,
-		c.Database.User,
-		c.Database.Password,
-		c.Database.Name,
-		c.Database.SSLMode,
-	)
+	return c.Database.URL
 }
 
 // GetTableName returns the table name with prefix if configured

@@ -326,8 +326,8 @@ type EmployeeGrade struct {
 // EmployeeContract represents employee contracts
 type EmployeeContract struct {
 	AuditableModel
-	EmployeeID uint `json:"employee_id" gorm:"not null;uniqueIndex:idx_employee_contract"`
-	ContractID uint `json:"contract_id" gorm:"uniqueIndex:idx_employee_contract"`
+	EmployeeID uint `json:"employee_id" gorm:"not null;index:idx_employee_contract"`
+	ContractID uint `json:"contract_id" gorm:"index:idx_employee_contract"`
 
 	// Relationships
 	Employee Employee `json:"employee,omitempty"`

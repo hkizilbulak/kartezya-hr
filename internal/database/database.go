@@ -20,14 +20,7 @@ type Database struct {
 
 // NewDatabase creates a new database connection
 func NewDatabase(cfg *config.Config) *Database {
-	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		cfg.Database.Host,
-		cfg.Database.Port,
-		cfg.Database.User,
-		cfg.Database.Password,
-		cfg.Database.Name,
-		cfg.Database.SSLMode,
-	)
+	dsn := cfg.Database.URL
 
 	// Set up GORM logger
 	var gormLogger logger.Interface
