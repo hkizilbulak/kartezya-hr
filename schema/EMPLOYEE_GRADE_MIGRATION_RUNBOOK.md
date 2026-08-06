@@ -17,13 +17,19 @@ Teknik operasyon notu. Veri değiştiren adımlar yalnız onay sonrası çalış
 
 ## 3. Deploy sırası
 
-1. Yeni uygulama deploy (Ensure yalnız **status kolonunu** ekler; backfill yapmaz).
-2. Diagnostic SQL (read-only).
-3. Manuel `migrate_employee_grade_status.sql` (transaction).
-4. Smoke test.
-5. Eski kolon DROP **ayrı aşama** — bu runbook’ta yok.
+1. Pre-deploy: `schema/diagnose_employee_grade_migration.sql` (read-only) önerilir. `orphan employee_id` artık AutoMigrate içinde migration-only schema’ya taşınır; `orphan grade_id` / overlapping closed ranges hâlâ startup blocker’dır.
+2. Yeni uygulama deploy with `DB_AUTO_MIGRATE=true`:
+   - `main` → `database.Migrate()` → GORM AutoMigrate → `ApplyEmployeeGradeStatusMigration`
+   - Tek transaction + `pg_advisory_xact_lock`
+   - Sıra: status kolonu → orphan quarantine → precheck → backfill → NOT NULL → CHECK → indexes → verify
+   - Quarantine: `employee_grade_status_quarantine.hr_employee_grades_orphan` (iş modeli değil; idempotent)
+   - Hata → startup fail (eksik şemayla server açılmaz)
+3. Smoke test.
+4. Eski kolon DROP **ayrı aşama** — bu runbook’ta yok.
 
-`DB_AUTO_MIGRATE=true` ortamında uygulama açılışı status kolonunu ekleyebilir; **veri backfill otomatik değildir**.
+`DB_AUTO_MIGRATE=false` ortamında hiçbir employee-grade DDL/quarantine/backfill çalışmaz.
+
+Ops/offline: `schema/migrate_employee_grade_status.sql` Go builder mantığının manuel mirror’ıdır; Runtime SoT Go Apply’dır.
 
 ## 4. Diagnostic
 
@@ -37,7 +43,8 @@ Dosya: `schema/diagnose_employee_grade_migration.sql`
 
 | Diagnostic | Aksiyon |
 |---|---|
-| orphan employee_id / grade_id | Manuel düzelt → tekrar diagnose |
+| orphan employee_id | AutoMigrate quarantine’a taşır (manuel zorunlu değil) |
+| orphan grade_id | Manuel düzelt → tekrar diagnose |
 | end_date < start_date | Manuel düzelt |
 | NULL start_date | Manuel düzelt |
 | overlapping closed ranges (10) | Manuel reconciliation |
@@ -67,7 +74,7 @@ Dosya: `schema/migrate_employee_grade_status.sql`
 - Tek transaction (`BEGIN` … `COMMIT`)
 - Precheck fail → otomatik rollback
 - Backfill → NOT NULL → assert → CHECK → index
-- Ensure ile aynı anda ikinci bir full backfill koşturma
+- AutoMigrate Apply ile aynı anda ikinci bir manuel full SQL koşturma (gereksiz; Apply idempotent)
 
 ## 9. Doğrulama SELECT’leri
 

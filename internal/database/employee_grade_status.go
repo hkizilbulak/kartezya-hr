@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"kartezya-hr/internal/domain"
 
@@ -14,6 +15,10 @@ const (
 	employeeGradeActiveGradeIDIndexSuffix      = "grade_id_active_lookup"
 	employeeGradeDatesCheckConstraintSuffix    = "dates_valid"
 	employeeGradeStatusEndDateCheckSuffix      = "status_end_date"
+
+	// Migration-only quarantine schema (not a GORM/domain model). Stable name for idempotent re-runs.
+	employeeGradeStatusQuarantineSchema = "employee_grade_status_quarantine"
+	employeeGradeOrphanQuarantineReason = "orphan employee_id blocks employee grade status migration"
 )
 
 // EmployeeGradeTableLogicalName is the logical table key used with domain.GetTableName.
@@ -110,8 +115,8 @@ func BuildEmployeeGradeActiveSelectionOrderBySQL() string {
 //
 // employees.grade_id is intentionally not modified in this migration phase.
 //
-// Run ONLY from schema/migrate_employee_grade_status.sql after diagnostics — not from
-// application AutoMigrate startup (see EnsureEmployeeGradeStatusConstraints).
+// Executed by ApplyEmployeeGradeStatusMigration when DB_AUTO_MIGRATE=true.
+// schema/migrate_employee_grade_status.sql is the ops mirror of the same builders.
 func BuildEmployeeGradeStatusBackfillSQL(tableName string) string {
 	t := quoteIdent(tableName)
 	active := string(domain.EmployeeGradeStatusActive)
@@ -220,12 +225,110 @@ func BuildAddEmployeeGradeStatusEndDateCheckConstraintSQL(tableName string) stri
 	)
 }
 
+// BuildEmployeeGradeOrphanQuarantineTableName returns the migration-only orphan table
+// name inside the quarantine schema (e.g. hr_employee_grades_orphan).
+func BuildEmployeeGradeOrphanQuarantineTableName(egTable string) string {
+	return egTable + "_orphan"
+}
+
+// BuildEmployeeGradeOrphanQuarantineSQL moves public employee-grade rows with
+// orphan employee_id into a migration-only quarantine schema/table.
+//
+// Behavior matches the validated company TEST quarantine:
+//   - CREATE SCHEMA / TABLE as needed
+//   - copy eg.* plus quarantined_at + quarantine_reason (no column loss)
+//   - remove copied rows from public (move, not destroy)
+//   - does not touch employees.grade_id or related tables
+//   - idempotent: second run with public orphan=0 is a no-op; no duplicate ids
+//
+// Must run AFTER status column exists and BEFORE precheck/backfill.
+func BuildEmployeeGradeOrphanQuarantineSQL(egTable, employeesTable string) string {
+	schema := employeeGradeStatusQuarantineSchema
+	qTable := BuildEmployeeGradeOrphanQuarantineTableName(egTable)
+	eg := quoteIdent(egTable)
+	emp := quoteIdent(employeesTable)
+	sch := quoteIdent(schema)
+	qt := quoteIdent(qTable)
+	reason := strings.ReplaceAll(employeeGradeOrphanQuarantineReason, `'`, `''`)
+
+	return fmt.Sprintf(`
+DO $orphan_quarantine$
+DECLARE
+	orphan_cnt bigint;
+	q_cnt bigint;
+BEGIN
+	SELECT COUNT(*) INTO orphan_cnt
+	FROM %s eg
+	LEFT JOIN %s e ON e.id = eg.employee_id
+	WHERE e.id IS NULL;
+
+	IF orphan_cnt = 0 THEN
+		RETURN;
+	END IF;
+
+	CREATE SCHEMA IF NOT EXISTS %s;
+
+	IF to_regclass(%s) IS NULL THEN
+		CREATE TABLE %s.%s AS
+		SELECT eg.*, NOW()::timestamptz AS quarantined_at, '%s'::text AS quarantine_reason
+		FROM %s eg
+		LEFT JOIN %s e ON e.id = eg.employee_id
+		WHERE e.id IS NULL;
+	ELSE
+		INSERT INTO %s.%s
+		SELECT eg.*, NOW()::timestamptz AS quarantined_at, '%s'::text AS quarantine_reason
+		FROM %s eg
+		LEFT JOIN %s e ON e.id = eg.employee_id
+		WHERE e.id IS NULL
+		  AND NOT EXISTS (SELECT 1 FROM %s.%s q WHERE q.id = eg.id);
+	END IF;
+
+	DELETE FROM %s eg
+	WHERE eg.id IN (
+		SELECT eg2.id
+		FROM %s eg2
+		LEFT JOIN %s e ON e.id = eg2.employee_id
+		WHERE e.id IS NULL
+	);
+
+	SELECT COUNT(*) INTO orphan_cnt
+	FROM %s eg
+	LEFT JOIN %s e ON e.id = eg.employee_id
+	WHERE e.id IS NULL;
+	IF orphan_cnt <> 0 THEN
+		RAISE EXCEPTION 'employee_grade_status quarantine: public orphan employee_id remain on %s';
+	END IF;
+
+	SELECT COUNT(*) INTO q_cnt FROM %s.%s;
+	IF q_cnt < 1 THEN
+		RAISE EXCEPTION 'employee_grade_status quarantine: quarantine table empty after move on %s';
+	END IF;
+END
+$orphan_quarantine$;
+`,
+		eg, emp,
+		sch,
+		quoteString(schema+"."+qTable),
+		sch, qt, reason, eg, emp,
+		sch, qt, reason, eg, emp, sch, qt,
+		eg, eg, emp,
+		eg, emp, egTable,
+		sch, qt, egTable,
+	)
+}
+
+// quoteString returns a single-quoted SQL string literal.
+func quoteString(s string) string {
+	return `'` + strings.ReplaceAll(s, `'`, `''`) + `'`
+}
+
 // BuildEmployeeGradeMigrationPrecheckSQL returns a PostgreSQL DO block that aborts
 // the transaction when critical anomalies exist. Must run AFTER status column exists
-// (nullable OK) and BEFORE deterministic backfill.
+// (nullable OK), AFTER orphan quarantine, and BEFORE deterministic backfill.
 //
 // Blockers:
-//   - orphan employee_id / grade_id
+//   - orphan employee_id (must already be quarantined)
+//   - orphan grade_id
 //   - NULL start_date
 //   - end_date < start_date
 //   - closed-interval overlaps (both end_dates set)
@@ -239,7 +342,7 @@ func BuildEmployeeGradeMigrationPrecheckSQL(egTable, employeesTable, gradesTable
 	return fmt.Sprintf(`
 DO $precheck$
 BEGIN
-	-- Orphan employee_id
+	-- Orphan employee_id (should be none after quarantine step)
 	IF EXISTS (
 		SELECT 1 FROM %s eg
 		LEFT JOIN %s e ON e.id = eg.employee_id
@@ -299,37 +402,153 @@ $precheck$;
 	)
 }
 
-// EnsureEmployeeGradeStatusConstraints prepares ONLY the status column for
-// AutoMigrate startups (idempotent ADD COLUMN).
-//
-// Data backfill, CHECK constraints, and partial unique indexes MUST be applied
-// via schema/migrate_employee_grade_status.sql after diagnostics — never run
-// full data migration on application boot.
-//
-// Does not drop or rewrite employees.grade_id (later phase).
+// Employee grade status migration advisory lock keys (pg_advisory_xact_lock).
+// Stable across instances so concurrent Railway boots serialize this migration.
+const (
+	employeeGradeStatusMigrationLockKey1 int64 = 0x4b415254 // "KART"
+	employeeGradeStatusMigrationLockKey2 int64 = 0x45475354 // "EGST"
+)
+
+// EnsureEmployeeGradeStatusConstraints is the AutoMigrate hook for the full
+// employee-grade status migration (column, backfill, CHECKs, indexes).
+// Kept name for call-site stability; implementation is ApplyEmployeeGradeStatusMigration.
 func EnsureEmployeeGradeStatusConstraints(db *gorm.DB) error {
+	return ApplyEmployeeGradeStatusMigration(db)
+}
+
+// ApplyEmployeeGradeStatusMigration runs the validated employee-grade status
+// migration in one transaction under a PostgreSQL advisory lock.
+//
+// Steps match schema/migrate_employee_grade_status.sql (builders are the single
+// runtime source of truth; the SQL file is the ops/manual mirror).
+//
+// Idempotent: safe to re-run; second pass leaves data/constraints equivalent.
+// On any error the transaction rolls back and the caller must fail startup.
+// Does not modify employees.grade_id. Orphan employee-grade rows are moved to a
+// migration-only quarantine schema (not destroyed; related tables untouched).
+func ApplyEmployeeGradeStatusMigration(db *gorm.DB) error {
 	if db == nil {
 		return fmt.Errorf("database is nil")
 	}
 
 	dialect := db.Dialector.Name()
 	if dialect != "postgres" {
-		return fmt.Errorf("employee grade status schema ensure requires postgres dialect, got %s", dialect)
+		return fmt.Errorf("employee grade status migration requires postgres dialect, got %s", dialect)
 	}
 
-	tableName := ResolveEmployeeGradeTableName()
-	if tableName == "" {
+	egTable := ResolveEmployeeGradeTableName()
+	if egTable == "" {
 		return fmt.Errorf("resolved employee grade table name is empty")
 	}
-
-	log.Printf("[Migrate] Ensuring employee grade status COLUMN only on table %s (backfill is manual SQL)", tableName)
-
-	if err := db.Exec(BuildAddEmployeeGradeStatusColumnSQL(tableName)).Error; err != nil {
-		return fmt.Errorf("failed to add status column on %s: %w", tableName, err)
+	employeesTable := domain.GetTableName("hr_employees")
+	gradesTable := domain.GetTableName("hr_grades")
+	if employeesTable == "" || gradesTable == "" {
+		return fmt.Errorf("resolved employees/grades table name is empty")
 	}
 
-	log.Printf("[Migrate] Employee grade status column ensured on %s — run schema/migrate_employee_grade_status.sql for backfill/constraints", tableName)
+	log.Printf("[Migrate] Applying employee grade status migration on %s (advisory-locked transaction)", egTable)
+
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec(
+			`SELECT pg_advisory_xact_lock(?, ?)`,
+			employeeGradeStatusMigrationLockKey1,
+			employeeGradeStatusMigrationLockKey2,
+		).Error; err != nil {
+			return fmt.Errorf("employee grade status advisory lock failed: %w", err)
+		}
+
+		steps := []struct {
+			name string
+			sql  string
+		}{
+			{"add_status_column", BuildAddEmployeeGradeStatusColumnSQL(egTable)},
+			{"orphan_quarantine", BuildEmployeeGradeOrphanQuarantineSQL(egTable, employeesTable)},
+			{"precheck", BuildEmployeeGradeMigrationPrecheckSQL(egTable, employeesTable, gradesTable)},
+			{"backfill", BuildEmployeeGradeStatusBackfillSQL(egTable)},
+			{"status_default", fmt.Sprintf(
+				`ALTER TABLE %s ALTER COLUMN status SET DEFAULT '%s'`,
+				quoteIdent(egTable), domain.EmployeeGradeStatusActive,
+			)},
+			{"status_null_fill", fmt.Sprintf(
+				`UPDATE %s SET status = '%s' WHERE status IS NULL`,
+				quoteIdent(egTable), domain.EmployeeGradeStatusActive,
+			)},
+			{"status_not_null", fmt.Sprintf(
+				`ALTER TABLE %s ALTER COLUMN status SET NOT NULL`,
+				quoteIdent(egTable),
+			)},
+			{"post_backfill_assert", BuildEmployeeGradePostBackfillAssertSQL(egTable)},
+			{"drop_dates_check", fmt.Sprintf(
+				`ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s`,
+				quoteIdent(egTable), quoteIdent(BuildEmployeeGradeDatesCheckConstraintName(egTable)),
+			)},
+			{"add_dates_check", fmt.Sprintf(
+				`ALTER TABLE %s ADD CONSTRAINT %s CHECK (end_date IS NULL OR end_date >= start_date)`,
+				quoteIdent(egTable), quoteIdent(BuildEmployeeGradeDatesCheckConstraintName(egTable)),
+			)},
+			{"drop_status_end_check", fmt.Sprintf(
+				`ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s`,
+				quoteIdent(egTable), quoteIdent(BuildEmployeeGradeStatusEndDateCheckConstraintName(egTable)),
+			)},
+			{"add_status_end_check", fmt.Sprintf(
+				`ALTER TABLE %s ADD CONSTRAINT %s CHECK (
+  (status = '%s' AND end_date IS NULL AND deleted = false)
+  OR (status = '%s' AND end_date IS NOT NULL)
+)`,
+				quoteIdent(egTable),
+				quoteIdent(BuildEmployeeGradeStatusEndDateCheckConstraintName(egTable)),
+				domain.EmployeeGradeStatusActive,
+				domain.EmployeeGradeStatusInactive,
+			)},
+			{"unique_active_index", BuildCreateEmployeeGradeActiveUniqueIndexSQL(egTable)},
+			{"lookup_index", BuildCreateEmployeeGradeActiveGradeIDIndexSQL(egTable)},
+			{"post_verify", BuildEmployeeGradePostMigrationVerifySQL(egTable, employeesTable)},
+		}
+
+		for _, step := range steps {
+			if err := tx.Exec(step.sql).Error; err != nil {
+				return fmt.Errorf("employee grade status migration step %s failed: %w", step.name, err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	log.Printf("[Migrate] Employee grade status migration applied on %s", egTable)
 	return nil
+}
+
+// BuildEmployeeGradePostMigrationVerifySQL asserts post-conditions that must hold
+// after backfill + constraints (orphan gone from public table, no multi-ACTIVE).
+func BuildEmployeeGradePostMigrationVerifySQL(egTable, employeesTable string) string {
+	eg := quoteIdent(egTable)
+	emp := quoteIdent(employeesTable)
+	active := string(domain.EmployeeGradeStatusActive)
+	return fmt.Sprintf(`
+DO $verify$
+BEGIN
+	IF EXISTS (
+		SELECT 1 FROM %s eg
+		LEFT JOIN %s e ON e.id = eg.employee_id
+		WHERE e.id IS NULL
+	) THEN
+		RAISE EXCEPTION 'employee_grade_status verify: orphan employee_id remain on %s';
+	END IF;
+
+	IF EXISTS (
+		SELECT 1
+		FROM %s
+		WHERE status = '%s' AND deleted = false
+		GROUP BY employee_id
+		HAVING COUNT(*) > 1
+	) THEN
+		RAISE EXCEPTION 'employee_grade_status verify: multiple ACTIVE grades remain on %s';
+	END IF;
+END
+$verify$;
+`, eg, emp, egTable, eg, active, egTable)
 }
 
 // BuildEmployeeGradePostBackfillAssertSQL fails the transaction if backfill left

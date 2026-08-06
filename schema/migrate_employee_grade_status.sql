@@ -1,20 +1,23 @@
 -- migrate_employee_grade_status.sql
 --
--- EmployeeGrade ACTIVE/INACTIVE status backfill + constraints (MANUAL / controlled).
+-- EmployeeGrade ACTIVE/INACTIVE status backfill + constraints.
 --
--- OPERASYON SIRASI (bkz. EMPLOYEE_GRADE_MIGRATION_RUNBOOK.md):
+-- RUNTIME SOURCE OF TRUTH:
+--   When DB_AUTO_MIGRATE=true, application startup runs the same logic via
+--   internal/database.ApplyEmployeeGradeStatusMigration (Go SQL builders) inside
+--   one transaction with pg_advisory_xact_lock — before HTTP/scheduler start.
+--   This SQL file is the ops/manual mirror for the same steps (logical hr_* names).
+--   Keep coverage aligned; TestMigrateEmployeeGradeStatusSQL_* guards markers.
+--
+-- MANUAL OPS (optional, when AutoMigrate is off or for offline apply):
 --   1) Backup
 --   2) schema/diagnose_employee_grade_migration.sql (read-only) incele
 --   3) Bu dosyayı TEK SEFERDE transaction içinde çalıştır
 --   4) Doğrulama SELECT sonuçlarını kontrol et
 --
--- AutoMigrate/Ensure (DB_AUTO_MIGRATE=true) yalnız status kolonunu ekler;
--- VERİ BACKFILL ve CONSTRAINT bu dosyadadır. Ensure ile bu SQL'i aynı anda
--- "çift backfill" olarak koşturmaayın — Ensure artık backfill yapmaz.
---
 -- PREFIX: Logical hr_* adları kullanılır (diğer schema/migrate_*.sql gibi).
 -- Ortam prefix'i hr_test / hr_prod ise tablo adlarını (ve chk_/ux_/idx_ isimlerini)
--- ortama göre değiştirin. Go Ensure path prefix-aware'dir; bu SQL mirror'dır.
+-- ortama göre değiştirin. Go Apply path prefix-aware'dir.
 --
 -- employees.grade_id / contract_no / mother_name / total_gap / is_grade_up DROP YOK.
 --
@@ -24,11 +27,72 @@
 --   3) CURRENT_DATE aralığında
 --   4) start_date DESC, created_at DESC, id DESC
 -- Soft-deleted → INACTIVE + end_date doldurulur.
+-- Orphan employee_id → migration-only quarantine schema'ya taşınır (silinmez).
+-- Orphan grade_id / overlapping closed ranges → BLOCKER (transaction abort).
 
 BEGIN;
 
 -- 1) Schema: status kolonu (idempotent)
 ALTER TABLE hr_employee_grades ADD COLUMN IF NOT EXISTS status VARCHAR(20);
+
+-- 1b) Orphan employee_id quarantine (idempotent move; TEST-validated pattern)
+DO $orphan_quarantine$
+DECLARE
+	orphan_cnt bigint;
+	q_cnt bigint;
+BEGIN
+	SELECT COUNT(*) INTO orphan_cnt
+	FROM hr_employee_grades eg
+	LEFT JOIN hr_employees e ON e.id = eg.employee_id
+	WHERE e.id IS NULL;
+
+	IF orphan_cnt = 0 THEN
+		RETURN;
+	END IF;
+
+	CREATE SCHEMA IF NOT EXISTS employee_grade_status_quarantine;
+
+	IF to_regclass('employee_grade_status_quarantine.hr_employee_grades_orphan') IS NULL THEN
+		CREATE TABLE employee_grade_status_quarantine.hr_employee_grades_orphan AS
+		SELECT eg.*, NOW()::timestamptz AS quarantined_at,
+			'orphan employee_id blocks employee grade status migration'::text AS quarantine_reason
+		FROM hr_employee_grades eg
+		LEFT JOIN hr_employees e ON e.id = eg.employee_id
+		WHERE e.id IS NULL;
+	ELSE
+		INSERT INTO employee_grade_status_quarantine.hr_employee_grades_orphan
+		SELECT eg.*, NOW()::timestamptz AS quarantined_at,
+			'orphan employee_id blocks employee grade status migration'::text AS quarantine_reason
+		FROM hr_employee_grades eg
+		LEFT JOIN hr_employees e ON e.id = eg.employee_id
+		WHERE e.id IS NULL
+		  AND NOT EXISTS (
+			SELECT 1 FROM employee_grade_status_quarantine.hr_employee_grades_orphan q WHERE q.id = eg.id
+		  );
+	END IF;
+
+	DELETE FROM hr_employee_grades eg
+	WHERE eg.id IN (
+		SELECT eg2.id
+		FROM hr_employee_grades eg2
+		LEFT JOIN hr_employees e ON e.id = eg2.employee_id
+		WHERE e.id IS NULL
+	);
+
+	SELECT COUNT(*) INTO orphan_cnt
+	FROM hr_employee_grades eg
+	LEFT JOIN hr_employees e ON e.id = eg.employee_id
+	WHERE e.id IS NULL;
+	IF orphan_cnt <> 0 THEN
+		RAISE EXCEPTION 'employee_grade_status quarantine: public orphan employee_id remain on hr_employee_grades';
+	END IF;
+
+	SELECT COUNT(*) INTO q_cnt FROM employee_grade_status_quarantine.hr_employee_grades_orphan;
+	IF q_cnt < 1 THEN
+		RAISE EXCEPTION 'employee_grade_status quarantine: quarantine table empty after move on hr_employee_grades';
+	END IF;
+END
+$orphan_quarantine$;
 
 -- 2) Precheck / guard — kritik anomalide transaction abort
 DO $precheck$

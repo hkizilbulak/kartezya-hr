@@ -180,6 +180,9 @@ func TestEnsureEmployeeGradeStatusConstraints_RejectsNilAndNonPostgres(t *testin
 	if err := EnsureEmployeeGradeStatusConstraints(nil); err == nil {
 		t.Fatal("expected error for nil db")
 	}
+	if err := ApplyEmployeeGradeStatusMigration(nil); err == nil {
+		t.Fatal("expected error for nil db on Apply")
+	}
 }
 
 func TestEmployeeGradeConstraintDDL_DocumentsPartialUniqueSemantics(t *testing.T) {
@@ -226,6 +229,9 @@ func TestMigrateEmployeeGradeStatusSQL_TransactionalGuardedIdempotent(t *testing
 	for _, part := range []string{
 		"BEGIN;",
 		"COMMIT;",
+		"ApplyEmployeeGradeStatusMigration",
+		"orphan_quarantine",
+		"employee_grade_status_quarantine",
 		"precheck BLOCKER",
 		"ADD COLUMN IF NOT EXISTS status",
 		"ROW_NUMBER() OVER",

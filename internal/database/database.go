@@ -126,13 +126,14 @@ func (d *Database) Migrate() error {
 	}
 
 	// Partial unique indexes / CHECK constraints are not managed by GORM AutoMigrate.
-	// Employee grade: Ensure adds status COLUMN only; data backfill + constraints
-	// are applied via schema/migrate_employee_grade_status.sql after diagnostics.
+	// Employee grade: full status migration (column + backfill + CHECKs + indexes)
+	// runs here via ApplyEmployeeGradeStatusMigration (advisory-locked transaction).
+	// schema/migrate_employee_grade_status.sql mirrors the same builder SQL for ops.
 	if err := EnsureJobHistoryReferenceDateUniqueIndex(d.DB); err != nil {
 		return fmt.Errorf("job history index migration failed: %w", err)
 	}
 	if err := EnsureEmployeeGradeStatusConstraints(d.DB); err != nil {
-		return fmt.Errorf("employee grade status schema ensure failed: %w", err)
+		return fmt.Errorf("employee grade status migration failed: %w", err)
 	}
 
 	seedPortalContracts(d.DB)
