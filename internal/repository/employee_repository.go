@@ -32,6 +32,8 @@ type EmployeeRepository interface {
 	GetWorkDayReportData(startDate, endDate string, companyID *uint, departmentIDs []uint, isActive *bool) ([]types.WorkDayReportRow, error)
 	GetGradeReportData(companyID *uint, departmentIDs []uint, isActive *bool) ([]types.GradeReportRow, error)
 	GetContractReportData(startDate, endDate string, companyID *uint, departmentIDs []uint, isActive *bool) ([]types.ContractReportRow, error)
+	// InTransaction runs fn with employee + employee-grade repos bound to the same DB transaction.
+	InTransaction(fn func(empRepo EmployeeRepository, gradeRepo EmployeeGradeRepository) error) error
 }
 
 type employeeRepository struct {
@@ -62,6 +64,12 @@ func (r *employeeRepository) Create(employee *domain.Employee, createdBy string)
 	employee.CreatedBy = createdBy
 	employee.ModifiedBy = createdBy
 	return r.db.Create(employee).Error
+}
+
+func (r *employeeRepository) InTransaction(fn func(empRepo EmployeeRepository, gradeRepo EmployeeGradeRepository) error) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		return fn(NewEmployeeRepository(tx), NewEmployeeGradeRepository(tx))
+	})
 }
 
 func (r *employeeRepository) GetByIDs(ids []uint) ([]*domain.Employee, error) {

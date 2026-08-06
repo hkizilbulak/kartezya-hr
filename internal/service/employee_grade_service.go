@@ -110,7 +110,7 @@ func (s *employeeGradeService) CreateEmployeeGrade(employeeID, gradeID uint, sta
 		}
 
 		if err := txRepo.Create(employeeGrade, createdBy); err != nil {
-			if repository.IsUniqueViolation(err) {
+			if repository.IsEmployeeGradeActiveUniqueViolation(err) {
 				return domain.ErrEmployeeGradeActiveConflict
 			}
 			return fmt.Errorf("failed to create employee grade: %w", err)

@@ -53,10 +53,17 @@ func NewDatabase(cfg *config.Config) *Database {
 
 	log.Println("Successfully connected to database")
 
-	return &Database{
+	database := &Database{
 		DB:     db,
 		Config: cfg,
 	}
+	// Restore/migration with explicit IDs can leave serial sequences behind MAX(id).
+	// Sync independently of AutoMigrate so assign/create do not hit PK unique collisions.
+	if err := SyncCriticalIDSequences(db); err != nil {
+		log.Printf("WARNING: failed to sync critical id sequences: %v", err)
+	}
+
+	return database
 }
 
 // Close closes the database connection

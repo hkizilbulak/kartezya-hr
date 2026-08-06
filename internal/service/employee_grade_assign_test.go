@@ -85,6 +85,9 @@ func (s *stubEGEmployeeRepo) GetGradeReportData(companyID *uint, departmentIDs [
 func (s *stubEGEmployeeRepo) GetContractReportData(startDate, endDate string, companyID *uint, departmentIDs []uint, isActive *bool) ([]types.ContractReportRow, error) {
 	return nil, nil
 }
+func (s *stubEGEmployeeRepo) InTransaction(fn func(empRepo repository.EmployeeRepository, gradeRepo repository.EmployeeGradeRepository) error) error {
+	return fn(s, newStubEmployeeGradeRepo())
+}
 
 type stubEGGradeRepo struct {
 	grade *domain.Grade
@@ -460,12 +463,34 @@ func TestCreateEmployeeGrade_CreateFailureRollsBackClose(t *testing.T) {
 
 func TestCreateEmployeeGrade_UniqueViolationMapped(t *testing.T) {
 	repo := newStubEmployeeGradeRepo()
-	repo.failCreate = &pgconn.PgError{Code: "23505", Message: "duplicate key"}
+	repo.failCreate = &pgconn.PgError{
+		Code:           "23505",
+		ConstraintName: "ux_hr_employee_grades_employee_id_status_active",
+		Message:        "duplicate key",
+	}
 	svc, _ := newEmployeeGradeServiceForTest(repo)
 
 	_, err := svc.CreateEmployeeGrade(1, 2, "2026-07-30", "", "hr@test")
 	if !errors.Is(err, domain.ErrEmployeeGradeActiveConflict) {
 		t.Fatalf("got %v", err)
+	}
+}
+
+func TestCreateEmployeeGrade_PrimaryKeyUniqueNotMappedAsActiveConflict(t *testing.T) {
+	repo := newStubEmployeeGradeRepo()
+	repo.failCreate = &pgconn.PgError{
+		Code:           "23505",
+		ConstraintName: "hr_employee_grades_pkey",
+		Message:        "duplicate key value violates unique constraint",
+	}
+	svc, _ := newEmployeeGradeServiceForTest(repo)
+
+	_, err := svc.CreateEmployeeGrade(1, 2, "2026-07-30", "", "hr@test")
+	if errors.Is(err, domain.ErrEmployeeGradeActiveConflict) {
+		t.Fatal("PK unique must not map to active conflict")
+	}
+	if err == nil {
+		t.Fatal("expected error")
 	}
 }
 

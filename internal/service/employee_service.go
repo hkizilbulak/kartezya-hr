@@ -9,6 +9,8 @@ import (
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/repository"
 	"kartezya-hr/internal/types"
+
+	"gorm.io/gorm"
 )
 
 type EmployeeService interface {
@@ -32,6 +34,7 @@ type EmployeeService interface {
 
 type employeeService struct {
 	employeeRepo      repository.EmployeeRepository
+	gradeRepo         repository.GradeRepository
 	userRepo          repository.UserRepository
 	userRoleRepo      repository.UserRoleRepository
 	roleRepo          repository.RoleRepository
@@ -42,9 +45,10 @@ type employeeService struct {
 	mailConfigService MailConfigService
 }
 
-func NewEmployeeService(employeeRepo repository.EmployeeRepository, userRepo repository.UserRepository, userRoleRepo repository.UserRoleRepository, roleRepo repository.RoleRepository, authService AuthService, auditService AuditService, workInfoRepo repository.WorkInformationRepository, emailService EmailService, mailConfigService MailConfigService) EmployeeService {
+func NewEmployeeService(employeeRepo repository.EmployeeRepository, gradeRepo repository.GradeRepository, userRepo repository.UserRepository, userRoleRepo repository.UserRoleRepository, roleRepo repository.RoleRepository, authService AuthService, auditService AuditService, workInfoRepo repository.WorkInformationRepository, emailService EmailService, mailConfigService MailConfigService) EmployeeService {
 	return &employeeService{
 		employeeRepo:      employeeRepo,
+		gradeRepo:         gradeRepo,
 		userRepo:          userRepo,
 		userRoleRepo:      userRoleRepo,
 		roleRepo:          roleRepo,
@@ -96,7 +100,7 @@ func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastNam
 		EmergencyContact:         emergencyContact,
 		EmergencyContactName:     emergencyContactName,
 		EmergencyContactRelation: emergencyContactRelation,
-		// GradeID is not written on employees; assign via EmployeeGrade lifecycle.
+		// GradeID is not written on employees; ACTIVE history is the source of truth.
 		ProfessionStartDate: professionStartDatePtr,
 		Note:                note,
 		FatherName:          fatherName,
@@ -104,7 +108,16 @@ func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastNam
 		IdentityNo:          identityNo,
 	}
 
-	_ = gradeID // request may still send grade_id; ignored for employees.grade_id
+	var initialGradeID uint
+	if gradeID != nil && *gradeID > 0 {
+		initialGradeID = uint(*gradeID)
+		if _, err := s.gradeRepo.GetByID(int64(initialGradeID)); err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, domain.ErrEmployeeGradeGradeNotFound
+			}
+			return nil, fmt.Errorf("failed to get grade: %w", err)
+		}
+	}
 
 	// Check if an employee with the same company email already exists and is active
 	existingEmployee, err := s.employeeRepo.GetByCompanyEmail(companyEmail)
@@ -148,9 +161,41 @@ func (s *employeeService) CreateEmployee(email, companyEmail, firstName, lastNam
 		}
 	}
 
-	// Create the employee
-	if err := s.employeeRepo.Create(employee, createdBy); err != nil {
-		return nil, fmt.Errorf("failed to create employee: %w", err)
+	var createdGrade *domain.EmployeeGrade
+	if err := s.employeeRepo.InTransaction(func(empRepo repository.EmployeeRepository, gradeHistRepo repository.EmployeeGradeRepository) error {
+		if err := empRepo.Create(employee, createdBy); err != nil {
+			return fmt.Errorf("failed to create employee: %w", err)
+		}
+		if initialGradeID == 0 {
+			return nil
+		}
+		startDay := time.Now().UTC()
+		if hireDatePtr != nil {
+			startDay = dateOnlyUTC(*hireDatePtr)
+		} else {
+			startDay = dateOnlyUTC(startDay)
+		}
+		eg := &domain.EmployeeGrade{
+			EmployeeID: employee.ID,
+			GradeID:    initialGradeID,
+			StartDate:  startDay,
+			EndDate:    nil,
+			Status:     domain.EmployeeGradeStatusActive,
+		}
+		if err := gradeHistRepo.Create(eg, createdBy); err != nil {
+			if repository.IsEmployeeGradeActiveUniqueViolation(err) {
+				return domain.ErrEmployeeGradeActiveConflict
+			}
+			return fmt.Errorf("failed to create initial employee grade: %w", err)
+		}
+		createdGrade = eg
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	if createdGrade != nil {
+		_ = s.auditService.CreateAuditLog("EmployeeGrade", createdGrade.ID, domain.AuditActionCreate, nil, createdGrade, createdBy)
 	}
 
 	fmt.Printf("Employee created successfully. User ID: %d, Employee ID: %d\n", user.ID, employee.ID)
