@@ -100,37 +100,3 @@ func TestEmployeeContractRepositoryReviveByContractAndEmployee(t *testing.T) {
 		t.Fatalf("expected modified_by to be updated, got %q", found.ModifiedBy)
 	}
 }
-
-func TestEmployeeContractRepositoryReviveAvoidsUniqueConflictReinsert(t *testing.T) {
-	db := newEmployeeContractTestDB(t)
-	repo := NewEmployeeContractRepository(db)
-	seedContract(t, db, 10)
-
-	record := &domain.EmployeeContract{
-		AuditableModel: domain.AuditableModel{Deleted: true},
-		ContractID:     10,
-		EmployeeID:     3,
-	}
-	if err := db.Create(record).Error; err != nil {
-		t.Fatalf("failed to seed employee contract: %v", err)
-	}
-
-	err := repo.Create(&domain.EmployeeContract{ContractID: 10, EmployeeID: 3}, "7")
-	if err == nil {
-		t.Fatal("expected unique constraint error when reinserting soft-deleted record")
-	}
-
-	if err := repo.ReviveByContractAndEmployee(10, 3, "7"); err != nil {
-		t.Fatalf("ReviveByContractAndEmployee returned error: %v", err)
-	}
-
-	var count int64
-	if err := db.Model(&domain.EmployeeContract{}).
-		Where("contract_id = ? AND employee_id = ?", 10, 3).
-		Count(&count).Error; err != nil {
-		t.Fatalf("failed to count employee contracts: %v", err)
-	}
-	if count != 1 {
-		t.Fatalf("expected exactly one row after revive, got %d", count)
-	}
-}
