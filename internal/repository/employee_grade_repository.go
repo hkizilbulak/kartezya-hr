@@ -1,11 +1,15 @@
 package repository
 
 import (
+	"errors"
 	"fmt"
+	"time"
+
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/types"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type EmployeeGradeRepository interface {
@@ -15,6 +19,16 @@ type EmployeeGradeRepository interface {
 	GetAll(limit, offset int, sortParams types.SortParams, employeeID *uint) ([]domain.EmployeeGrade, int64, error)
 	Update(employeeGrade *domain.EmployeeGrade, modifiedBy string) error
 	Delete(id uint, deletedBy string) error
+
+	// Transaction runs fn with a repository bound to the same DB transaction.
+	Transaction(fn func(txRepo EmployeeGradeRepository) error) error
+	// GetActiveByEmployeeIDForUpdate locks the ACTIVE row (FOR UPDATE) for an employee.
+	// Returns (nil, nil) when no active grade exists.
+	GetActiveByEmployeeIDForUpdate(employeeID uint) (*domain.EmployeeGrade, error)
+	// CloseActiveAsInactive sets status=INACTIVE and end_date on an ACTIVE row.
+	CloseActiveAsInactive(id uint, endDate time.Time, modifiedBy string) error
+	// ExistsByEmployeeGradeStartDate reports a non-deleted row with the same triple.
+	ExistsByEmployeeGradeStartDate(employeeID, gradeID uint, startDate time.Time) (bool, error)
 }
 
 type employeeGradeRepository struct {
@@ -27,9 +41,18 @@ func NewEmployeeGradeRepository(db *gorm.DB) EmployeeGradeRepository {
 	}
 }
 
+func (r *employeeGradeRepository) Transaction(fn func(txRepo EmployeeGradeRepository) error) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		return fn(&employeeGradeRepository{db: tx})
+	})
+}
+
 func (r *employeeGradeRepository) Create(employeeGrade *domain.EmployeeGrade, createdBy string) error {
 	employeeGrade.CreatedBy = createdBy
 	employeeGrade.ModifiedBy = createdBy
+	if employeeGrade.Status == "" {
+		employeeGrade.Status = domain.EmployeeGradeStatusFromEndDate(employeeGrade.EndDate)
+	}
 	return r.db.Create(employeeGrade).Error
 }
 
@@ -57,7 +80,6 @@ func (r *employeeGradeRepository) GetAll(limit, offset int, sortParams types.Sor
 	var employeeGrades []domain.EmployeeGrade
 	var total int64
 
-	// Validate and sanitize sort field
 	validSortFields := map[string]bool{
 		"id":          true,
 		"employee_id": true,
@@ -80,22 +102,17 @@ func (r *employeeGradeRepository) GetAll(limit, offset int, sortParams types.Sor
 
 	orderBy := fmt.Sprintf("%s %s", sortField, direction)
 
-	// Build base query
 	query := r.db.Model(&domain.EmployeeGrade{}).Where("deleted = ?", false)
 
-	// Apply employee_id filter if provided
 	if employeeID != nil {
 		query = query.Where("employee_id = ?", *employeeID)
 	}
 
-	// Count total records
 	query.Count(&total)
 
-	// Get paginated records with sorting
 	finalQuery := r.db.Preload("Employee").Preload("Grade").
 		Where("deleted = ?", false)
 
-	// Apply employee_id filter if provided
 	if employeeID != nil {
 		finalQuery = finalQuery.Where("employee_id = ?", *employeeID)
 	}
@@ -108,7 +125,18 @@ func (r *employeeGradeRepository) GetAll(limit, offset int, sortParams types.Sor
 
 func (r *employeeGradeRepository) Update(employeeGrade *domain.EmployeeGrade, modifiedBy string) error {
 	employeeGrade.ModifiedBy = modifiedBy
-	return r.db.Save(employeeGrade).Error
+	if employeeGrade.Status == "" {
+		employeeGrade.Status = domain.EmployeeGradeStatusFromEndDate(employeeGrade.EndDate)
+	}
+	return r.db.Model(&domain.EmployeeGrade{}).
+		Where("id = ? AND deleted = ?", employeeGrade.ID, false).
+		Updates(map[string]interface{}{
+			"grade_id":    employeeGrade.GradeID,
+			"start_date":  employeeGrade.StartDate,
+			"end_date":    employeeGrade.EndDate,
+			"status":      employeeGrade.Status,
+			"modified_by": modifiedBy,
+		}).Error
 }
 
 func (r *employeeGradeRepository) Delete(id uint, deletedBy string) error {
@@ -116,6 +144,51 @@ func (r *employeeGradeRepository) Delete(id uint, deletedBy string) error {
 		Where("id = ?", id).
 		Updates(map[string]interface{}{
 			"deleted":     true,
+			"status":      domain.EmployeeGradeStatusInactive,
+			"end_date":    gorm.Expr("COALESCE(end_date, start_date)"),
 			"modified_by": deletedBy,
 		}).Error
+}
+
+func (r *employeeGradeRepository) GetActiveByEmployeeIDForUpdate(employeeID uint) (*domain.EmployeeGrade, error) {
+	var employeeGrade domain.EmployeeGrade
+	err := r.db.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("employee_id = ? AND deleted = ? AND status = ?", employeeID, false, domain.EmployeeGradeStatusActive).
+		First(&employeeGrade).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &employeeGrade, nil
+}
+
+func (r *employeeGradeRepository) CloseActiveAsInactive(id uint, endDate time.Time, modifiedBy string) error {
+	result := r.db.Model(&domain.EmployeeGrade{}).
+		Where("id = ? AND deleted = ? AND status = ?", id, false, domain.EmployeeGradeStatusActive).
+		Updates(map[string]interface{}{
+			"status":      domain.EmployeeGradeStatusInactive,
+			"end_date":    endDate,
+			"modified_by": modifiedBy,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("failed to close active employee grade %d: no matching ACTIVE row", id)
+	}
+	return nil
+}
+
+func (r *employeeGradeRepository) ExistsByEmployeeGradeStartDate(employeeID, gradeID uint, startDate time.Time) (bool, error) {
+	startDay := time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, time.UTC)
+	var count int64
+	err := r.db.Model(&domain.EmployeeGrade{}).
+		Where("employee_id = ? AND grade_id = ? AND deleted = ? AND start_date = ?", employeeID, gradeID, false, startDay).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }

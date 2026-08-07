@@ -53,10 +53,17 @@ func NewDatabase(cfg *config.Config) *Database {
 
 	log.Println("Successfully connected to database")
 
-	return &Database{
+	database := &Database{
 		DB:     db,
 		Config: cfg,
 	}
+	// Restore/migration with explicit IDs can leave serial sequences behind MAX(id).
+	// Sync independently of AutoMigrate so assign/create do not hit PK unique collisions.
+	if err := SyncCriticalIDSequences(db); err != nil {
+		log.Printf("WARNING: failed to sync critical id sequences: %v", err)
+	}
+
+	return database
 }
 
 // Close closes the database connection
@@ -125,11 +132,15 @@ func (d *Database) Migrate() error {
 		return fmt.Errorf("auto-migration failed: %w", err)
 	}
 
-	// Partial unique indexes are not managed by GORM AutoMigrate.
-	// This bootstrap is idempotent and uses the configured DB table prefix
-	// so test and production follow the same code path.
+	// Partial unique indexes / CHECK constraints are not managed by GORM AutoMigrate.
+	// Employee grade: full status migration (column + backfill + CHECKs + indexes)
+	// runs here via ApplyEmployeeGradeStatusMigration (advisory-locked transaction).
+	// schema/migrate_employee_grade_status.sql mirrors the same builder SQL for ops.
 	if err := EnsureJobHistoryReferenceDateUniqueIndex(d.DB); err != nil {
 		return fmt.Errorf("job history index migration failed: %w", err)
+	}
+	if err := EnsureEmployeeGradeStatusConstraints(d.DB); err != nil {
+		return fmt.Errorf("employee grade status migration failed: %w", err)
 	}
 
 	seedPortalContracts(d.DB)

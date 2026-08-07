@@ -7,6 +7,7 @@ import (
 
 	"kartezya-hr/internal/authz"
 	"kartezya-hr/internal/domain"
+	"kartezya-hr/internal/repository"
 	"kartezya-hr/internal/types"
 )
 
@@ -85,13 +86,16 @@ func (s *stubEmployeeRepoForProtection) GetGradeReportData(companyID *uint, depa
 func (s *stubEmployeeRepoForProtection) GetContractReportData(startDate, endDate string, companyID *uint, departmentIDs []uint, isActive *bool) ([]types.ContractReportRow, error) {
 	return nil, nil
 }
+func (s *stubEmployeeRepoForProtection) InTransaction(fn func(empRepo repository.EmployeeRepository, gradeRepo repository.EmployeeGradeRepository) error) error {
+	return fn(s, nil)
+}
 
 type stubUserRepoForProtection struct {
 	user *domain.User
 }
 
 func (s *stubUserRepoForProtection) Create(user *domain.User, createdBy string) error { return nil }
-func (s *stubUserRepoForProtection) GetByID(id uint) (*domain.User, error)         { return s.user, nil }
+func (s *stubUserRepoForProtection) GetByID(id uint) (*domain.User, error)            { return s.user, nil }
 func (s *stubUserRepoForProtection) GetByEmail(email string) (*domain.User, error) {
 	return nil, errors.New("not found")
 }
@@ -142,7 +146,7 @@ func (s *stubUserRoleRepoForProtection) Delete(userID, roleID uint, deletedBy st
 type stubRoleRepoForProtection struct{}
 
 func (s *stubRoleRepoForProtection) Create(role *domain.Role, createdBy string) error { return nil }
-func (s *stubRoleRepoForProtection) GetByID(id uint) (*domain.Role, error)           { return nil, nil }
+func (s *stubRoleRepoForProtection) GetByID(id uint) (*domain.Role, error)            { return nil, nil }
 func (s *stubRoleRepoForProtection) GetByName(name string) (*domain.Role, error) {
 	return &domain.Role{AuditableModel: domain.AuditableModel{ID: 1}, Name: name}, nil
 }
@@ -175,7 +179,7 @@ func TestUpdateEmployeeAdminCanAssignAdmin(t *testing.T) {
 	emp := &domain.Employee{AuditableModel: domain.AuditableModel{ID: 1}, UserID: 10, CompanyEmail: "t@example.com"}
 	svc, empRepo, _ := newProtectionEmployeeService(emp, false)
 
-	err := svc.UpdateEmployee(1, "p@example.com", "t@example.com", "A", "B", "", "", "", "", "", "", "", "", 0, "", "", "", "", nil, "", "", "", "", "", "", "", "ACTIVE", "admin@x", 99, []string{domain.RoleAdmin}, []string{domain.RoleAdmin})
+	err := svc.UpdateEmployee(1, "p@example.com", "t@example.com", "A", "B", "", "", "", "", "", "", "", "", "", "", "", "", nil, "", "", "", "", "", "ACTIVE", "admin@x", 99, []string{domain.RoleAdmin}, []string{domain.RoleAdmin})
 	if err != nil {
 		t.Fatalf("ADMIN should assign ADMIN: %v", err)
 	}
@@ -188,7 +192,7 @@ func TestUpdateEmployeeHRCannotAssignAdmin(t *testing.T) {
 	emp := &domain.Employee{AuditableModel: domain.AuditableModel{ID: 1}, UserID: 10, CompanyEmail: "t@example.com"}
 	svc, empRepo, _ := newProtectionEmployeeService(emp, false)
 
-	err := svc.UpdateEmployee(1, "p@example.com", "t@example.com", "A", "B", "", "", "", "", "", "", "", "", 0, "", "", "", "", nil, "", "", "", "", "", "", "", "ACTIVE", "hr@x", 99, []string{domain.RoleHR}, []string{domain.RoleAdmin})
+	err := svc.UpdateEmployee(1, "p@example.com", "t@example.com", "A", "B", "", "", "", "", "", "", "", "", "", "", "", "", nil, "", "", "", "", "", "ACTIVE", "hr@x", 99, []string{domain.RoleHR}, []string{domain.RoleAdmin})
 	if !errors.Is(err, authz.ErrForbiddenAssignAdmin) {
 		t.Fatalf("expected ErrForbiddenAssignAdmin, got %v", err)
 	}
@@ -201,7 +205,7 @@ func TestUpdateEmployeeHRCanAssignAllowedRoles(t *testing.T) {
 	emp := &domain.Employee{AuditableModel: domain.AuditableModel{ID: 1}, UserID: 10, CompanyEmail: "t@example.com"}
 	svc, _, _ := newProtectionEmployeeService(emp, false)
 
-	err := svc.UpdateEmployee(1, "p@example.com", "t@example.com", "A", "B", "", "", "", "", "", "", "", "", 0, "", "", "", "", nil, "", "", "", "", "", "", "", "ACTIVE", "hr@x", 99, []string{domain.RoleHR}, []string{domain.RoleEmployee, domain.RoleHR, domain.RoleFinancial})
+	err := svc.UpdateEmployee(1, "p@example.com", "t@example.com", "A", "B", "", "", "", "", "", "", "", "", "", "", "", "", nil, "", "", "", "", "", "ACTIVE", "hr@x", 99, []string{domain.RoleHR}, []string{domain.RoleEmployee, domain.RoleHR, domain.RoleFinancial})
 	if err != nil {
 		t.Fatalf("HR should assign allowed roles: %v", err)
 	}
@@ -211,7 +215,7 @@ func TestUpdateEmployeeHRCannotUpdateAdminTarget(t *testing.T) {
 	emp := &domain.Employee{AuditableModel: domain.AuditableModel{ID: 1}, UserID: 10, CompanyEmail: "t@example.com"}
 	svc, empRepo, _ := newProtectionEmployeeService(emp, true)
 
-	err := svc.UpdateEmployee(1, "p@example.com", "t@example.com", "A", "B", "", "", "", "", "", "", "", "", 0, "", "", "", "", nil, "", "", "", "", "", "", "", "ACTIVE", "hr@x", 99, []string{domain.RoleHR}, []string{domain.RoleEmployee})
+	err := svc.UpdateEmployee(1, "p@example.com", "t@example.com", "A", "B", "", "", "", "", "", "", "", "", "", "", "", "", nil, "", "", "", "", "", "ACTIVE", "hr@x", 99, []string{domain.RoleHR}, []string{domain.RoleEmployee})
 	if !errors.Is(err, authz.ErrForbiddenAdminTarget) {
 		t.Fatalf("expected ErrForbiddenAdminTarget, got %v", err)
 	}
@@ -224,7 +228,7 @@ func TestUpdateEmployeeAdminCanUpdateAdminTarget(t *testing.T) {
 	emp := &domain.Employee{AuditableModel: domain.AuditableModel{ID: 1}, UserID: 10, CompanyEmail: "t@example.com"}
 	svc, _, _ := newProtectionEmployeeService(emp, true)
 
-	err := svc.UpdateEmployee(1, "p@example.com", "t@example.com", "A", "B", "", "", "", "", "", "", "", "", 0, "", "", "", "", nil, "", "", "", "", "", "", "", "ACTIVE", "admin@x", 99, []string{domain.RoleAdmin}, []string{domain.RoleAdmin})
+	err := svc.UpdateEmployee(1, "p@example.com", "t@example.com", "A", "B", "", "", "", "", "", "", "", "", "", "", "", "", nil, "", "", "", "", "", "ACTIVE", "admin@x", 99, []string{domain.RoleAdmin}, []string{domain.RoleAdmin})
 	if err != nil {
 		t.Fatalf("ADMIN should manage ADMIN target: %v", err)
 	}

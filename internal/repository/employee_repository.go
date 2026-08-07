@@ -32,6 +32,8 @@ type EmployeeRepository interface {
 	GetWorkDayReportData(startDate, endDate string, companyID *uint, departmentIDs []uint, isActive *bool) ([]types.WorkDayReportRow, error)
 	GetGradeReportData(companyID *uint, departmentIDs []uint, isActive *bool) ([]types.GradeReportRow, error)
 	GetContractReportData(startDate, endDate string, companyID *uint, departmentIDs []uint, isActive *bool) ([]types.ContractReportRow, error)
+	// InTransaction runs fn with employee + employee-grade repos bound to the same DB transaction.
+	InTransaction(fn func(empRepo EmployeeRepository, gradeRepo EmployeeGradeRepository) error) error
 }
 
 type employeeRepository struct {
@@ -64,6 +66,12 @@ func (r *employeeRepository) Create(employee *domain.Employee, createdBy string)
 	return r.db.Create(employee).Error
 }
 
+func (r *employeeRepository) InTransaction(fn func(empRepo EmployeeRepository, gradeRepo EmployeeGradeRepository) error) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		return fn(NewEmployeeRepository(tx), NewEmployeeGradeRepository(tx))
+	})
+}
+
 func (r *employeeRepository) GetByIDs(ids []uint) ([]*domain.Employee, error) {
 	var employees []*domain.Employee
 	err := r.db.Where("id IN ?", ids).Find(&employees).Error
@@ -72,13 +80,15 @@ func (r *employeeRepository) GetByIDs(ids []uint) ([]*domain.Employee, error) {
 
 func (r *employeeRepository) GetByID(id uint) (*domain.Employee, error) {
 	var employee domain.Employee
-	err := r.db.Preload("User").Where("deleted = ?", false).First(&employee, id).Error
+	err := preloadActiveEmployeeGrade(r.db.Preload("User")).
+		Where("deleted = ?", false).First(&employee, id).Error
 	return &employee, err
 }
 
 func (r *employeeRepository) GetByUserID(userID uint) (*domain.Employee, error) {
 	var employee domain.Employee
-	err := r.db.Preload("User").Where("user_id = ? AND deleted = ?", userID, false).First(&employee).Error
+	err := preloadActiveEmployeeGrade(r.db.Preload("User")).
+		Where("user_id = ? AND deleted = ?", userID, false).First(&employee).Error
 	return &employee, err
 }
 
@@ -129,7 +139,7 @@ func (r *employeeRepository) GetAll(limit, offset int, sortParams types.SortPara
 	r.db.Model(&domain.Employee{}).Where("deleted = ?", false).Count(&total)
 
 	// Get paginated records with sorting — all relations preloaded in bulk (eliminates N+1)
-	err := r.db.Preload("User").
+	err := preloadActiveEmployeeGrade(r.db.Preload("User").
 		Preload("User.UserRoles").
 		Preload("User.UserRoles.Role").
 		Preload("EmployeeWorkInformation", func(db *gorm.DB) *gorm.DB {
@@ -137,7 +147,7 @@ func (r *employeeRepository) GetAll(limit, offset int, sortParams types.SortPara
 		}).
 		Preload("EmployeeWorkInformation.Company").
 		Preload("EmployeeWorkInformation.Department").
-		Preload("EmployeeWorkInformation.JobPosition").
+		Preload("EmployeeWorkInformation.JobPosition")).
 		Where("deleted = ?", false).
 		Order(orderBy).
 		Limit(limit).
@@ -296,7 +306,7 @@ func (r *employeeRepository) GetAllWithFilters(limit, offset int, sortParams typ
 		}
 
 		if gradeID, ok := filters["grade_id"]; ok {
-			query = query.Where(fmt.Sprintf("%s.grade_id = ?", domain.GetTableName("hr_employees")), gradeID)
+			query = applyActiveEmployeeGradeIDFilter(query, domain.GetTableName("hr_employees"), gradeID)
 		}
 
 		// City filter (il)
@@ -437,7 +447,7 @@ func (r *employeeRepository) GetAllWithFilters(limit, offset int, sortParams typ
 			countQuery = countQuery.Where(fmt.Sprintf("%s.marital_status = ?", domain.GetTableName("hr_employees")), maritalStatus)
 		}
 		if gradeID, ok := filters["grade_id"]; ok {
-			countQuery = countQuery.Where(fmt.Sprintf("%s.grade_id = ?", domain.GetTableName("hr_employees")), gradeID)
+			countQuery = applyActiveEmployeeGradeIDFilter(countQuery, domain.GetTableName("hr_employees"), gradeID)
 		}
 
 		// City filter (il) for count query
@@ -456,7 +466,7 @@ func (r *employeeRepository) GetAllWithFilters(limit, offset int, sortParams typ
 
 	// GROUP BY primary key collapses duplicate rows from filter JOINs while still
 	// allowing ORDER BY correlated display-field subqueries (unlike SELECT DISTINCT).
-	err := query.Preload("User").
+	err := preloadActiveEmployeeGrade(query.Preload("User").
 		Preload("User.UserRoles").
 		Preload("User.UserRoles.Role").
 		Preload("EmployeeWorkInformation", func(db *gorm.DB) *gorm.DB {
@@ -464,7 +474,7 @@ func (r *employeeRepository) GetAllWithFilters(limit, offset int, sortParams typ
 		}).
 		Preload("EmployeeWorkInformation.Company").
 		Preload("EmployeeWorkInformation.Department").
-		Preload("EmployeeWorkInformation.JobPosition").
+		Preload("EmployeeWorkInformation.JobPosition")).
 		Select(fmt.Sprintf("%s.*", domain.GetTableName("hr_employees"))).
 		Group(fmt.Sprintf("%s.id", domain.GetTableName("hr_employees"))).
 		Order(orderBy).
@@ -574,7 +584,7 @@ func (r *employeeRepository) GetTotalCountWithFilters(filters map[string]interfa
 
 		// Grade ID filter
 		if gradeID, ok := filters["grade_id"]; ok {
-			query = query.Where(fmt.Sprintf("%s.grade_id = ?", domain.GetTableName("hr_employees")), gradeID)
+			query = applyActiveEmployeeGradeIDFilter(query, domain.GetTableName("hr_employees"), gradeID)
 		}
 
 		// Company and Department filters need JOIN with work information
@@ -733,21 +743,18 @@ func (r *employeeRepository) Update(employee *domain.Employee, modifiedBy string
 		"date_of_birth":              employee.DateOfBirth,
 		"hire_date":                  employee.HireDate,
 		"leave_date":                 employee.LeaveDate,
-		"total_gap":                  employee.TotalGap,
 		"marital_status":             employee.MaritalStatus,
 		"emergency_contact":          employee.EmergencyContact,
 		"emergency_contact_name":     employee.EmergencyContactName,
 		"emergency_contact_relation": employee.EmergencyContactRelation,
-		"grade_id":                   employee.GradeID,
-		"contract_no":                employee.ContractNo,
-		"profession_start_date":      employee.ProfessionStartDate,
-		"note":                       employee.Note,
-		"mother_name":                employee.MotherName,
-		"father_name":                employee.FatherName,
-		"nationality":                employee.Nationality,
-		"identity_no":                employee.IdentityNo,
-		"status":                     employee.Status,
-		"modified_by":                modifiedBy,
+		// grade_id intentionally omitted: current grade lives on hr_employee_grades (ACTIVE).
+		"profession_start_date": employee.ProfessionStartDate,
+		"note":                  employee.Note,
+		"father_name":           employee.FatherName,
+		"nationality":           employee.Nationality,
+		"identity_no":           employee.IdentityNo,
+		"status":                employee.Status,
+		"modified_by":           modifiedBy,
 	}
 
 	return r.db.Where("deleted = ?", false).Model(employee).Updates(updates).Error
@@ -952,11 +959,11 @@ func (r *employeeRepository) GetInternCountByCompanyDepartment() ([]interface{},
 			domain.GetTableName("hr_job_positions"),
 			domain.GetTableName("hr_employee_work_information"),
 			domain.GetTableName("hr_job_positions"))).
-		Where(fmt.Sprintf("%s.deleted = ? AND %s.status = ? AND (LOWER(%s.title) LIKE ? OR LOWER(%s.title) LIKE ?)", 
-			domain.GetTableName("hr_employees"), 
-			domain.GetTableName("hr_employees"), 
-			domain.GetTableName("hr_job_positions"), 
-			domain.GetTableName("hr_job_positions")), 
+		Where(fmt.Sprintf("%s.deleted = ? AND %s.status = ? AND (LOWER(%s.title) LIKE ? OR LOWER(%s.title) LIKE ?)",
+			domain.GetTableName("hr_employees"),
+			domain.GetTableName("hr_employees"),
+			domain.GetTableName("hr_job_positions"),
+			domain.GetTableName("hr_job_positions")),
 			false, "ACTIVE", "%intern%", "%stajyer%").
 		Group(fmt.Sprintf("%s.name, %s.name", domain.GetTableName("hr_companies"), domain.GetTableName("hr_departments"))).
 		Select(fmt.Sprintf("%s.name as company_name, %s.name as department_name, COUNT(*) as count, STRING_AGG(CONCAT(%s.first_name, ' ', %s.last_name), ', ') as employee_names",
@@ -975,31 +982,32 @@ func (r *employeeRepository) GetInternCountByCompanyDepartment() ([]interface{},
 	return data, nil
 }
 
-// GetEmployeeCountByGrade returns employee count grouped by grade
+// GetEmployeeCountByGrade returns employee count grouped by ACTIVE EmployeeGrade.
+// employees.grade_id is not used. Employees without an ACTIVE grade are counted as "Bilinmiyor".
 func (r *employeeRepository) GetEmployeeCountByGrade() ([]interface{}, error) {
 	type GradeCount struct {
 		GradeName string `json:"grade_name"`
 		Count     int64  `json:"count"`
 	}
 
+	employees := domain.GetTableName("hr_employees")
+	grades := domain.GetTableName("hr_grades")
+	employeeGrades := domain.GetTableName("hr_employee_grades")
+
 	var results []GradeCount
 	err := r.db.Model(&domain.Employee{}).
-		Joins(fmt.Sprintf("LEFT JOIN %s ON %s.employee_id = %s.id AND %s.deleted = false AND %s.start_date <= CURRENT_DATE AND (%s.end_date IS NULL OR %s.end_date >= CURRENT_DATE)",
-			domain.GetTableName("hr_employee_grades"),
-			domain.GetTableName("hr_employee_grades"),
-			domain.GetTableName("hr_employees"),
-			domain.GetTableName("hr_employee_grades"),
-			domain.GetTableName("hr_employee_grades"),
-			domain.GetTableName("hr_employee_grades"),
-			domain.GetTableName("hr_employee_grades"))).
-		Joins(fmt.Sprintf("LEFT JOIN %s ON %s.id = %s.grade_id AND %s.deleted = false",
-			domain.GetTableName("hr_grades"),
-			domain.GetTableName("hr_grades"),
-			domain.GetTableName("hr_employee_grades"),
-			domain.GetTableName("hr_grades"))).
-		Where(fmt.Sprintf("%s.deleted = ? AND %s.status = ?", domain.GetTableName("hr_employees"), domain.GetTableName("hr_employees")), false, "ACTIVE").
-		Group("COALESCE(" + domain.GetTableName("hr_grades") + ".name, 'Bilinmiyor')").
-		Select("COALESCE(" + domain.GetTableName("hr_grades") + ".name, 'Bilinmiyor') as grade_name, COUNT(*) as count").
+		Joins(fmt.Sprintf(
+			"LEFT JOIN %s eg ON %s",
+			employeeGrades,
+			ActiveEmployeeGradeJoinOn("eg", employees+".id"),
+		)).
+		Joins(fmt.Sprintf(
+			"LEFT JOIN %s g ON g.id = eg.grade_id AND g.deleted = false",
+			grades,
+		)).
+		Where(fmt.Sprintf("%s.deleted = ? AND %s.status = ?", employees, employees), false, "ACTIVE").
+		Group("COALESCE(g.name, 'Bilinmiyor')").
+		Select("COALESCE(g.name, 'Bilinmiyor') as grade_name, COUNT(DISTINCT " + employees + ".id) as count").
 		Order("count DESC").
 		Scan(&results).Error
 
@@ -1014,12 +1022,21 @@ func (r *employeeRepository) GetEmployeeCountByGrade() ([]interface{}, error) {
 	return data, nil
 }
 
-// GetWorkDayReportData executes the work day report SQL query
+// GetWorkDayReportData executes the work day report SQL query.
+// current_grade is ACTIVE EmployeeGrade SoT (not date-window history).
+// Work/leave day counting remains historical over [startDate, endDate].
 func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, companyID *uint, departmentIDs []uint, isActive *bool) ([]types.WorkDayReportRow, error) {
 	var rows []types.WorkDayReportRow
 
-	// Build base query with numbered parameters for PostgreSQL
-	query := `
+	employees := domain.GetTableName("hr_employees")
+	holidays := domain.GetTableName("hr_holidays")
+	workInfo := domain.GetTableName("hr_employee_work_information")
+	leaveRequests := domain.GetTableName("hr_leave_requests")
+	companies := domain.GetTableName("hr_companies")
+	departments := domain.GetTableName("hr_departments")
+	currentGradeSelect := buildActiveCurrentGradeSelectSQL()
+
+	query := fmt.Sprintf(`
 		WITH date_range AS (
 			SELECT generate_series(
 				$1::date,
@@ -1035,7 +1052,7 @@ func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, com
                                         ELSE 1.0
                                 END AS day_value
                         FROM date_range
-                        LEFT JOIN hr_holidays h ON h.holiday_date = date_range.work_date
+                        LEFT JOIN %s h ON h.holiday_date = date_range.work_date
                         WHERE EXTRACT(DOW FROM date_range.work_date) NOT IN (0,6)
                           AND (h.id IS NULL OR h.is_full_day = false)
 		),
@@ -1054,14 +1071,14 @@ func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, com
 					ELSE 'WORK'
 					END AS day_type
 			FROM working_days w
-				CROSS JOIN hr_employees e
+				CROSS JOIN %s e
 			
-				LEFT JOIN hr_employee_work_information wi
+				LEFT JOIN %s wi
 					ON wi.employee_id = e.id AND wi.deleted = false
 						AND w.work_date BETWEEN wi.start_date
 						   AND COALESCE(wi.end_date, DATE '9999-12-31')
 			
-				LEFT JOIN hr_leave_requests lr
+				LEFT JOIN %s lr
 					ON lr.employee_id = e.id AND lr.deleted = false
 						AND w.work_date BETWEEN lr.start_date AND lr.end_date
 						AND lr.status = 'APPROVED'
@@ -1098,24 +1115,18 @@ func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, com
 		
 		FROM employee_days ed
 		
-		JOIN hr_employees e ON e.id = ed.employee_id
+		JOIN %s e ON e.id = ed.employee_id
 		
-		LEFT JOIN hr_companies c ON c.id = ed.company_id
-		LEFT JOIN hr_departments d ON d.id = ed.department_id
+		LEFT JOIN %s c ON c.id = ed.company_id
+		LEFT JOIN %s d ON d.id = ed.department_id
 		
 		LEFT JOIN (
-			SELECT
-				eg.employee_id,
-				g.name AS current_grade
-			FROM hr_employee_grades eg
-			LEFT JOIN hr_grades g
-				ON g.id = eg.grade_id
-			WHERE eg.deleted = false
-			  AND eg.start_date <= CURRENT_DATE
-			  AND (eg.end_date IS NULL OR eg.end_date >= CURRENT_DATE)
+%s
 		) cg ON cg.employee_id = e.id
 		
-		WHERE 1=1`
+		WHERE 1=1`,
+		holidays, employees, workInfo, leaveRequests,
+		employees, companies, departments, currentGradeSelect)
 
 	// Build dynamic parameters list
 	params := []interface{}{startDate, endDate}
@@ -1141,7 +1152,7 @@ func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, com
 	}
 
 	// Exclude interns (job_position_id = 21)
-	query += "\n\t\t\tAND NOT EXISTS (SELECT 1 FROM hr_employee_work_information wi2 WHERE wi2.employee_id = e.id AND wi2.job_position_id = 21 AND wi2.deleted = false AND wi2.start_date <= $1::date AND (wi2.end_date IS NULL OR wi2.end_date >= $1::date))"
+	query += fmt.Sprintf("\n\t\t\tAND NOT EXISTS (SELECT 1 FROM %s wi2 WHERE wi2.employee_id = e.id AND wi2.job_position_id = 21 AND wi2.deleted = false AND wi2.start_date <= $1::date AND (wi2.end_date IS NULL OR wi2.end_date >= $1::date))", workInfo)
 
 	// Add active/passive filter
 	if isActive != nil {
@@ -1177,12 +1188,31 @@ func (r *employeeRepository) GetWorkDayReportData(startDate, endDate string, com
 	return rows, err
 }
 
-// GetGradeReportData executes the grade report SQL query
+// gradeReportExperienceExprSQL returns fractional years of experience from
+// profession_start_date AGE only (years + months/12). It does not subtract total_gap.
+func gradeReportExperienceExprSQL() string {
+	return `(
+                    EXTRACT(YEAR FROM AGE(CURRENT_DATE, e.profession_start_date))
+                        +
+                    EXTRACT(MONTH FROM AGE(CURRENT_DATE, e.profession_start_date)) / 12.0
+                    )`
+}
+
+// GetGradeReportData executes the grade report SQL query.
+// current_grade is ACTIVE EmployeeGrade SoT (not date-window history).
+// Experience is AGE(profession_start_date) only — no total_gap subtraction.
 func (r *employeeRepository) GetGradeReportData(companyID *uint, departmentIDs []uint, isActive *bool) ([]types.GradeReportRow, error) {
 	var rows []types.GradeReportRow
 
-	// Build base query with user-provided SQL
-	query := `
+	employees := domain.GetTableName("hr_employees")
+	grades := domain.GetTableName("hr_grades")
+	workInfo := domain.GetTableName("hr_employee_work_information")
+	companies := domain.GetTableName("hr_companies")
+	departments := domain.GetTableName("hr_departments")
+	currentGradeSelect := buildActiveCurrentGradeSelectSQL()
+	experienceExpr := gradeReportExperienceExprSQL()
+
+	query := fmt.Sprintf(`
 WITH experience_calc AS (
     SELECT
         e.id,
@@ -1191,17 +1221,11 @@ WITH experience_calc AS (
         e.hire_date,
         e.leave_date,
         e.profession_start_date,
-        COALESCE(e.total_gap,0) AS total_gap,
 
         CASE
             WHEN e.profession_start_date IS NULL THEN 0
             ELSE
-                (
-                    EXTRACT(YEAR FROM AGE(CURRENT_DATE, e.profession_start_date))
-                        +
-                    EXTRACT(MONTH FROM AGE(CURRENT_DATE, e.profession_start_date)) / 12.0
-                    )
-                    - COALESCE(e.total_gap,0)
+                %s
             END AS total_experience,
 
         -- rapor için text format
@@ -1220,7 +1244,7 @@ WITH experience_calc AS (
             END AS total_experience_text
 
 
-    FROM hr_employees e
+    FROM %s e
     WHERE e.deleted = false
 ),
 
@@ -1237,21 +1261,13 @@ expected_grade AS (
         g.id AS expected_grade_id,
         g.name AS expected_grade
     FROM expected_grade_calc egc
-    LEFT JOIN hr_test_grades g
+    LEFT JOIN %s g
         ON egc.expected_experience >= g.min_year
             AND egc.expected_experience < g.max_year
 ),
 
 current_grade AS (
-    SELECT
-        eg.employee_id,
-        g.name AS current_grade
-    FROM hr_employee_grades eg
-    LEFT JOIN hr_grades g
-        ON g.id = eg.grade_id
-    WHERE eg.deleted = false
-      AND eg.start_date <= CURRENT_DATE
-      AND (eg.end_date IS NULL OR eg.end_date >= CURRENT_DATE)
+%s
 ),
 
 team_info AS (
@@ -1263,10 +1279,10 @@ team_info AS (
         c.name AS company_name,
         d.name AS department_name,
         d.manager
-    FROM hr_employee_work_information wi
-    LEFT JOIN hr_companies c
+    FROM %s wi
+    LEFT JOIN %s c
         ON c.id = wi.company_id
-    LEFT JOIN hr_departments d
+    LEFT JOIN %s d
         ON d.id = wi.department_id
     WHERE wi.start_date <= CURRENT_DATE
       AND (wi.end_date IS NULL OR wi.end_date >= CURRENT_DATE)
@@ -1282,7 +1298,6 @@ SELECT
     t.manager,
     t.start_date AS team_start_date,
     e.profession_start_date,
-    e.total_gap,
     e.total_experience_text,
     cg.current_grade,
     eg.expected_grade
@@ -1291,7 +1306,8 @@ FROM expected_grade eg
 JOIN experience_calc e ON e.id = eg.id
 LEFT JOIN current_grade cg ON cg.employee_id = e.id
 LEFT JOIN team_info t ON t.employee_id = e.id
-WHERE 1=1`
+WHERE 1=1`,
+		experienceExpr, employees, grades, currentGradeSelect, workInfo, companies, departments)
 
 	// Build dynamic parameters list
 	params := []interface{}{}
@@ -1316,15 +1332,15 @@ WHERE 1=1`
 	}
 
 	// Exclude interns (job_position_id = 21)
-	query += `
+	query += fmt.Sprintf(`
   AND NOT EXISTS (
-    SELECT 1 FROM hr_employee_work_information wi2
+    SELECT 1 FROM %s wi2
     WHERE wi2.employee_id = e.id
       AND wi2.job_position_id = 21
       AND wi2.deleted = false
       AND wi2.start_date <= CURRENT_DATE
       AND (wi2.end_date IS NULL OR wi2.end_date >= CURRENT_DATE)
-  )`
+  )`, workInfo)
 
 	// Add active/passive filter
 	if isActive != nil {

@@ -138,7 +138,7 @@ func main() {
 	emailService := service.NewEmailService(cfg, userRepo)
 	documentService := service.NewDocumentService(attachmentRepo, storageProvider, cfg, employeeRepo, leaveRepo, expenseRepo, otherRequestRepo)
 	mailConfigService := service.NewMailConfigService(mailConfigRepo)
-	employeeService := service.NewEmployeeService(employeeRepo, userRepo, userRoleRepo, roleRepo, authService, auditService, workInfoRepo, emailService, mailConfigService)
+	employeeService := service.NewEmployeeService(employeeRepo, gradeRepo, userRepo, userRoleRepo, roleRepo, authService, auditService, workInfoRepo, emailService, mailConfigService)
 	leaveService := service.NewLeaveService(leaveRepo, leaveTypeRepo, leaveBalanceRepo, employeeRepo, holidayRepo, attachmentRepo, storageProvider, auditService)
 	departmentService := service.NewDepartmentService(departmentRepo, companyRepo, auditService)
 	companyService := service.NewCompanyService(companyRepo, departmentRepo, departmentService, auditService)

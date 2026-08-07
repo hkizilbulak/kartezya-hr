@@ -34,3 +34,20 @@ func TestIsUniqueViolation_OtherCodes(t *testing.T) {
 		t.Fatal("nil must not be unique violation")
 	}
 }
+
+func TestIsEmployeeGradeActiveUniqueViolation(t *testing.T) {
+	active := &pgconn.PgError{
+		Code:           "23505",
+		ConstraintName: "ux_hr_test_employee_grades_employee_id_status_active",
+	}
+	if !IsEmployeeGradeActiveUniqueViolation(active) {
+		t.Fatal("active unique index must match")
+	}
+	pk := &pgconn.PgError{Code: "23505", ConstraintName: "hr_employee_grades_pkey"}
+	if IsEmployeeGradeActiveUniqueViolation(pk) {
+		t.Fatal("primary key unique must not match active conflict")
+	}
+	if IsEmployeeGradeActiveUniqueViolation(&pgconn.PgError{Code: "23503"}) {
+		t.Fatal("non-unique must not match")
+	}
+}

@@ -335,7 +335,7 @@ func (s *reportService) ExportGradeReportExcel(filter *types.GradeReportFilter) 
 	headers := []string{
 		"Ad", "Soyad", "Şirket", "Departman", "Yönetici",
 		"İşe Giriş Tarihi", "Ekip Başlangıç Tarihi", "Meslek Başlangıç Tarihi",
-		"Toplam Boşluk (Yıl)", "Toplam Deneyim", "Mevcut Kademe", "Beklenen Kademe",
+		"Toplam Deneyim", "Mevcut Kademe", "Beklenen Kademe",
 	}
 
 	for colIndex, header := range headers {
@@ -359,7 +359,6 @@ func (s *reportService) ExportGradeReportExcel(filter *types.GradeReportFilter) 
 			nilableString(row.HireDate),
 			nilableString(row.TeamStartDate),
 			nilableString(row.ProfessionStartDate),
-			row.TotalGap,
 			row.TotalExperienceText,
 			row.CurrentGrade,
 			row.ExpectedGrade,
