@@ -57,6 +57,7 @@ func buildActiveCurrentGradeSelectSQL() string {
 	return fmt.Sprintf(`
 			SELECT DISTINCT ON (eg.employee_id)
 				eg.employee_id,
+				eg.grade_id AS current_grade_id,
 				g.name AS current_grade
 			FROM %s eg
 			LEFT JOIN %s g

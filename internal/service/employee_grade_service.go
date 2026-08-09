@@ -187,8 +187,8 @@ func (s *employeeGradeService) GetEmployeeGradeByUserID(userID uint) ([]*types.E
 	return result, nil
 }
 
-// UpdateEmployeeGrade allows limited correction of INACTIVE history rows only.
-// ACTIVE rows must be changed via CreateEmployeeGrade (assign). employee_id is immutable.
+// UpdateEmployeeGrade corrects an existing history row without changing its lifecycle state.
+// employee_id is immutable; ACTIVE updates are serialized with grade assignment.
 func (s *employeeGradeService) UpdateEmployeeGrade(id uint, employeeID, gradeID uint, startDate, endDate, modifiedBy string, requestingUserID uint, isAdmin bool) error {
 	existingEmployeeGrade, err := s.employeeGradeRepo.GetByID(id)
 	if err != nil {
@@ -205,10 +205,6 @@ func (s *employeeGradeService) UpdateEmployeeGrade(id uint, employeeID, gradeID 
 		}
 	}
 
-	if existingEmployeeGrade.Status == domain.EmployeeGradeStatusActive {
-		return domain.ErrEmployeeGradeActiveUpdateForbidden
-	}
-
 	if employeeID != existingEmployeeGrade.EmployeeID {
 		return domain.ErrEmployeeGradeEmployeeImmutable
 	}
@@ -218,18 +214,6 @@ func (s *employeeGradeService) UpdateEmployeeGrade(id uint, employeeID, gradeID 
 		return domain.ErrEmployeeGradeInvalidStartDate
 	}
 	startDay := dateOnlyUTC(*startDateParsed)
-
-	if endDate == "" {
-		return domain.ErrEmployeeGradeInactiveRequiresEndDate
-	}
-	endDateParsed, err := parseDate(endDate)
-	if err != nil || endDateParsed == nil {
-		return fmt.Errorf("%w: invalid end date format", domain.ErrEmployeeGradeInactiveRequiresEndDate)
-	}
-	endDay := dateOnlyUTC(*endDateParsed)
-	if endDay.Before(startDay) {
-		return domain.ErrEmployeeGradeEndBeforeStart
-	}
 
 	if _, err := s.gradeRepo.GetByID(int64(gradeID)); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -242,13 +226,40 @@ func (s *employeeGradeService) UpdateEmployeeGrade(id uint, employeeID, gradeID 
 		EmployeeID: existingEmployeeGrade.EmployeeID,
 		GradeID:    gradeID,
 		StartDate:  startDay,
-		EndDate:    &endDay,
-		Status:     domain.EmployeeGradeStatusInactive,
+		Status:     existingEmployeeGrade.Status,
 	}
 	employeeGrade.ID = id
 
-	if err := s.employeeGradeRepo.Update(employeeGrade, modifiedBy); err != nil {
-		return err
+	if existingEmployeeGrade.Status == domain.EmployeeGradeStatusActive {
+		employeeGrade.EndDate = nil
+		if err := s.employeeGradeRepo.Transaction(func(txRepo repository.EmployeeGradeRepository) error {
+			active, err := txRepo.GetActiveByEmployeeIDForUpdate(existingEmployeeGrade.EmployeeID)
+			if err != nil {
+				return fmt.Errorf("failed to lock active employee grade: %w", err)
+			}
+			if active == nil || active.ID != id {
+				return domain.ErrEmployeeGradeActiveConflict
+			}
+			return txRepo.Update(employeeGrade, modifiedBy)
+		}); err != nil {
+			return err
+		}
+	} else {
+		if endDate == "" {
+			return domain.ErrEmployeeGradeInactiveRequiresEndDate
+		}
+		endDateParsed, err := parseDate(endDate)
+		if err != nil || endDateParsed == nil {
+			return fmt.Errorf("%w: invalid end date format", domain.ErrEmployeeGradeInactiveRequiresEndDate)
+		}
+		endDay := dateOnlyUTC(*endDateParsed)
+		if endDay.Before(startDay) {
+			return domain.ErrEmployeeGradeEndBeforeStart
+		}
+		employeeGrade.EndDate = &endDay
+		if err := s.employeeGradeRepo.Update(employeeGrade, modifiedBy); err != nil {
+			return err
+		}
 	}
 
 	updatedEmployeeGrade, _ := s.employeeGradeRepo.GetByID(id)
@@ -263,11 +274,18 @@ func (s *employeeGradeService) DeleteEmployeeGrade(id uint, deletedBy string) er
 		return err
 	}
 
-	if existingEmployeeGrade.Status == domain.EmployeeGradeStatusActive {
-		return domain.ErrEmployeeGradeActiveCannotDelete
-	}
-
-	if err := s.employeeGradeRepo.Delete(id, deletedBy); err != nil {
+	if err := s.employeeGradeRepo.Transaction(func(txRepo repository.EmployeeGradeRepository) error {
+		if existingEmployeeGrade.Status == domain.EmployeeGradeStatusActive {
+			active, err := txRepo.GetActiveByEmployeeIDForUpdate(existingEmployeeGrade.EmployeeID)
+			if err != nil {
+				return fmt.Errorf("failed to lock active employee grade: %w", err)
+			}
+			if active == nil || active.ID != id {
+				return domain.ErrEmployeeGradeActiveConflict
+			}
+		}
+		return txRepo.Delete(id, deletedBy)
+	}); err != nil {
 		return err
 	}
 

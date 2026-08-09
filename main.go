@@ -151,7 +151,7 @@ func main() {
 	contractService := service.NewContractService(contractRepo, employeeContractRepo, auditService)
 	portalContractService := service.NewPortalContractService(portalContractRepo, employeeRepo)
 	expenseService := service.NewExpenseService(expenseRepo, expenseTypeRepo, attachmentRepo, employeeRepo, storageProvider, auditService)
-	reportService := service.NewReportService(employeeRepo, workInfoRepo, leaveRepo, holidayRepo, leaveService)
+	reportService := service.NewReportService(employeeRepo, workInfoRepo, leaveRepo, holidayRepo, gradeRepo, leaveService)
 	jobService := service.NewJobService(jobRepo, auditService)
 	eventService := service.NewEventService(eventRepo, eventParticipantRepo, userRepo, employeeRepo, emailService, mailConfigService, cfg)
 	faqService := service.NewFAQService(faqRepo, auditService)
