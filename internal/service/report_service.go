@@ -3,8 +3,11 @@ package service
 import (
 	"fmt"
 	"reflect"
+	"sort"
+	"strings"
 	"time"
 
+	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/repository"
 	"kartezya-hr/internal/types"
 
@@ -26,7 +29,9 @@ type reportService struct {
 	workInfoRepo repository.WorkInformationRepository
 	leaveRepo    repository.LeaveRepository
 	holidayRepo  repository.HolidayRepository
+	gradeRepo    repository.GradeRepository
 	leaveService LeaveService
+	now          func() time.Time
 }
 
 func NewReportService(
@@ -34,6 +39,7 @@ func NewReportService(
 	workInfoRepo repository.WorkInformationRepository,
 	leaveRepo repository.LeaveRepository,
 	holidayRepo repository.HolidayRepository,
+	gradeRepo repository.GradeRepository,
 	leaveService LeaveService,
 ) ReportService {
 	return &reportService{
@@ -41,7 +47,9 @@ func NewReportService(
 		workInfoRepo: workInfoRepo,
 		leaveRepo:    leaveRepo,
 		holidayRepo:  holidayRepo,
+		gradeRepo:    gradeRepo,
 		leaveService: leaveService,
+		now:          time.Now,
 	}
 }
 
@@ -314,11 +322,154 @@ func (s *reportService) GetGradeReportData(filter *types.GradeReportFilter) (*ty
 		return nil, fmt.Errorf("failed to get grade report data: %w", err)
 	}
 
+	gradeCount, err := s.gradeRepo.GetTotalCount()
+	if err != nil {
+		return nil, fmt.Errorf("failed to count grades for grade report: %w", err)
+	}
+	grades, _, err := s.gradeRepo.GetAll(int(gradeCount), 0, types.SortParams{Sort: "id", Direction: "ASC"})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get grades for grade report: %w", err)
+	}
+	now := s.now
+	if now == nil {
+		now = time.Now
+	}
+	if err := applyExpectedGrades(rows, grades, dateOnlyUTC(now())); err != nil {
+		return nil, fmt.Errorf("failed to calculate expected grades: %w", err)
+	}
+
 	response := &types.GradeReportResponse{
 		Rows: rows,
 	}
 
 	return response, nil
+}
+
+func applyExpectedGrades(rows []types.GradeReportRow, grades []*domain.Grade, asOfDate time.Time) error {
+	sort.SliceStable(grades, func(i, j int) bool {
+		left, right := grades[i], grades[j]
+		if left.MinYear == nil {
+			return false
+		}
+		if right.MinYear == nil {
+			return true
+		}
+		if *left.MinYear != *right.MinYear {
+			return *left.MinYear < *right.MinYear
+		}
+		return left.ID < right.ID
+	})
+
+	gradesByID := make(map[int64]*domain.Grade, len(grades))
+	gradesByName := make(map[string]*domain.Grade, len(grades))
+	for _, grade := range grades {
+		gradesByID[int64(grade.ID)] = grade
+		gradesByName[grade.Name] = grade
+		gradesByName[normalizeGradeLabel(grade.Name)] = grade
+	}
+
+	for index := range rows {
+		row := &rows[index]
+		row.ExpectedGrade = row.CurrentGrade
+		if row.ProfessionStartDate == nil || row.CurrentGrade == "" {
+			continue
+		}
+
+		currentGrade := resolveCurrentReportGrade(row, gradesByID, gradesByName)
+		if currentGrade == nil {
+			return fmt.Errorf("employee %d current grade %q could not be resolved", row.ID, row.CurrentGrade)
+		}
+		if currentGrade.MaxYear == nil {
+			continue
+		}
+		nextGrade := findNextReportGrade(grades, currentGrade)
+		if nextGrade == nil {
+			continue
+		}
+
+		professionStartDate, professionStartErr := parseDate(*row.ProfessionStartDate)
+		if professionStartErr != nil || professionStartDate == nil {
+			continue
+		}
+
+		if expectedGradeTransitionSoon(
+			dateOnlyUTC(*professionStartDate),
+			asOfDate,
+			*currentGrade.MaxYear,
+		) {
+			row.ExpectedGrade = nextGrade.Name
+		}
+	}
+	return nil
+}
+
+func resolveCurrentReportGrade(
+	row *types.GradeReportRow,
+	gradesByID map[int64]*domain.Grade,
+	gradesByName map[string]*domain.Grade,
+) *domain.Grade {
+	if row.CurrentGradeID != nil {
+		if grade := gradesByID[*row.CurrentGradeID]; grade != nil {
+			return grade
+		}
+	}
+	if grade := gradesByName[row.CurrentGrade]; grade != nil {
+		return grade
+	}
+	return gradesByName[normalizeGradeLabel(row.CurrentGrade)]
+}
+
+func normalizeGradeLabel(label string) string {
+	label = strings.TrimSpace(label)
+	if rangeStart := strings.Index(label, "("); rangeStart >= 0 {
+		label = strings.TrimSpace(label[:rangeStart])
+	}
+	return strings.ToUpper(label)
+}
+
+func findNextReportGrade(grades []*domain.Grade, currentGrade *domain.Grade) *domain.Grade {
+	if currentGrade == nil || currentGrade.MaxYear == nil {
+		return nil
+	}
+	for _, grade := range grades {
+		if grade.ID != currentGrade.ID && grade.MinYear != nil && *grade.MinYear >= *currentGrade.MaxYear {
+			return grade
+		}
+	}
+	return nil
+}
+
+func expectedGradeTransitionSoon(professionStartDate, asOfDate time.Time, transitionYear int) bool {
+	if transitionYear < 0 || asOfDate.Before(professionStartDate) {
+		return false
+	}
+
+	nextTransition := addCalendarYears(professionStartDate, transitionYear)
+	threshold := addCalendarMonths(nextTransition, -9)
+	return !asOfDate.Before(threshold)
+}
+
+func addCalendarYears(date time.Time, years int) time.Time {
+	return calendarDate(date.Year()+years, date.Month(), date.Day())
+}
+
+func addCalendarMonths(date time.Time, months int) time.Time {
+	monthIndex := int(date.Month()) - 1 + months
+	year := date.Year() + monthIndex/12
+	month := monthIndex % 12
+	if month < 0 {
+		month += 12
+		year--
+	}
+	return calendarDate(year, time.Month(month+1), date.Day())
+}
+
+func calendarDate(year int, month time.Month, day int) time.Time {
+	lastDay := time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
+	if day > lastDay {
+		day = lastDay
+	}
+	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 }
 
 // ExportGradeReportExcel exports grade report data as an Excel file

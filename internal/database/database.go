@@ -131,6 +131,13 @@ func (d *Database) Migrate() error {
 	if err != nil {
 		return fmt.Errorf("auto-migration failed: %w", err)
 	}
+	backfilledGrades, err := BackfillMissingGradeBounds(d.DB)
+	if err != nil {
+		return fmt.Errorf("grade bounds backfill failed: %w", err)
+	}
+	if backfilledGrades > 0 {
+		log.Printf("Backfilled bounds for %d grade records", backfilledGrades)
+	}
 
 	// Partial unique indexes / CHECK constraints are not managed by GORM AutoMigrate.
 	// Employee grade: full status migration (column + backfill + CHECKs + indexes)

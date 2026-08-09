@@ -521,6 +521,7 @@ type GradeReportRow struct {
 	TeamStartDate       *string `json:"team_start_date"`
 	ProfessionStartDate *string `json:"profession_start_date"`
 	TotalExperienceText string  `json:"total_experience_text"`
+	CurrentGradeID      *int64  `json:"-" gorm:"column:current_grade_id"`
 	CurrentGrade        string  `json:"current_grade"`
 	ExpectedGrade       string  `json:"expected_grade"`
 }

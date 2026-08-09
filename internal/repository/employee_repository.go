@@ -1200,12 +1200,12 @@ func gradeReportExperienceExprSQL() string {
 
 // GetGradeReportData executes the grade report SQL query.
 // current_grade is ACTIVE EmployeeGrade SoT (not date-window history).
+// Expected-grade business rules are applied by reportService.
 // Experience is AGE(profession_start_date) only — no total_gap subtraction.
 func (r *employeeRepository) GetGradeReportData(companyID *uint, departmentIDs []uint, isActive *bool) ([]types.GradeReportRow, error) {
 	var rows []types.GradeReportRow
 
 	employees := domain.GetTableName("hr_employees")
-	grades := domain.GetTableName("hr_grades")
 	workInfo := domain.GetTableName("hr_employee_work_information")
 	companies := domain.GetTableName("hr_companies")
 	departments := domain.GetTableName("hr_departments")
@@ -1248,24 +1248,6 @@ WITH experience_calc AS (
     WHERE e.deleted = false
 ),
 
-expected_grade_calc AS (
-    SELECT
-        ec.*,
-        (ec.total_experience + 0.5) AS expected_experience
-    FROM experience_calc ec
-),
-
-expected_grade AS (
-    SELECT
-        egc.*,
-        g.id AS expected_grade_id,
-        g.name AS expected_grade
-    FROM expected_grade_calc egc
-    LEFT JOIN %s g
-        ON egc.expected_experience >= g.min_year
-            AND egc.expected_experience < g.max_year
-),
-
 current_grade AS (
 %s
 ),
@@ -1298,16 +1280,16 @@ SELECT
     t.manager,
     t.start_date AS team_start_date,
     e.profession_start_date,
-    e.total_experience_text,
+	e.total_experience_text,
+	CAST(cg.current_grade_id AS BIGINT) AS current_grade_id,
     cg.current_grade,
-    eg.expected_grade
+	'' AS expected_grade
 
-FROM expected_grade eg
-JOIN experience_calc e ON e.id = eg.id
+FROM experience_calc e
 LEFT JOIN current_grade cg ON cg.employee_id = e.id
 LEFT JOIN team_info t ON t.employee_id = e.id
 WHERE 1=1`,
-		experienceExpr, employees, grades, currentGradeSelect, workInfo, companies, departments)
+		experienceExpr, employees, currentGradeSelect, workInfo, companies, departments)
 
 	// Build dynamic parameters list
 	params := []interface{}{}

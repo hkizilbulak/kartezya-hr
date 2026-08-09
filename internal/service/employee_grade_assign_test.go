@@ -24,8 +24,9 @@ func (s *stubEGAudit) CreateAuditLog(entityName string, entityID uint, action st
 }
 
 type stubEGEmployeeRepo struct {
-	employee *domain.Employee
-	err      error
+	employee        *domain.Employee
+	gradeReportRows []types.GradeReportRow
+	err             error
 }
 
 func (s *stubEGEmployeeRepo) Create(employee *domain.Employee, createdBy string) error { return nil }
@@ -80,7 +81,7 @@ func (s *stubEGEmployeeRepo) GetWorkDayReportData(startDate, endDate string, com
 	return nil, nil
 }
 func (s *stubEGEmployeeRepo) GetGradeReportData(companyID *uint, departmentIDs []uint, isActive *bool) ([]types.GradeReportRow, error) {
-	return nil, nil
+	return s.gradeReportRows, nil
 }
 func (s *stubEGEmployeeRepo) GetContractReportData(startDate, endDate string, companyID *uint, departmentIDs []uint, isActive *bool) ([]types.ContractReportRow, error) {
 	return nil, nil
@@ -90,8 +91,9 @@ func (s *stubEGEmployeeRepo) InTransaction(fn func(empRepo repository.EmployeeRe
 }
 
 type stubEGGradeRepo struct {
-	grade *domain.Grade
-	err   error
+	grade  *domain.Grade
+	grades []*domain.Grade
+	err    error
 }
 
 func (s *stubEGGradeRepo) Create(grade *domain.Grade, createdBy string) error { return nil }
@@ -106,12 +108,14 @@ func (s *stubEGGradeRepo) GetByID(id int64) (*domain.Grade, error) {
 }
 func (s *stubEGGradeRepo) GetByName(name string) (*domain.Grade, error) { return nil, nil }
 func (s *stubEGGradeRepo) GetAll(limit, offset int, sortParams types.SortParams) ([]*domain.Grade, int64, error) {
-	return nil, 0, nil
+	return s.grades, int64(len(s.grades)), s.err
 }
 func (s *stubEGGradeRepo) GetLookup() ([]domain.Grade, error)                  { return nil, nil }
 func (s *stubEGGradeRepo) Update(grade *domain.Grade, modifiedBy string) error { return nil }
 func (s *stubEGGradeRepo) Delete(id int64, deletedBy string) error             { return nil }
-func (s *stubEGGradeRepo) GetTotalCount() (int64, error)                       { return 0, nil }
+func (s *stubEGGradeRepo) GetTotalCount() (int64, error) {
+	return int64(len(s.grades)), s.err
+}
 
 type stubEmployeeGradeRepo struct {
 	mu         sync.Mutex
@@ -507,7 +511,7 @@ func TestCreateEmployeeGrade_IgnoresClientEndDate(t *testing.T) {
 	}
 }
 
-func TestDeleteEmployeeGrade_ActiveRejected(t *testing.T) {
+func TestDeleteEmployeeGrade_ActiveSoftDeletesAndClearsCurrent(t *testing.T) {
 	repo := newStubEmployeeGradeRepo(&domain.EmployeeGrade{
 		AuditableModel: domain.AuditableModel{ID: 5},
 		EmployeeID:     1,
@@ -517,12 +521,18 @@ func TestDeleteEmployeeGrade_ActiveRejected(t *testing.T) {
 	})
 	svc, _ := newEmployeeGradeServiceForTest(repo)
 
-	err := svc.DeleteEmployeeGrade(5, "hr@test")
-	if !errors.Is(err, domain.ErrEmployeeGradeActiveCannotDelete) {
-		t.Fatalf("got %v", err)
+	if err := svc.DeleteEmployeeGrade(5, "hr@test"); err != nil {
+		t.Fatalf("delete: %v", err)
 	}
-	if repo.records[5].Deleted {
-		t.Fatal("active row must not be deleted")
+	if !repo.records[5].Deleted || repo.records[5].Status != domain.EmployeeGradeStatusInactive {
+		t.Fatalf("unexpected delete state %#v", repo.records[5])
+	}
+	active, err := repo.GetActiveByEmployeeIDForUpdate(1)
+	if err != nil {
+		t.Fatalf("get current: %v", err)
+	}
+	if active != nil {
+		t.Fatalf("deleted ACTIVE must not remain current: %#v", active)
 	}
 }
 
@@ -546,7 +556,7 @@ func TestDeleteEmployeeGrade_InactiveSoftDeletes(t *testing.T) {
 	}
 }
 
-func TestUpdateEmployeeGrade_ActiveRejected(t *testing.T) {
+func TestUpdateEmployeeGrade_ActiveUpdatesInPlace(t *testing.T) {
 	repo := newStubEmployeeGradeRepo(&domain.EmployeeGrade{
 		AuditableModel: domain.AuditableModel{ID: 5},
 		EmployeeID:     1,
@@ -556,9 +566,21 @@ func TestUpdateEmployeeGrade_ActiveRejected(t *testing.T) {
 	})
 	svc, _ := newEmployeeGradeServiceForTest(repo)
 
-	err := svc.UpdateEmployeeGrade(5, 1, 2, "2026-01-01", "2026-02-01", "hr@test", 10, true)
-	if !errors.Is(err, domain.ErrEmployeeGradeActiveUpdateForbidden) {
-		t.Fatalf("got %v", err)
+	if err := svc.UpdateEmployeeGrade(5, 1, 2, "2026-01-05", "", "hr@test", 10, true); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	got := repo.records[5]
+	if got.GradeID != 2 || got.Status != domain.EmployeeGradeStatusActive || got.EndDate != nil {
+		t.Fatalf("unexpected active update %#v", got)
+	}
+	activeCount := 0
+	for _, record := range repo.records {
+		if !record.Deleted && record.Status == domain.EmployeeGradeStatusActive {
+			activeCount++
+		}
+	}
+	if activeCount != 1 {
+		t.Fatalf("active count = %d, want 1", activeCount)
 	}
 }
 
