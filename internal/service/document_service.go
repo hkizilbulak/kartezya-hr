@@ -328,6 +328,12 @@ func (s *documentService) authorizeLinkTarget(relatedType domain.AttachmentRelat
 		}
 		return errors.New("access denied: not authorized to link documents to this user record")
 
+	case domain.AttachmentRelatedTypeAcademy:
+		if authz.HasCapability(roles, authz.CanManageAcademy) {
+			return nil
+		}
+		return errors.New("access denied: not authorized to link documents to academy trainings")
+
 	default:
 		return errors.New("access denied: unsupported or unauthorized document link target")
 	}

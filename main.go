@@ -107,6 +107,9 @@ func main() {
 	otherRequestRepo := repository.NewOtherRequestRepository(db.DB)
 	mailConfigRepo := repository.NewMailConfigRepository(db.DB)
 	settingsRepo := repository.NewSettingsRepository(db.DB)
+	academyTrainingRepo := repository.NewTrainingRepository(db.DB)
+	academyAssignmentRepo := repository.NewAssignmentRepository(db.DB)
+	academyCertificateRepo := repository.NewCertificateRepository(db.DB)
 
 	// Initialize storage provider
 	var storageProvider service.StorageProvider
@@ -144,7 +147,7 @@ func main() {
 	companyService := service.NewCompanyService(companyRepo, departmentRepo, departmentService, auditService)
 	jobPositionService := service.NewJobPositionService(jobPositionRepo, auditService)
 	workInfoService := service.NewWorkInformationService(workInfoRepo, employeeRepo, companyRepo, departmentRepo, jobPositionRepo, auditService)
-	lookupService := service.NewLookupService(companyRepo, departmentRepo, jobPositionRepo, leaveTypeRepo, gradeRepo, roleRepo)
+	lookupService := service.NewLookupService(companyRepo, departmentRepo, jobPositionRepo, leaveTypeRepo, gradeRepo, roleRepo, employeeRepo)
 	gradeService := service.NewGradeService(gradeRepo, auditService)
 	employeeGradeService := service.NewEmployeeGradeService(employeeGradeRepo, employeeRepo, gradeRepo, auditService)
 	employeeContractService := service.NewEmployeeContractService(employeeContractRepo, employeeRepo, auditService)
@@ -157,6 +160,7 @@ func main() {
 	faqService := service.NewFAQService(faqRepo, auditService)
 	otherRequestService := service.NewOtherRequestService(otherRequestRepo, attachmentRepo, auditService, emailService, storageProvider, employeeRepo, mailConfigService)
 	settingsService := service.NewSettingsService(settingsRepo, auditService)
+	academyService := service.NewAcademyService(academyTrainingRepo, academyAssignmentRepo, academyCertificateRepo, employeeRepo, auditService)
 
 	// Initialize and start scheduled jobs
 	scheduler := jobs.NewScheduler(db.DB, documentService, jobService, emailService, mailConfigService, reportService)
@@ -188,6 +192,7 @@ func main() {
 	emailHandler := handler.NewEmailHandler(emailService, mailConfigService, cfg)
 	mailConfigHandler := handler.NewMailConfigHandler(mailConfigService)
 	settingsHandler := handler.NewSettingsHandler(settingsService)
+	academyHandler := handler.NewAcademyHandler(academyService, employeeRepo, documentService)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -268,6 +273,7 @@ func main() {
 		lookup.GET("/departments", lookupHandler.GetDepartmentsLookup)
 		lookup.GET("/departments-by-company", lookupHandler.GetDepartmentsByCompanyLookup)
 		lookup.GET("/job-positions", lookupHandler.GetJobPositionsLookup)
+		lookup.GET("/employees", lookupHandler.GetEmployeesLookup)
 		lookup.GET("/leave-types", lookupHandler.GetLeaveTypesLookup)
 		lookup.GET("/grades", lookupHandler.GetGradesLookup)
 	}
@@ -626,6 +632,26 @@ func main() {
 			jobRoutes.PUT("/:id", jobHandler.UpdateJob)
 			jobRoutes.POST("/:id/run", jobHandler.RunJob)
 			jobRoutes.GET("/:id/history", jobHandler.GetJobHistory)
+		}
+		// Kartezya Akademi routes
+		academyRoutes := protected.Group("/academy")
+		{
+			// Tüm yetkili kullanıcılar
+			academyRoutes.GET("/trainings", academyHandler.ListTrainings)
+			academyRoutes.GET("/trainings/:id", academyHandler.GetTraining)
+			academyRoutes.GET("/assignments/me", academyHandler.GetMyAssignments)
+			academyRoutes.POST("/assignments/:id/start", academyHandler.StartTraining)
+			academyRoutes.POST("/assignments/:id/complete", academyHandler.CompleteTraining)
+			academyRoutes.GET("/certificates/me", academyHandler.GetMyCertificates)
+			academyRoutes.GET("/certificates/:code", academyHandler.GetCertificateByCode)
+
+			// Admin / HR
+			academyRoutes.POST("/trainings", authMiddleware.RequireCapability(authz.CanManageAcademy), academyHandler.CreateTraining)
+			academyRoutes.PUT("/trainings/:id", authMiddleware.RequireCapability(authz.CanManageAcademy), academyHandler.UpdateTraining)
+			academyRoutes.DELETE("/trainings/:id", authMiddleware.RequireCapability(authz.CanManageAcademy), academyHandler.DeleteTraining)
+			academyRoutes.POST("/trainings/:id/assign", authMiddleware.RequireCapability(authz.CanManageAcademy), academyHandler.AssignEmployee)
+			academyRoutes.GET("/trainings/:id/assignments", authMiddleware.RequireCapability(authz.CanManageAcademy), academyHandler.ListTrainingAssignments)
+			academyRoutes.DELETE("/assignments/:id", authMiddleware.RequireCapability(authz.CanManageAcademy), academyHandler.RemoveAssignment)
 		}
 	}
 

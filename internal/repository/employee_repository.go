@@ -20,6 +20,7 @@ type EmployeeRepository interface {
 	GetByCompanyEmail(companyEmail string) (*domain.Employee, error)
 	GetAll(limit, offset int, sortParams types.SortParams) ([]*domain.Employee, int64, error)
 	GetAllWithFilters(limit, offset int, sortParams types.SortParams, filters map[string]interface{}) ([]*domain.Employee, int64, error)
+	GetLookupList() ([]*domain.Employee, error)
 	Update(employee *domain.Employee, modifiedBy string) error
 	Delete(id uint, deletedBy string) error
 	GetTotalCount() (int64, error)
@@ -42,6 +43,15 @@ type employeeRepository struct {
 
 func NewEmployeeRepository(db *gorm.DB) EmployeeRepository {
 	return &employeeRepository{db: db}
+}
+
+func (r *employeeRepository) GetLookupList() ([]*domain.Employee, error) {
+	var employees []*domain.Employee
+	err := r.db.Select("id, first_name, last_name, company_email").
+		Where("deleted = ?", false).
+		Order("first_name ASC, last_name ASC").
+		Find(&employees).Error
+	return employees, err
 }
 
 func normalizeFilterValue(value interface{}) string {

@@ -198,3 +198,26 @@ func (h *LookupHandler) GetRolesLookup(c *gin.Context) {
 		Data:    roles,
 	})
 }
+
+// GetEmployeesLookup godoc
+// @Summary Get all employees for lookup
+// @Description Get all employees as lookup data
+// @Tags Lookup
+// @Produce json
+// @Success 200 {object} APIResponse{data=[]types.EmployeeLookup}
+// @Router /lookup/employees [get]
+func (h *LookupHandler) GetEmployeesLookup(c *gin.Context) {
+	employees, err := h.lookupService.GetEmployeesLookup()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, APIResponse{
+		Success: true,
+		Data:    employees,
+	})
+}

@@ -19,6 +19,7 @@ const (
 	CanManageOtherRequests   Capability = "canManageOtherRequests"
 	CanManageRequestTypes    Capability = "canManageRequestTypes"
 	CanAccessAdminModules    Capability = "canAccessAdminModules"
+	CanManageAcademy         Capability = "canManageAcademy"
 )
 
 // RoleCapabilities maps each role to the capabilities granted by this ticket.
@@ -38,6 +39,7 @@ var RoleCapabilities = map[string][]Capability{
 		CanManageOtherRequests,
 		CanManageRequestTypes,
 		CanAccessAdminModules,
+		CanManageAcademy,
 	},
 	domain.RoleHR: {
 		CanViewEmployees,
@@ -52,6 +54,7 @@ var RoleCapabilities = map[string][]Capability{
 		CanManageOtherRequests,
 		CanManageRequestTypes,
 		CanAccessAdminModules,
+		CanManageAcademy,
 	},
 	domain.RoleFinancial: {
 		CanViewEmployees,
