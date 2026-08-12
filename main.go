@@ -107,9 +107,12 @@ func main() {
 	otherRequestRepo := repository.NewOtherRequestRepository(db.DB)
 	mailConfigRepo := repository.NewMailConfigRepository(db.DB)
 	settingsRepo := repository.NewSettingsRepository(db.DB)
+
+	// Academy Repositories
 	academyTrainingRepo := repository.NewTrainingRepository(db.DB)
 	academyAssignmentRepo := repository.NewAssignmentRepository(db.DB)
 	academyCertificateRepo := repository.NewCertificateRepository(db.DB)
+	academySurveyRepo := repository.NewAcademySurveyRepository(db.DB)
 
 	// Initialize storage provider
 	var storageProvider service.StorageProvider
@@ -160,7 +163,7 @@ func main() {
 	faqService := service.NewFAQService(faqRepo, auditService)
 	otherRequestService := service.NewOtherRequestService(otherRequestRepo, attachmentRepo, auditService, emailService, storageProvider, employeeRepo, mailConfigService)
 	settingsService := service.NewSettingsService(settingsRepo, auditService)
-	academyService := service.NewAcademyService(academyTrainingRepo, academyAssignmentRepo, academyCertificateRepo, employeeRepo, auditService)
+	academyService := service.NewAcademyService(academyTrainingRepo, academyAssignmentRepo, academyCertificateRepo, employeeRepo, academySurveyRepo, auditService)
 
 	// Initialize and start scheduled jobs
 	scheduler := jobs.NewScheduler(db.DB, documentService, jobService, emailService, mailConfigService, reportService)
@@ -644,6 +647,10 @@ func main() {
 			academyRoutes.POST("/assignments/:id/complete", academyHandler.CompleteTraining)
 			academyRoutes.GET("/certificates/me", academyHandler.GetMyCertificates)
 			academyRoutes.GET("/certificates/:code", academyHandler.GetCertificateByCode)
+			
+			// Anket (Surveys) - Herkes
+			academyRoutes.GET("/surveys", academyHandler.ListSurveys)
+			academyRoutes.POST("/surveys/:id/vote", academyHandler.SubmitSurveyVote)
 
 			// Admin / HR
 			academyRoutes.POST("/trainings", authMiddleware.RequireCapability(authz.CanManageAcademy), academyHandler.CreateTraining)
@@ -652,6 +659,10 @@ func main() {
 			academyRoutes.POST("/trainings/:id/assign", authMiddleware.RequireCapability(authz.CanManageAcademy), academyHandler.AssignEmployee)
 			academyRoutes.GET("/trainings/:id/assignments", authMiddleware.RequireCapability(authz.CanManageAcademy), academyHandler.ListTrainingAssignments)
 			academyRoutes.DELETE("/assignments/:id", authMiddleware.RequireCapability(authz.CanManageAcademy), academyHandler.RemoveAssignment)
+			
+			// Anket (Surveys) - Admin
+			academyRoutes.POST("/surveys", authMiddleware.RequireCapability(authz.CanManageAcademy), academyHandler.CreateSurvey)
+			academyRoutes.DELETE("/surveys/:id", authMiddleware.RequireCapability(authz.CanManageAcademy), academyHandler.DeleteSurvey)
 		}
 	}
 

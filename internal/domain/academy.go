@@ -25,7 +25,7 @@ type Training struct {
 	Title       string         `json:"title" gorm:"type:varchar(255);not null"`
 	Description string         `json:"description" gorm:"type:text"`
 	Duration    int            `json:"duration" gorm:"default:0"` // dakika cinsinden tahmini süre
-	Status      TrainingStatus `json:"status" gorm:"size:20;not null;default:'ACTIVE'"`
+	Status      TrainingStatus `json:"status" gorm:"type:varchar(20);default:'ACTIVE'"`
 	// İlişkili dosyalar Attachment tablosu üzerinden tutulur (AttachmentRelatedTypeAcademy).
 }
 
@@ -68,4 +68,45 @@ type TrainingCertificate struct {
 
 func (TrainingCertificate) TableName() string {
 	return GetTableName("training_certificates")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Academy Survey Models
+// ─────────────────────────────────────────────────────────────────────────────
+
+// AcademySurvey admin tarafından oluşturulan akademideki ankettir.
+type AcademySurvey struct {
+	AuditableModel
+	Title         string                `json:"title" gorm:"type:varchar(255);not null"`
+	Description   string                `json:"description" gorm:"type:text"`
+	IsMultiSelect bool                  `json:"is_multi_select" gorm:"default:false"`
+	IsActive      bool                  `json:"is_active" gorm:"default:true"`
+	Options       []AcademySurveyOption `json:"options,omitempty" gorm:"foreignKey:SurveyID;constraint:OnDelete:CASCADE"`
+}
+
+func (AcademySurvey) TableName() string {
+	return GetTableName("academy_surveys")
+}
+
+// AcademySurveyOption anketin şıklarını/maddelerini belirtir.
+type AcademySurveyOption struct {
+	AuditableModel
+	SurveyID uint   `json:"survey_id" gorm:"not null;index"`
+	Text     string `json:"text" gorm:"type:varchar(255);not null"`
+}
+
+func (AcademySurveyOption) TableName() string {
+	return GetTableName("academy_survey_options")
+}
+
+// AcademySurveyResponse çalışanların anketlere verdikleri oyları (seçimleri) tutar.
+type AcademySurveyResponse struct {
+	AuditableModel
+	SurveyID   uint `json:"survey_id" gorm:"not null;index"`
+	EmployeeID uint `json:"employee_id" gorm:"not null;index"`
+	OptionID   uint `json:"option_id" gorm:"not null;index"`
+}
+
+func (AcademySurveyResponse) TableName() string {
+	return GetTableName("academy_survey_responses")
 }

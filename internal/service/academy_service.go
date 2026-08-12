@@ -36,6 +36,14 @@ type AcademyService interface {
 	// Certificates
 	GetMyCertificates(employeeID uint) ([]*domain.TrainingCertificate, error)
 	GetCertificateByCode(code string) (*domain.TrainingCertificate, error)
+
+	// Surveys
+	CreateSurvey(survey *domain.AcademySurvey, userEmail string) error
+	GetSurvey(id uint) (*domain.AcademySurvey, error)
+	ListSurveys(isAdmin bool, limit, offset int) ([]*domain.AcademySurvey, int64, error)
+	DeleteSurvey(id uint, userEmail string) error
+	SubmitSurveyVote(surveyID, employeeID uint, optionIDs []uint, userEmail string) error
+	GetSurveyResults(surveyID uint) (map[uint]int, error)
 }
 
 type academyService struct {
@@ -43,6 +51,7 @@ type academyService struct {
 	assignmentRepo  repository.AssignmentRepository
 	certificateRepo repository.CertificateRepository
 	employeeRepo    repository.EmployeeRepository
+	surveyRepo      repository.AcademySurveyRepository
 	auditService    AuditService
 }
 
@@ -50,14 +59,16 @@ func NewAcademyService(
 	trainingRepo repository.TrainingRepository,
 	assignmentRepo repository.AssignmentRepository,
 	certificateRepo repository.CertificateRepository,
-	employeeRepo    repository.EmployeeRepository,
-	auditService    AuditService,
+	employeeRepo repository.EmployeeRepository,
+	surveyRepo repository.AcademySurveyRepository,
+	auditService AuditService,
 ) AcademyService {
 	return &academyService{
 		trainingRepo:    trainingRepo,
 		assignmentRepo:  assignmentRepo,
 		certificateRepo: certificateRepo,
 		employeeRepo:    employeeRepo,
+		surveyRepo:      surveyRepo,
 		auditService:    auditService,
 	}
 }
@@ -227,4 +238,80 @@ func (s *academyService) GetCertificateByCode(code string) (*domain.TrainingCert
 func generateCertCode() string {
 	id := uuid.New()
 	return fmt.Sprintf("KA-%s", id.String()[:8])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Academy Survey
+// ─────────────────────────────────────────────────────────────────────────────
+
+func (s *academyService) CreateSurvey(survey *domain.AcademySurvey, userEmail string) error {
+	return s.surveyRepo.Create(survey, userEmail)
+}
+
+func (s *academyService) GetSurvey(id uint) (*domain.AcademySurvey, error) {
+	return s.surveyRepo.GetByID(id)
+}
+
+func (s *academyService) ListSurveys(isAdmin bool, limit, offset int) ([]*domain.AcademySurvey, int64, error) {
+	if isAdmin {
+		return s.surveyRepo.ListAll(limit, offset)
+	}
+	return s.surveyRepo.ListActive(limit, offset)
+}
+
+func (s *academyService) DeleteSurvey(id uint, userEmail string) error {
+	return s.surveyRepo.Delete(id, userEmail)
+}
+
+func (s *academyService) SubmitSurveyVote(surveyID, employeeID uint, optionIDs []uint, userEmail string) error {
+	survey, err := s.surveyRepo.GetByID(surveyID)
+	if err != nil {
+		return err
+	}
+	if !survey.IsActive {
+		return errors.New("anket aktif değil")
+	}
+
+	hasResponded, err := s.surveyRepo.HasUserResponded(surveyID, employeeID)
+	if err != nil {
+		return err
+	}
+	if hasResponded {
+		return errors.New("bu ankete daha önce katıldınız")
+	}
+
+	if !survey.IsMultiSelect && len(optionIDs) > 1 {
+		return errors.New("bu ankette birden fazla seçim yapılamaz")
+	}
+	if len(optionIDs) == 0 {
+		return errors.New("en az bir seçim yapmalısınız")
+	}
+
+	// Validate options exist in survey
+	validOptions := make(map[uint]bool)
+	for _, opt := range survey.Options {
+		validOptions[opt.ID] = true
+	}
+	var responses []domain.AcademySurveyResponse
+	for _, optID := range optionIDs {
+		if !validOptions[optID] {
+			return fmt.Errorf("geçersiz seçenek: %d", optID)
+		}
+		responses = append(responses, domain.AcademySurveyResponse{
+			SurveyID:   surveyID,
+			EmployeeID: employeeID,
+			OptionID:   optID,
+		})
+	}
+	
+	for i := range responses {
+		responses[i].CreatedBy = userEmail
+		responses[i].ModifiedBy = userEmail
+	}
+
+	return s.surveyRepo.SubmitResponse(responses)
+}
+
+func (s *academyService) GetSurveyResults(surveyID uint) (map[uint]int, error) {
+	return s.surveyRepo.GetSurveyResults(surveyID)
 }

@@ -126,9 +126,16 @@ func (r *assignmentRepository) GetByEmployeeAndTraining(employeeID, trainingID u
 
 func (r *assignmentRepository) ListByEmployee(employeeID uint) ([]*domain.TrainingAssignment, error) {
 	var list []*domain.TrainingAssignment
+	
+	trainingsTable := domain.GetTableName("trainings")
+	assignmentsTable := domain.GetTableName("training_assignments")
+	
 	err := r.db.Preload("Training").
-		Where("employee_id = ? AND deleted = ?", employeeID, false).
-		Order("created_at DESC").Find(&list).Error
+		Joins("JOIN " + trainingsTable + " ON " + trainingsTable + ".id = " + assignmentsTable + ".training_id").
+		Where(assignmentsTable + ".employee_id = ? AND " + assignmentsTable + ".deleted = ?", employeeID, false).
+		Where(trainingsTable + ".deleted = ?", false).
+		Order(assignmentsTable + ".created_at DESC").Find(&list).Error
+		
 	return list, err
 }
 
@@ -218,4 +225,111 @@ func (r *certificateRepository) ListByEmployee(employeeID uint) ([]*domain.Train
 		Where("employee_id = ? AND deleted = ?", employeeID, false).
 		Order("issued_at DESC").Find(&list).Error
 	return list, err
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Academy Survey Repository
+// ─────────────────────────────────────────────────────────────────────────────
+
+type AcademySurveyRepository interface {
+	Create(survey *domain.AcademySurvey, createdBy string) error
+	GetByID(id uint) (*domain.AcademySurvey, error)
+	ListAll(limit, offset int) ([]*domain.AcademySurvey, int64, error)
+	ListActive(limit, offset int) ([]*domain.AcademySurvey, int64, error)
+	Delete(id uint, deletedBy string) error
+	SubmitResponse(responses []domain.AcademySurveyResponse) error
+	HasUserResponded(surveyID, employeeID uint) (bool, error)
+	GetSurveyResults(surveyID uint) (map[uint]int, error) // map[OptionID]voteCount
+}
+
+type academySurveyRepository struct {
+	db *gorm.DB
+}
+
+func NewAcademySurveyRepository(db *gorm.DB) AcademySurveyRepository {
+	return &academySurveyRepository{db: db}
+}
+
+func (r *academySurveyRepository) Create(survey *domain.AcademySurvey, createdBy string) error {
+	survey.CreatedBy = createdBy
+	survey.ModifiedBy = createdBy
+	for i := range survey.Options {
+		survey.Options[i].CreatedBy = createdBy
+		survey.Options[i].ModifiedBy = createdBy
+	}
+	return r.db.Create(survey).Error
+}
+
+func (r *academySurveyRepository) GetByID(id uint) (*domain.AcademySurvey, error) {
+	var s domain.AcademySurvey
+	err := r.db.Preload("Options").Where("id = ? AND deleted = ?", id, false).First(&s).Error
+	if err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
+func (r *academySurveyRepository) ListAll(limit, offset int) ([]*domain.AcademySurvey, int64, error) {
+	var list []*domain.AcademySurvey
+	var total int64
+	q := r.db.Model(&domain.AcademySurvey{}).Preload("Options").Where("deleted = ?", false)
+	q.Count(&total)
+	err := q.Order("created_at DESC").Limit(limit).Offset(offset).Find(&list).Error
+	return list, total, err
+}
+
+func (r *academySurveyRepository) ListActive(limit, offset int) ([]*domain.AcademySurvey, int64, error) {
+	var list []*domain.AcademySurvey
+	var total int64
+	q := r.db.Model(&domain.AcademySurvey{}).Preload("Options").Where("deleted = ? AND is_active = ?", false, true)
+	q.Count(&total)
+	err := q.Order("created_at DESC").Limit(limit).Offset(offset).Find(&list).Error
+	return list, total, err
+}
+
+func (r *academySurveyRepository) Delete(id uint, deletedBy string) error {
+	return r.db.Model(&domain.AcademySurvey{}).
+		Where("id = ? AND deleted = ?", id, false).
+		Updates(map[string]interface{}{
+			"deleted":     true,
+			"is_active":   false,
+			"modified_by": deletedBy,
+		}).Error
+}
+
+func (r *academySurveyRepository) SubmitResponse(responses []domain.AcademySurveyResponse) error {
+	if len(responses) == 0 {
+		return nil
+	}
+	return r.db.Create(&responses).Error
+}
+
+func (r *academySurveyRepository) HasUserResponded(surveyID, employeeID uint) (bool, error) {
+	var count int64
+	err := r.db.Model(&domain.AcademySurveyResponse{}).
+		Where("survey_id = ? AND employee_id = ? AND deleted = ?", surveyID, employeeID, false).
+		Count(&count).Error
+	return count > 0, err
+}
+
+func (r *academySurveyRepository) GetSurveyResults(surveyID uint) (map[uint]int, error) {
+	type result struct {
+		OptionID uint
+		Count    int
+	}
+	var results []result
+	err := r.db.Model(&domain.AcademySurveyResponse{}).
+		Select("option_id, count(*) as count").
+		Where("survey_id = ? AND deleted = ?", surveyID, false).
+		Group("option_id").
+		Find(&results).Error
+
+	resMap := make(map[uint]int)
+	if err != nil {
+		return resMap, err
+	}
+	for _, r := range results {
+		resMap[r.OptionID] = r.Count
+	}
+	return resMap, nil
 }

@@ -167,14 +167,14 @@ func (h *AcademyHandler) CreateTraining(c *gin.Context) {
 		return
 	}
 
-	// 2. Upload Document
+	// 3. Upload Document
 	attachment, err := h.documentService.UploadDocument(file, userID, domain.AttachmentRelatedTypeAcademy, domain.AttachmentTypeDocument)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Eğitim oluşturuldu ancak PDF yüklenemedi", "details": err.Error()})
 		return
 	}
 
-	// 3. Link Document to Training
+	// 4. Link Document to Training
 	err = h.documentService.LinkDocumentsToRecord([]string{attachment.ID}, domain.AttachmentRelatedTypeAcademy, training.ID, userID, roles)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "PDF eğitime bağlanamadı", "details": err.Error()})
@@ -200,11 +200,14 @@ func (h *AcademyHandler) UpdateTraining(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Geçersiz ID"})
 		return
 	}
+
+
 	var req UpdateTrainingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Geçersiz istek", "details": err.Error()})
 		return
 	}
+
 	userEmail := academyGetUserEmail(c)
 
 	training := &domain.Training{
@@ -512,4 +515,139 @@ func containsAdminOrHR(roles []string) bool {
 		}
 	}
 	return false
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Academy Survey Endpoints
+// ─────────────────────────────────────────────────────────────────────────────
+
+type CreateSurveyRequest struct {
+	Title         string   `json:"title" binding:"required"`
+	Description   string   `json:"description"`
+	IsMultiSelect bool     `json:"is_multi_select"`
+	IsActive      bool     `json:"is_active"`
+	Options       []string `json:"options" binding:"required,min=2"`
+}
+
+type SubmitVoteRequest struct {
+	OptionIDs []uint `json:"option_ids" binding:"required,min=1"`
+}
+
+// CreateSurvey godoc
+func (h *AcademyHandler) CreateSurvey(c *gin.Context) {
+	var req CreateSurveyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	userEmail, _ := c.Get("email")
+	emailStr, _ := userEmail.(string)
+
+	survey := &domain.AcademySurvey{
+		Title:         req.Title,
+		Description:   req.Description,
+		IsMultiSelect: req.IsMultiSelect,
+		IsActive:      req.IsActive,
+	}
+
+	for _, text := range req.Options {
+		survey.Options = append(survey.Options, domain.AcademySurveyOption{Text: text})
+	}
+
+	if err := h.academyService.CreateSurvey(survey, emailStr); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": survey})
+}
+
+// ListSurveys godoc
+func (h *AcademyHandler) ListSurveys(c *gin.Context) {
+	limit := academyParseIntQuery(c, "limit", 20)
+	offset := academyParseIntQuery(c, "offset", 0)
+
+	_, isAdmin := c.Get("isAdmin")
+	rolesRaw, _ := c.Get("roles")
+	roles, _ := rolesRaw.([]string)
+	admin := isAdmin || containsAdminOrHR(roles)
+
+	list, total, err := h.academyService.ListSurveys(admin, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	// Admin ise sonuçları (oy dağılımlarını) da ekleyelim
+	type SurveyResponse struct {
+		*domain.AcademySurvey
+		Results map[uint]int `json:"results,omitempty"`
+	}
+
+	var responseList []SurveyResponse
+	for _, s := range list {
+		sr := SurveyResponse{AcademySurvey: s}
+		if admin {
+			resMap, _ := h.academyService.GetSurveyResults(s.ID)
+			sr.Results = resMap
+		}
+		responseList = append(responseList, sr)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": responseList, "total": total})
+}
+
+// DeleteSurvey godoc
+func (h *AcademyHandler) DeleteSurvey(c *gin.Context) {
+	id, err := academyParseUintParam(c, "id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Geçersiz ID"})
+		return
+	}
+	userEmail, _ := c.Get("email")
+	emailStr, _ := userEmail.(string)
+
+	if err := h.academyService.DeleteSurvey(id, emailStr); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Anket silindi"})
+}
+
+// SubmitSurveyVote godoc
+func (h *AcademyHandler) SubmitSurveyVote(c *gin.Context) {
+	surveyID, err := academyParseUintParam(c, "id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Geçersiz ID"})
+		return
+	}
+
+	var req SubmitVoteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	userIDRaw, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Kullanıcı bilgisi bulunamadı"})
+		return
+	}
+	userID, _ := userIDRaw.(uint)
+
+	emp, err := h.employeeRepo.GetByUserID(userID)
+	if err != nil || emp == nil {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Çalışan profili bulunamadı"})
+		return
+	}
+
+	userEmail, _ := c.Get("email")
+	emailStr, _ := userEmail.(string)
+
+	if err := h.academyService.SubmitSurveyVote(surveyID, emp.ID, req.OptionIDs, emailStr); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Oyunuz kaydedildi"})
 }

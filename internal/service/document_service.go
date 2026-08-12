@@ -392,6 +392,11 @@ func (s *documentService) canAccessDocument(attachment *domain.Attachment, userI
 		return authz.HasCapability(roles, authz.CanManageEmployees)
 	}
 
+	// Any employee can view Academy documents (training PDFs)
+	if attachment.RelatedType == domain.AttachmentRelatedTypeAcademy {
+		return true
+	}
+
 	// Legacy ADMIN role string access for non-personnel generic documents.
 	if s.hasRole(roles, domain.RoleAdmin) {
 		return true
