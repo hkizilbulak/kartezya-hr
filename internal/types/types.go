@@ -163,6 +163,7 @@ type WorkInformationEmployeeLookup struct {
 	ID        uint   `json:"id"`
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
+	CompanyEmail string `json:"company_email,omitempty"`
 }
 
 type WorkInformationCompanyLookup struct {
@@ -241,6 +242,7 @@ type EmployeeLookup struct {
 	ID        uint   `json:"id"`
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
+	CompanyEmail string `json:"company_email,omitempty"`
 }
 
 type AdminLeaveRequestResponse struct {
@@ -434,6 +436,7 @@ type EmployeeGradeLookup struct {
 	ID        uint   `json:"id"`
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
+	CompanyEmail string `json:"company_email,omitempty"`
 }
 
 // EmployeeGradeResponse for detail responses
@@ -467,6 +470,7 @@ type EmployeeContractLookup struct {
 	ID        uint   `json:"id"`
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
+	CompanyEmail string `json:"company_email,omitempty"`
 }
 
 // EmployeeContractResponse for detail responses

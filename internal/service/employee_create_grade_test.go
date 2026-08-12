@@ -29,6 +29,7 @@ func (r *createEmpRepo) Create(employee *domain.Employee, createdBy string) erro
 	return nil
 }
 
+func (r *createEmpRepo) GetLookupList() ([]*domain.Employee, error) { return nil, nil }
 func (r *createEmpRepo) InTransaction(fn func(empRepo repository.EmployeeRepository, gradeRepo repository.EmployeeGradeRepository) error) error {
 	gradeRepo := r.inTxGradeRepo
 	if gradeRepo == nil {

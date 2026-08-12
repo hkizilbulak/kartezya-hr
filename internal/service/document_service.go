@@ -328,6 +328,12 @@ func (s *documentService) authorizeLinkTarget(relatedType domain.AttachmentRelat
 		}
 		return errors.New("access denied: not authorized to link documents to this user record")
 
+	case domain.AttachmentRelatedTypeAcademy:
+		if authz.HasCapability(roles, authz.CanManageAcademy) {
+			return nil
+		}
+		return errors.New("access denied: not authorized to link documents to academy trainings")
+
 	default:
 		return errors.New("access denied: unsupported or unauthorized document link target")
 	}
@@ -384,6 +390,11 @@ func (s *documentService) canAccessDocument(attachment *domain.Attachment, userI
 	// Personnel / CV documents: owner (above) or employee managers — not CanViewEmployees alone.
 	if attachment.RelatedType == domain.AttachmentRelatedTypeEmployee {
 		return authz.HasCapability(roles, authz.CanManageEmployees)
+	}
+
+	// Any employee can view Academy documents (training PDFs)
+	if attachment.RelatedType == domain.AttachmentRelatedTypeAcademy {
+		return true
 	}
 
 	// Legacy ADMIN role string access for non-personnel generic documents.

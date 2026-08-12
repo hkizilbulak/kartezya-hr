@@ -86,6 +86,7 @@ func (s *stubEGEmployeeRepo) GetGradeReportData(companyID *uint, departmentIDs [
 func (s *stubEGEmployeeRepo) GetContractReportData(startDate, endDate string, companyID *uint, departmentIDs []uint, isActive *bool) ([]types.ContractReportRow, error) {
 	return nil, nil
 }
+func (s *stubEGEmployeeRepo) GetLookupList() ([]*domain.Employee, error) { return nil, nil }
 func (s *stubEGEmployeeRepo) InTransaction(fn func(empRepo repository.EmployeeRepository, gradeRepo repository.EmployeeGradeRepository) error) error {
 	return fn(s, newStubEmployeeGradeRepo())
 }

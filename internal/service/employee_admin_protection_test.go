@@ -86,6 +86,7 @@ func (s *stubEmployeeRepoForProtection) GetGradeReportData(companyID *uint, depa
 func (s *stubEmployeeRepoForProtection) GetContractReportData(startDate, endDate string, companyID *uint, departmentIDs []uint, isActive *bool) ([]types.ContractReportRow, error) {
 	return nil, nil
 }
+func (s *stubEmployeeRepoForProtection) GetLookupList() ([]*domain.Employee, error) { return nil, nil }
 func (s *stubEmployeeRepoForProtection) InTransaction(fn func(empRepo repository.EmployeeRepository, gradeRepo repository.EmployeeGradeRepository) error) error {
 	return fn(s, nil)
 }
