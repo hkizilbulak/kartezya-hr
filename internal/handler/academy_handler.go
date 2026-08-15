@@ -139,7 +139,7 @@ func (h *AcademyHandler) CreateTraining(c *gin.Context) {
 
 	file, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Eğitim PDF dosyası zorunludur"})
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Eğitim dosyası zorunludur"})
 		return
 	}
 
@@ -170,14 +170,14 @@ func (h *AcademyHandler) CreateTraining(c *gin.Context) {
 	// 3. Upload Document
 	attachment, err := h.documentService.UploadDocument(file, userID, domain.AttachmentRelatedTypeAcademy, domain.AttachmentTypeDocument)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Eğitim oluşturuldu ancak PDF yüklenemedi", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Eğitim oluşturuldu ancak dosya yüklenemedi", "details": err.Error()})
 		return
 	}
 
 	// 4. Link Document to Training
 	err = h.documentService.LinkDocumentsToRecord([]string{attachment.ID}, domain.AttachmentRelatedTypeAcademy, training.ID, userID, roles)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "PDF eğitime bağlanamadı", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Dosya eğitime bağlanamadı", "details": err.Error()})
 		return
 	}
 

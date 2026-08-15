@@ -72,6 +72,9 @@ func NewDocumentService(
 		"application/vnd.openxmlformats-officedocument.wordprocessingml.document": true,
 		"application/vnd.ms-excel": true,
 		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": true,
+		"video/mp4":       true,
+		"video/quicktime": true,
+		"video/x-msvideo": true,
 	}
 
 	return &documentService{
