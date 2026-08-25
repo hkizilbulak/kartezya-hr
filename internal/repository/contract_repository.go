@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"strings"
 
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/types"
@@ -59,7 +60,10 @@ func (r *contractRepository) GetAll(limit, offset int, sortParams types.SortPara
 		query = query.Where("customer_contact_name ILIKE ?", "%"+filters.CustomerName+"%")
 	}
 	if filters.Status != "" {
-		query = query.Where("status = ?", filters.Status)
+		statuses := strings.Split(filters.Status, ",")
+		if len(statuses) > 0 {
+			query = query.Where("status IN (?)", statuses)
+		}
 	}
 
 	if err := query.Count(&total).Error; err != nil {
