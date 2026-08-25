@@ -35,7 +35,7 @@ Tüm roller için aynı: yalnızca kendi kaydı.
 
 Leave ve expense create: client farklı `employee_id` gönderse bile backend caller employee ID kullanır. Tüm roller yalnızca kendileri adına oluşturabilir.
 
-Diğer ortak: Login / şifre sıfırlama / Yandex (**Public**); Logout, settings, KVKK, FAQ okuma, event portalı, **Dashboard** (**JWT** — tüm giriş yapmış kullanıcılar).
+Diğer ortak: Login / şifre sıfırlama / Yandex (**Public**); Logout, settings, KVKK, FAQ okuma, event portalı (**JWT** — tüm giriş yapmış kullanıcılar).
 
 ---
 
@@ -61,7 +61,7 @@ Diğer ortak: Login / şifre sıfırlama / Yandex (**Public**); Logout, settings
 | Org definitions | Şirket, departman, pozisyon | `/companies`, `/departments`, `/job-positions` | `CanManageOrgMaster` |
 | Reports / Jobs / Mail | Yönetim | `/reports`, `/jobs`, `/emails`, `/mail-configs` | `CanAccessAdminModules` |
 | FAQ / Event management | Yazma | `/faqs`, `/events` | `CanAccessAdminModules` |
-| Dashboard | Veri | `/api/v1/dashboard/...` | JWT |
+| Dashboard | Veri | `/api/v1/dashboard/...` | `CanAccessAdminModules` |
 
 ADMIN notları: başka adına leave oluşturamaz; expense **update** owner-only; expense **delete**’te ADMIN role-string ile başkasını silebilir; generic non-personnel doc’ta ADMIN role-string shortcut vardır.
 
@@ -83,7 +83,7 @@ ADMIN ile aynı yönetim alanlarının çoğu (`CanPayExpense` hariç). İzin y�
 | Other requests | Yönetim + belgeler | `/api/v1/other-requests` | `CanManageOtherRequests` |
 | Personnel documents | Başka kullanıcı | `/api/v1/documents/user/:id` | Owner veya `CanManageEmployees` |
 | Org / Reports / Jobs / Mail / FAQ / Events | Tanım ve admin modüller | `/companies`, `/reports`… | `CanManageOrgMaster` / `CanAccessAdminModules` |
-| Dashboard | Veri | `/api/v1/dashboard/...` | JWT |
+| Dashboard | Veri | `/api/v1/dashboard/...` | `CanAccessAdminModules` |
 
 ### HR — Yapamadıkları
 
@@ -111,7 +111,7 @@ ADMIN ile aynı yönetim alanlarının çoğu (`CanPayExpense` hariç). İzin y�
 | Expense payment | Ödeme | `POST .../pay` | `CanPayExpense` |
 | Expense documents | Tümü | `/api/v1/expense/.../documents` | Owner veya `CanViewExpenseManagement` |
 | Expense types | Tip CRUD | `/api/v1/expense/types` | `CanManageExpenseTypes` |
-| Dashboard / FAQ / Event portal | Okuma / katılım | `/dashboard`, `/faqs`, `/events/dashboard` | JWT |
+| FAQ / Event portal | Okuma / katılım | `/faqs`, `/events/dashboard` | JWT |
 
 #### Masraf işlemleri (FINANCIAL)
 
@@ -155,7 +155,7 @@ Management capability listesi boştur (`RoleCapabilities[EMPLOYEE] = []`). Self-
 | Kendi profil, çalışma bilgisi, sözleşme, derece | Kendi |
 | Kendi izin / masraf / diğer talepler ve belgeleri | Kendi |
 | Kendi belgeleri | Kendi |
-| Dashboard / FAQ okuma / Event portal | JWT (Var) |
+| FAQ okuma / Event portal | JWT (Var) |
 
 ### Erişemediği API’ler
 
@@ -182,7 +182,7 @@ Management capability listesi boştur (`RoleCapabilities[EMPLOYEE] = []`). Self-
 | Masraf silme | Tümü (role-string) | Kendi | Kendi | Kendi |
 | Diğer talep yönetimi | Tümü | Tümü | Yok | Yok |
 | Personel belgeleri | Tümü | Tümü | Yok | Kendi |
-| Dashboard | Var | Var | Var | Var |
+| Dashboard | Var | Var | Yok | Yok |
 
 ---
 
@@ -191,7 +191,7 @@ Management capability listesi boştur (`RoleCapabilities[EMPLOYEE] = []`). Self-
 | Kontrol | Açıklama | Örnek |
 |---|---|---|
 | Public | JWT gerekmez | `/api/v1/auth/login` |
-| JWT | Giriş yeterlidir | `/api/v1/dashboard/...` |
+| JWT | Giriş yeterlidir | `/faqs`, `/events/dashboard` |
 | Ownership | Yalnızca kendi kaydı | `/api/v1/employees/me` |
 | Capability | Role bağlı yönetim | `CanApproveExpense`, `CanPayExpense` |
 | Owner veya Capability | Sahip veya yönetici | Leave / expense / other documents |

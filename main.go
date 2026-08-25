@@ -505,12 +505,12 @@ func main() {
 		// Dashboard routes
 		dashboardRoutes := protected.Group("/dashboard")
 		{
-			dashboardRoutes.GET("/data", dashboardHandler.GetDashboardData)
-			dashboardRoutes.GET("/employees-by-gender", dashboardHandler.GetEmployeesByGender)
-			dashboardRoutes.GET("/employees-by-position", dashboardHandler.GetEmployeesByPosition)
-			dashboardRoutes.GET("/employees-by-company-department", dashboardHandler.GetEmployeesByCompanyDepartment)
-			dashboardRoutes.GET("/interns-by-company-department", dashboardHandler.GetInternsByCompanyDepartment)
-			dashboardRoutes.GET("/employees-by-grade", dashboardHandler.GetEmployeesByGrade)
+			dashboardRoutes.GET("/data", authMiddleware.RequireCapability(authz.CanAccessAdminModules), dashboardHandler.GetDashboardData)
+			dashboardRoutes.GET("/employees-by-gender", authMiddleware.RequireCapability(authz.CanAccessAdminModules), dashboardHandler.GetEmployeesByGender)
+			dashboardRoutes.GET("/employees-by-position", authMiddleware.RequireCapability(authz.CanAccessAdminModules), dashboardHandler.GetEmployeesByPosition)
+			dashboardRoutes.GET("/employees-by-company-department", authMiddleware.RequireCapability(authz.CanAccessAdminModules), dashboardHandler.GetEmployeesByCompanyDepartment)
+			dashboardRoutes.GET("/interns-by-company-department", authMiddleware.RequireCapability(authz.CanAccessAdminModules), dashboardHandler.GetInternsByCompanyDepartment)
+			dashboardRoutes.GET("/employees-by-grade", authMiddleware.RequireCapability(authz.CanAccessAdminModules), dashboardHandler.GetEmployeesByGrade)
 		}
 
 		// Document Management System (DYS) routes
