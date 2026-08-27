@@ -131,6 +131,7 @@ func (d *Database) Migrate() error {
 		&domain.AcademySurvey{},         // Kartezya Akademi — Anket Modülü
 		&domain.AcademySurveyOption{},
 		&domain.AcademySurveyResponse{},
+		&domain.InventoryItem{}, // Inventory Management
 		// Note: AuditLog is excluded - it's created by schema.sql
 	)
 
