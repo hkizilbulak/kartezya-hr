@@ -19,6 +19,8 @@ func SyncCriticalIDSequences(db *gorm.DB) error {
 	tables := []string{
 		domain.GetTableName("hr_employees"),
 		domain.GetTableName("hr_employee_grades"),
+		domain.GetTableName("hr_roles"),
+		domain.GetTableName("hr_leave_types"),
 	}
 	for _, table := range tables {
 		if err := syncTableIDSequence(db, table); err != nil {

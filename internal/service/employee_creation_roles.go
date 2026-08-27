@@ -23,7 +23,7 @@ func ValidateEmployeeCreationRoles(roles []string) (string, error) {
 	}
 
 	switch role {
-	case domain.RoleEmployee, domain.RoleHR, domain.RoleFinancial:
+	case domain.RoleEmployee, domain.RoleHR, domain.RoleFinancial, domain.RoleTeamLeader:
 		return role, nil
 	case domain.RoleAdmin:
 		return "", errors.New("ADMIN role cannot be assigned during employee creation")

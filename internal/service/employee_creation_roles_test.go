@@ -29,6 +29,11 @@ func TestValidateEmployeeCreationRoles(t *testing.T) {
 			want:  domain.RoleFinancial,
 		},
 		{
+			name:  "team leader accepted",
+			roles: []string{domain.RoleTeamLeader},
+			want:  domain.RoleTeamLeader,
+		},
+		{
 			name:    "admin rejected",
 			roles:   []string{domain.RoleAdmin},
 			wantErr: "ADMIN role cannot be assigned during employee creation",

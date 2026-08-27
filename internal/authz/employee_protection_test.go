@@ -42,14 +42,14 @@ func TestValidateAssignableRoles(t *testing.T) {
 			requested: []string{domain.RoleAdmin},
 		},
 		{
-			name:      "admin can assign all four",
+			name:      "admin can assign all five",
 			actor:     ActorAdmin,
-			requested: []string{domain.RoleAdmin, domain.RoleEmployee, domain.RoleHR, domain.RoleFinancial},
+			requested: []string{domain.RoleAdmin, domain.RoleEmployee, domain.RoleHR, domain.RoleFinancial, domain.RoleTeamLeader},
 		},
 		{
-			name:      "hr can assign employee hr finance",
+			name:      "hr can assign employee hr finance team_leader",
 			actor:     ActorHR,
-			requested: []string{domain.RoleEmployee, domain.RoleHR, domain.RoleFinancial},
+			requested: []string{domain.RoleEmployee, domain.RoleHR, domain.RoleFinancial, domain.RoleTeamLeader},
 		},
 		{
 			name:      "hr cannot assign admin",

@@ -206,7 +206,7 @@ func TestUpdateEmployeeHRCanAssignAllowedRoles(t *testing.T) {
 	emp := &domain.Employee{AuditableModel: domain.AuditableModel{ID: 1}, UserID: 10, CompanyEmail: "t@example.com"}
 	svc, _, _ := newProtectionEmployeeService(emp, false)
 
-	err := svc.UpdateEmployee(1, "p@example.com", "t@example.com", "A", "B", "", "", "", "", "", "", "", "", "", "", "", "", nil, "", "", "", "", "", "ACTIVE", "hr@x", 99, []string{domain.RoleHR}, []string{domain.RoleEmployee, domain.RoleHR, domain.RoleFinancial})
+	err := svc.UpdateEmployee(1, "p@example.com", "t@example.com", "A", "B", "", "", "", "", "", "", "", "", "", "", "", "", nil, "", "", "", "", "", "ACTIVE", "hr@x", 99, []string{domain.RoleHR}, []string{domain.RoleEmployee, domain.RoleHR, domain.RoleFinancial, domain.RoleTeamLeader})
 	if err != nil {
 		t.Fatalf("HR should assign allowed roles: %v", err)
 	}

@@ -74,9 +74,10 @@ func ValidateAssignableRoles(actor ActorKind, requested []string) error {
 	}
 
 	allowed := map[string]bool{
-		domain.RoleEmployee: true,
-		domain.RoleHR:       true,
-		domain.RoleFinancial: true,
+		domain.RoleEmployee:   true,
+		domain.RoleHR:         true,
+		domain.RoleFinancial:  true,
+		domain.RoleTeamLeader: true,
 	}
 	if actor == ActorAdmin {
 		allowed[domain.RoleAdmin] = true

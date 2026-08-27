@@ -714,6 +714,7 @@ func seedDatabase(db *database.Database) error {
 		{Name: domain.RoleEmployee, Description: "Regular employee with limited access"},
 		{Name: domain.RoleHR, Description: "HR specialist with HR management access"},
 		{Name: domain.RoleFinancial, Description: "Finance specialist with payment access"},
+		{Name: domain.RoleTeamLeader, Description: "Team Leader with CV and academy management access"},
 	}
 
 	for _, role := range roles {

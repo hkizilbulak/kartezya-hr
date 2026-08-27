@@ -20,6 +20,7 @@ const (
 	CanManageRequestTypes    Capability = "canManageRequestTypes"
 	CanAccessAdminModules    Capability = "canAccessAdminModules"
 	CanManageAcademy         Capability = "canManageAcademy"
+	CanManageCV              Capability = "canManageCV"
 	CanViewInventory         Capability = "canViewInventory"
 	CanManageInventory       Capability = "canManageInventory"
 	CanReportInventory       Capability = "canReportInventory"
@@ -43,6 +44,7 @@ var RoleCapabilities = map[string][]Capability{
 		CanManageRequestTypes,
 		CanAccessAdminModules,
 		CanManageAcademy,
+		CanManageCV,
 		CanViewInventory,
 		CanManageInventory,
 		CanReportInventory,
@@ -61,6 +63,7 @@ var RoleCapabilities = map[string][]Capability{
 		CanManageRequestTypes,
 		CanAccessAdminModules,
 		CanManageAcademy,
+		CanManageCV,
 		CanViewInventory,
 		CanManageInventory,
 		CanReportInventory,
@@ -73,6 +76,10 @@ var RoleCapabilities = map[string][]Capability{
 		CanReportInventory,
 	},
 	domain.RoleEmployee: {},
+	domain.RoleTeamLeader: {
+		CanManageAcademy,
+		CanManageCV,
+	},
 }
 
 // HasCapability reports whether any of the given roles grants the capability.
