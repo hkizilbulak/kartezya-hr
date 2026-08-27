@@ -113,6 +113,7 @@ func main() {
 	academyAssignmentRepo := repository.NewAssignmentRepository(db.DB)
 	academyCertificateRepo := repository.NewCertificateRepository(db.DB)
 	academySurveyRepo := repository.NewAcademySurveyRepository(db.DB)
+	inventoryRepo := repository.NewInventoryRepository(db.DB)
 
 	// Initialize storage provider
 	var storageProvider service.StorageProvider
@@ -164,6 +165,7 @@ func main() {
 	otherRequestService := service.NewOtherRequestService(otherRequestRepo, attachmentRepo, auditService, emailService, storageProvider, employeeRepo, mailConfigService)
 	settingsService := service.NewSettingsService(settingsRepo, auditService)
 	academyService := service.NewAcademyService(academyTrainingRepo, academyAssignmentRepo, academyCertificateRepo, employeeRepo, academySurveyRepo, auditService)
+	inventoryService := service.NewInventoryService(inventoryRepo, employeeRepo, auditService)
 
 	// Initialize and start scheduled jobs
 	scheduler := jobs.NewScheduler(db.DB, documentService, jobService, emailService, mailConfigService, reportService)
@@ -196,6 +198,7 @@ func main() {
 	mailConfigHandler := handler.NewMailConfigHandler(mailConfigService)
 	settingsHandler := handler.NewSettingsHandler(settingsService)
 	academyHandler := handler.NewAcademyHandler(academyService, employeeRepo, documentService)
+	inventoryHandler := handler.NewInventoryHandler(inventoryService, employeeService)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -302,9 +305,13 @@ func main() {
 			authRoutes.POST("/kvkk", settingsHandler.SaveKvkkConsent)
 		}
 
-		// Employee routes
+			// Employee routes
 		employeeRoutes := protected.Group("/employees")
 		{
+			// Employee Inventory routes (Admin/HR)
+			employeeRoutes.GET("/:id/inventory", authMiddleware.RequireCapability(authz.CanViewInventory), inventoryHandler.GetEmployeeInventory)
+			employeeRoutes.POST("/:id/inventory", authMiddleware.RequireCapability(authz.CanManageInventory), inventoryHandler.AssignItemToEmployee)
+
 			// Portal contracts for employee (specific route should be before the generic GET ":id")
 			employeeRoutes.GET("/:id/contracts", authMiddleware.RequireCapability(authz.CanViewEmployees), portalContractHandler.GetEmployeeContracts)
 
@@ -608,6 +615,9 @@ func main() {
 			reportRoutes.GET("/contract", authMiddleware.RequireCapability(authz.CanAccessAdminModules), reportHandler.GetContractReport)
 			reportRoutes.POST("/contract/export/excel", authMiddleware.RequireCapability(authz.CanAccessAdminModules), reportHandler.ExportContractReportExcel)
 			reportRoutes.POST("/email", authMiddleware.RequireCapability(authz.CanAccessAdminModules), reportHandler.SendReportEmail)
+			
+			// Inventory Report
+			reportRoutes.GET("/inventory", authMiddleware.RequireCapability(authz.CanReportInventory), inventoryHandler.GetInventoryReports)
 		}
 
 		// Event Management routes
@@ -663,6 +673,16 @@ func main() {
 			// Anket (Surveys) - Admin
 			academyRoutes.POST("/surveys", authMiddleware.RequireCapability(authz.CanManageAcademy), academyHandler.CreateSurvey)
 			academyRoutes.DELETE("/surveys/:id", authMiddleware.RequireCapability(authz.CanManageAcademy), academyHandler.DeleteSurvey)
+		}
+
+		// Inventory Management routes
+		inventoryRoutes := protected.Group("/inventory")
+		{
+			// My Inventory (Employee)
+			inventoryRoutes.GET("/my-items", inventoryHandler.GetMyItems)
+			inventoryRoutes.POST("/my-items", inventoryHandler.CreateMyItem)
+			inventoryRoutes.PUT("/my-items/:id", inventoryHandler.UpdateMyItem)
+			inventoryRoutes.DELETE("/my-items/:id", inventoryHandler.DeleteMyItem)
 		}
 	}
 
