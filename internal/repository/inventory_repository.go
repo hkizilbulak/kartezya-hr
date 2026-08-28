@@ -37,15 +37,17 @@ func (r *inventoryRepository) Update(item *domain.InventoryItem, modifiedBy stri
 }
 
 func (r *inventoryRepository) Delete(id uint, deletedBy string) error {
-	return r.db.Model(&domain.InventoryItem{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"deleted_by": deletedBy,
-		"deleted_at": gorm.DeletedAt{Time: r.db.NowFunc(), Valid: true},
-	}).Error
+	return r.db.Model(&domain.InventoryItem{}).
+		Where("id = ? AND deleted = ?", id, false).
+		Updates(map[string]interface{}{
+			"deleted":     true,
+			"modified_by": deletedBy,
+		}).Error
 }
 
 func (r *inventoryRepository) GetByID(id uint) (*domain.InventoryItem, error) {
 	var item domain.InventoryItem
-	err := r.db.Preload("Employee").First(&item, id).Error
+	err := r.db.Where("id = ? AND deleted = ?", id, false).Preload("Employee").First(&item).Error
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +56,7 @@ func (r *inventoryRepository) GetByID(id uint) (*domain.InventoryItem, error) {
 
 func (r *inventoryRepository) GetByEmployeeID(employeeID uint) ([]*domain.InventoryItem, error) {
 	var items []*domain.InventoryItem
-	err := r.db.Where("employee_id = ?", employeeID).Preload("Employee").Find(&items).Error
+	err := r.db.Where("employee_id = ? AND deleted = ?", employeeID, false).Preload("Employee").Find(&items).Error
 	return items, err
 }
 
@@ -62,7 +64,7 @@ func (r *inventoryRepository) GetAllWithFilters(limit, offset int, sortParams ty
 	var items []*domain.InventoryItem
 	var total int64
 
-	query := r.db.Model(&domain.InventoryItem{})
+	query := r.db.Model(&domain.InventoryItem{}).Where("deleted = ?", false)
 
 	// Apply filters
 	if search, ok := filters["search"].(string); ok && search != "" {
