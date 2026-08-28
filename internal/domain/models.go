@@ -499,6 +499,7 @@ const (
 	AttachmentRelatedTypeContract     AttachmentRelatedType = 5 // Sözleşme
 	AttachmentRelatedTypeOtherRequest AttachmentRelatedType = 6 // Diğer Talepler
 	AttachmentRelatedTypeAcademy      AttachmentRelatedType = 7 // Kartezya Akademi Eğitimleri
+	AttachmentRelatedTypeInventory    AttachmentRelatedType = 8 // Envanter
 )
 
 // AttachmentType Enum - Defines document category
@@ -514,6 +515,7 @@ const (
 	AttachmentTypeDiploma       AttachmentType = 7  // Diploma
 	AttachmentTypeCertificate   AttachmentType = 8  // Sertifika
 	AttachmentTypeResume        AttachmentType = 9  // CV / Özgeçmiş
+	AttachmentTypeDevicePhoto   AttachmentType = 10 // Cihaz Fotoğrafı
 	AttachmentTypeDocument      AttachmentType = 99 // Döküman
 	AttachmentTypeOther         AttachmentType = 99 // Diğer
 )

@@ -48,6 +48,7 @@ type documentService struct {
 	leaveRepo        repository.LeaveRepository
 	expenseRepo      repository.ExpenseRepository
 	otherRequestRepo repository.OtherRequestRepository
+	inventoryRepo    repository.InventoryRepository
 	allowedMimeTypes map[string]bool
 	maxFileSize      int64
 }
@@ -60,6 +61,7 @@ func NewDocumentService(
 	leaveRepo repository.LeaveRepository,
 	expenseRepo repository.ExpenseRepository,
 	otherRequestRepo repository.OtherRequestRepository,
+	inventoryRepo repository.InventoryRepository,
 ) DocumentService {
 	// Define allowed MIME types
 	allowedMimeTypes := map[string]bool{
@@ -85,6 +87,7 @@ func NewDocumentService(
 		leaveRepo:        leaveRepo,
 		expenseRepo:      expenseRepo,
 		otherRequestRepo: otherRequestRepo,
+		inventoryRepo:    inventoryRepo,
 		allowedMimeTypes: allowedMimeTypes,
 		maxFileSize:      10 * 1024 * 1024, // 10 MB default
 	}
@@ -337,6 +340,20 @@ func (s *documentService) authorizeLinkTarget(relatedType domain.AttachmentRelat
 		}
 		return errors.New("access denied: not authorized to link documents to academy trainings")
 
+	case domain.AttachmentRelatedTypeInventory:
+		item, err := s.inventoryRepo.GetByID(relatedID)
+		if err != nil {
+			return errors.New("target inventory item not found")
+		}
+		if authz.HasCapability(roles, authz.CanManageInventory) {
+			return nil
+		}
+		employee, err := s.employeeRepo.GetByUserID(userID)
+		if err != nil || item.EmployeeID == nil || *item.EmployeeID != employee.ID {
+			return errors.New("access denied: not authorized to link documents to this inventory item")
+		}
+		return nil
+
 	default:
 		return errors.New("access denied: unsupported or unauthorized document link target")
 	}
@@ -400,6 +417,21 @@ func (s *documentService) canAccessDocument(attachment *domain.Attachment, userI
 		return true
 	}
 
+	// Inventory documents: owner (above) or users who can view/manage inventory
+	if attachment.RelatedType == domain.AttachmentRelatedTypeInventory {
+		if authz.HasCapability(roles, authz.CanViewInventory) || authz.HasCapability(roles, authz.CanManageInventory) {
+			return true
+		}
+		// Or check if the device is assigned to this user
+		employee, err := s.employeeRepo.GetByUserID(userID)
+		if err == nil && attachment.RelatedID != nil {
+			item, err := s.inventoryRepo.GetByID(*attachment.RelatedID)
+			if err == nil && item.EmployeeID != nil && *item.EmployeeID == employee.ID {
+				return true
+			}
+		}
+	}
+
 	// Legacy ADMIN role string access for non-personnel generic documents.
 	if s.hasRole(roles, domain.RoleAdmin) {
 		return true
@@ -413,6 +445,12 @@ func (s *documentService) canDeleteDocument(attachment *domain.Attachment, userI
 	// Personnel / CV documents: employee managers may delete linked files.
 	if attachment.RelatedType == domain.AttachmentRelatedTypeEmployee &&
 		authz.HasCapability(roles, authz.CanManageEmployees) {
+		return true
+	}
+
+	// Inventory documents: manager may delete linked files.
+	if attachment.RelatedType == domain.AttachmentRelatedTypeInventory &&
+		authz.HasCapability(roles, authz.CanManageInventory) {
 		return true
 	}
 
@@ -467,6 +505,8 @@ func GenerateStoragePath(relatedType domain.AttachmentRelatedType, filename stri
 		folder = "contract"
 	case domain.AttachmentRelatedTypeOtherRequest:
 		folder = "other_requests"
+	case domain.AttachmentRelatedTypeInventory:
+		folder = "inventory"
 	}
 
 	// Get file extension
