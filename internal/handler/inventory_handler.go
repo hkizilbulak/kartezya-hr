@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -16,6 +17,7 @@ import (
 type InventoryHandler struct {
 	inventoryService service.InventoryService
 	employeeService  service.EmployeeService
+	documentService  service.DocumentService
 }
 
 type InventoryItemRequest struct {
@@ -27,6 +29,7 @@ type InventoryItemRequest struct {
 	AssignmentDate string                     `json:"assignment_date"`
 	Notes          string                     `json:"notes"`
 	Specifications interface{}                `json:"specifications"`
+	DocumentID     *string                    `json:"document_id"`
 }
 
 func parseAssignmentDate(dateStr string) *time.Time {
@@ -62,10 +65,12 @@ func parseSpecifications(specs interface{}) string {
 func NewInventoryHandler(
 	inventoryService service.InventoryService,
 	employeeService service.EmployeeService,
+	documentService service.DocumentService,
 ) *InventoryHandler {
 	return &InventoryHandler{
 		inventoryService: inventoryService,
 		employeeService:  employeeService,
+		documentService:  documentService,
 	}
 }
 
@@ -94,7 +99,7 @@ func (h *InventoryHandler) GetMyItems(c *gin.Context) {
 
 // CreateMyItem allows an employee to add an item to their inventory
 func (h *InventoryHandler) CreateMyItem(c *gin.Context) {
-	userID, _, _, ok := getUserContext(c)
+	userID, _, roles, ok := getUserContext(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Authentication required"})
 		return
@@ -127,6 +132,19 @@ func (h *InventoryHandler) CreateMyItem(c *gin.Context) {
 	if err := h.inventoryService.CreateItem(&item, strconv.FormatUint(uint64(userID), 10)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
+	}
+
+	// Link document if provided
+	if req.DocumentID != nil && *req.DocumentID != "" {
+		if err := h.documentService.LinkDocumentsToRecord(
+			[]string{*req.DocumentID},
+			domain.AttachmentRelatedTypeInventory,
+			item.ID,
+			userID,
+			roles,
+		); err != nil {
+			log.Printf("Warning: failed to link document %s to inventory item %d: %v", *req.DocumentID, item.ID, err)
+		}
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"success": true, "data": item})
@@ -202,6 +220,19 @@ func (h *InventoryHandler) UpdateMyItem(c *gin.Context) {
 		return
 	}
 
+	// Link document if provided
+	if req.DocumentID != nil && *req.DocumentID != "" {
+		if err := h.documentService.LinkDocumentsToRecord(
+			[]string{*req.DocumentID},
+			domain.AttachmentRelatedTypeInventory,
+			uint(id),
+			userID,
+			roles,
+		); err != nil {
+			log.Printf("Warning: failed to link document %s to inventory item %d: %v", *req.DocumentID, id, err)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": updatedItem})
 }
 
@@ -275,7 +306,7 @@ func (h *InventoryHandler) GetEmployeeInventory(c *gin.Context) {
 
 // AssignItemToEmployee assigns a new inventory item to an employee
 func (h *InventoryHandler) AssignItemToEmployee(c *gin.Context) {
-	userID, _, _, ok := getUserContext(c)
+	userID, _, roles, ok := getUserContext(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Authentication required"})
 		return
@@ -310,6 +341,19 @@ func (h *InventoryHandler) AssignItemToEmployee(c *gin.Context) {
 	if err := h.inventoryService.CreateItem(&item, strconv.FormatUint(uint64(userID), 10)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
+	}
+
+	// Link document if provided
+	if req.DocumentID != nil && *req.DocumentID != "" {
+		if err := h.documentService.LinkDocumentsToRecord(
+			[]string{*req.DocumentID},
+			domain.AttachmentRelatedTypeInventory,
+			item.ID,
+			userID,
+			roles,
+		); err != nil {
+			log.Printf("Warning: failed to link document %s to inventory item %d: %v", *req.DocumentID, item.ID, err)
+		}
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"success": true, "data": item})

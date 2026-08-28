@@ -198,7 +198,7 @@ func main() {
 	mailConfigHandler := handler.NewMailConfigHandler(mailConfigService)
 	settingsHandler := handler.NewSettingsHandler(settingsService)
 	academyHandler := handler.NewAcademyHandler(academyService, employeeRepo, documentService)
-	inventoryHandler := handler.NewInventoryHandler(inventoryService, employeeService)
+	inventoryHandler := handler.NewInventoryHandler(inventoryService, employeeService, documentService)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
