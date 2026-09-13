@@ -47,6 +47,13 @@ func (m *AuthMiddleware) JWTAuth() gin.HandlerFunc {
 			return
 		}
 
+		// Check if employee is passive
+		if err := m.authService.CheckEmployeeStatus(claims.UserID); err != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Hesabınız aktif değildir. Lütfen İnsan Kaynakları departmanı ile iletişime geçiniz."})
+			c.Abort()
+			return
+		}
+
 		// Set user context
 		c.Set("userID", claims.UserID)
 		c.Set("email", claims.Email)

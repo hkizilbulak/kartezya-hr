@@ -26,6 +26,7 @@ type AuthService interface {
 	CreateUserForEmployee(email string, createdBy string) (*domain.User, error)
 	GetYandexOAuthConfig() *oauth2.Config
 	HandleYandexCallback(code string) (*LoginResponse, error)
+	CheckEmployeeStatus(userID uint) error
 }
 
 type authService struct {
@@ -93,6 +94,9 @@ func (s *authService) Login(email, password string) (*LoginResponse, error) {
 	firstName := ""
 	lastName := ""
 	if err == nil && employee != nil {
+		if employee.Status == "PASSIVE" {
+			return nil, errors.New("Hesabınız aktif değildir. Lütfen İnsan Kaynakları departmanı ile iletişime geçiniz.")
+		}
 		firstName = employee.FirstName
 		lastName = employee.LastName
 	}
@@ -325,6 +329,9 @@ func (s *authService) HandleYandexCallback(code string) (*LoginResponse, error) 
 	firstName := yandexUser.FirstName
 	lastName := yandexUser.LastName
 	if err == nil && employee != nil {
+		if employee.Status == "PASSIVE" {
+			return nil, errors.New("Hesabınız aktif değildir. Lütfen İnsan Kaynakları departmanı ile iletişime geçiniz.")
+		}
 		// Prefer employee data if available
 		if employee.FirstName != "" {
 			firstName = employee.FirstName
@@ -364,4 +371,16 @@ func (s *authService) HandleYandexCallback(code string) (*LoginResponse, error) 
 			Roles:     roleNames,
 		},
 	}, nil
+}
+
+func (s *authService) CheckEmployeeStatus(userID uint) error {
+	employee, err := s.userRepo.GetEmployeeByUserID(userID)
+	if err != nil {
+		// If user is not an employee (e.g. pure admin), allow access
+		return nil
+	}
+	if employee.Status == "PASSIVE" {
+		return errors.New("employee is passive")
+	}
+	return nil
 }
