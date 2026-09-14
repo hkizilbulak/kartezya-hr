@@ -94,9 +94,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	response, err := h.authService.Login(req.Email, req.Password)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
+		status := http.StatusUnauthorized
+		if err.Error() == "Hesabınız aktif değildir. Lütfen İnsan Kaynakları departmanı ile iletişime geçiniz." {
+			status = http.StatusForbidden
+		}
+		c.JSON(status, gin.H{
 			"success": false,
-			"error":   "error",
+			"error":   err.Error(),
 		})
 		return
 	}
@@ -578,9 +582,17 @@ func (h *AuthHandler) YandexCallback(c *gin.Context) {
 
 	response, err := h.authService.HandleYandexCallback(code)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
+		status := http.StatusUnauthorized
+		errorMsg := "Failed to authenticate with Yandex: " + err.Error()
+		
+		if err.Error() == "Hesabınız aktif değildir. Lütfen İnsan Kaynakları departmanı ile iletişime geçiniz." {
+			status = http.StatusForbidden
+			errorMsg = err.Error()
+		}
+		
+		c.JSON(status, gin.H{
 			"success": false,
-			"error":   "Failed to authenticate with Yandex: " + err.Error(),
+			"error":   errorMsg,
 		})
 		return
 	}
