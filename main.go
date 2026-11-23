@@ -305,7 +305,7 @@ func main() {
 			authRoutes.POST("/kvkk", settingsHandler.SaveKvkkConsent)
 		}
 
-			// Employee routes
+		// Employee routes
 		employeeRoutes := protected.Group("/employees")
 		{
 			// Employee Inventory routes (Admin/HR)
@@ -615,7 +615,7 @@ func main() {
 			reportRoutes.GET("/contract", authMiddleware.RequireCapability(authz.CanAccessAdminModules), reportHandler.GetContractReport)
 			reportRoutes.POST("/contract/export/excel", authMiddleware.RequireCapability(authz.CanAccessAdminModules), reportHandler.ExportContractReportExcel)
 			reportRoutes.POST("/email", authMiddleware.RequireCapability(authz.CanAccessAdminModules), reportHandler.SendReportEmail)
-			
+
 			// Inventory Report
 			reportRoutes.GET("/inventory", authMiddleware.RequireCapability(authz.CanReportInventory), inventoryHandler.GetInventoryReports)
 		}
@@ -657,7 +657,7 @@ func main() {
 			academyRoutes.POST("/assignments/:id/complete", academyHandler.CompleteTraining)
 			academyRoutes.GET("/certificates/me", academyHandler.GetMyCertificates)
 			academyRoutes.GET("/certificates/:code", academyHandler.GetCertificateByCode)
-			
+
 			// Anket (Surveys) - Herkes
 			academyRoutes.GET("/surveys", academyHandler.ListSurveys)
 			academyRoutes.POST("/surveys/:id/vote", academyHandler.SubmitSurveyVote)
@@ -669,7 +669,7 @@ func main() {
 			academyRoutes.POST("/trainings/:id/assign", authMiddleware.RequireCapability(authz.CanManageAcademy), academyHandler.AssignEmployee)
 			academyRoutes.GET("/trainings/:id/assignments", authMiddleware.RequireCapability(authz.CanManageAcademy), academyHandler.ListTrainingAssignments)
 			academyRoutes.DELETE("/assignments/:id", authMiddleware.RequireCapability(authz.CanManageAcademy), academyHandler.RemoveAssignment)
-			
+
 			// Anket (Surveys) - Admin
 			academyRoutes.POST("/surveys", authMiddleware.RequireCapability(authz.CanManageAcademy), academyHandler.CreateSurvey)
 			academyRoutes.DELETE("/surveys/:id", authMiddleware.RequireCapability(authz.CanManageAcademy), academyHandler.DeleteSurvey)
@@ -683,6 +683,10 @@ func main() {
 			inventoryRoutes.POST("/my-items", inventoryHandler.CreateMyItem)
 			inventoryRoutes.PUT("/my-items/:id", inventoryHandler.UpdateMyItem)
 			inventoryRoutes.DELETE("/my-items/:id", inventoryHandler.DeleteMyItem)
+
+			// Inventory Item details & history
+			inventoryRoutes.GET("/items/:id", inventoryHandler.GetItemByID)
+			inventoryRoutes.GET("/items/:id/history", inventoryHandler.GetItemHistories)
 		}
 	}
 

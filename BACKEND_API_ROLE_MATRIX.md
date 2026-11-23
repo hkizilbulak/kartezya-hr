@@ -32,6 +32,8 @@ Tüm roller için aynı: yalnızca kendi kaydı.
 | Diğer talepler | `GET /api/v1/other-requests/me` | Kendi |
 | Belgeler | `GET /api/v1/documents/me` | Kendi |
 | Şifre değiştirme | `POST /api/v1/auth/change-password` | Kendi |
+| Zimmetlerim (Envanter) | `GET/POST/PUT/DELETE /api/v1/inventory/my-items...` | Kendi |
+| Envanter detay / geçmiş | `GET /api/v1/inventory/items/:id`, `.../history` | Owner veya `CanViewInventory` / `CanReportInventory` |
 
 Leave ve expense create: client farklı `employee_id` gönderse bile backend caller employee ID kullanır. Tüm roller yalnızca kendileri adına oluşturabilir.
 
@@ -62,6 +64,7 @@ Diğer ortak: Login / şifre sıfırlama / Yandex (**Public**); Logout, settings
 | Reports / Jobs / Mail | Yönetim | `/reports`, `/jobs`, `/emails`, `/mail-configs` | `CanAccessAdminModules` |
 | FAQ / Event management | Yazma | `/faqs`, `/events` | `CanAccessAdminModules` |
 | Dashboard | Veri | `/api/v1/dashboard/...` | `CanAccessAdminModules` |
+| Envanter yönetimi | Zimmet atama, liste, rapor, detay, geçmiş | `/employees/:id/inventory`, `/reports/inventory`, `/inventory/items/...` | `CanManageInventory` / `CanViewInventory` / `CanReportInventory` |
 
 ADMIN notları: başka adına leave oluşturamaz; expense **update** owner-only; expense **delete**’te ADMIN role-string ile başkasını silebilir; generic non-personnel doc’ta ADMIN role-string shortcut vardır.
 
@@ -84,6 +87,7 @@ ADMIN ile aynı yönetim alanlarının çoğu (`CanPayExpense` hariç). İzin y�
 | Personnel documents | Başka kullanıcı | `/api/v1/documents/user/:id` | Owner veya `CanManageEmployees` |
 | Org / Reports / Jobs / Mail / FAQ / Events | Tanım ve admin modüller | `/companies`, `/reports`… | `CanManageOrgMaster` / `CanAccessAdminModules` |
 | Dashboard | Veri | `/api/v1/dashboard/...` | `CanAccessAdminModules` |
+| Envanter yönetimi | Zimmet atama, liste, rapor, detay, geçmiş | `/employees/:id/inventory`, `/reports/inventory`, `/inventory/items/...` | `CanManageInventory` / `CanViewInventory` / `CanReportInventory` |
 
 ### HR — Yapamadıkları
 
@@ -111,6 +115,7 @@ ADMIN ile aynı yönetim alanlarının çoğu (`CanPayExpense` hariç). İzin y�
 | Expense payment | Ödeme | `POST .../pay` | `CanPayExpense` |
 | Expense documents | Tümü | `/api/v1/expense/.../documents` | Owner veya `CanViewExpenseManagement` |
 | Expense types | Tip CRUD | `/api/v1/expense/types` | `CanManageExpenseTypes` |
+| Envanter raporu ve detay | Rapor listesi, detay, geçmiş | `GET /reports/inventory`, `GET /inventory/items/:id`, `.../history` | `CanReportInventory` |
 | FAQ / Event portal | Okuma / katılım | `/faqs`, `/events/dashboard` | JWT |
 
 #### Masraf işlemleri (FINANCIAL)
@@ -154,6 +159,7 @@ Management capability listesi boştur (`RoleCapabilities[EMPLOYEE] = []`). Self-
 |---|---|
 | Kendi profil, çalışma bilgisi, sözleşme, derece | Kendi |
 | Kendi izin / masraf / diğer talepler ve belgeleri | Kendi |
+| Kendi zimmetleri ve geçmişi | Kendi |
 | Kendi belgeleri | Kendi |
 | FAQ okuma / Event portal | JWT (Var) |
 

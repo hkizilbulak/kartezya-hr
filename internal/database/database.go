@@ -125,19 +125,25 @@ func (d *Database) Migrate() error {
 		&domain.MailRecipient{},          // Mail Configuration Module
 		&domain.PortalContract{},         // Portal Contract Approval Tracking
 		&domain.EmployeePortalContract{}, // Portal Contract Approval Tracking Pivot
-		&domain.Training{},              // Kartezya Akademi
-		&domain.TrainingAssignment{},    // Kartezya Akademi — Çalışan Ataması
-		&domain.TrainingCertificate{},   // Kartezya Akademi — Tamamlama Sertifikası
-		&domain.AcademySurvey{},         // Kartezya Akademi — Anket Modülü
+		&domain.Training{},               // Kartezya Akademi
+		&domain.TrainingAssignment{},     // Kartezya Akademi — Çalışan Ataması
+		&domain.TrainingCertificate{},    // Kartezya Akademi — Tamamlama Sertifikası
+		&domain.AcademySurvey{},          // Kartezya Akademi — Anket Modülü
 		&domain.AcademySurveyOption{},
 		&domain.AcademySurveyResponse{},
-		&domain.InventoryItem{}, // Inventory Management
+		&domain.InventoryItem{},              // Inventory Management
+		&domain.InventoryAssignmentHistory{}, // Inventory Assignment History
 		// Note: AuditLog is excluded - it's created by schema.sql
 	)
 
 	if err != nil {
 		return fmt.Errorf("auto-migration failed: %w", err)
 	}
+
+	if _, err := BackfillInventoryHistories(d.DB); err != nil {
+		log.Printf("Warning: inventory history backfill failed: %v", err)
+	}
+
 	backfilledGrades, err := BackfillMissingGradeBounds(d.DB)
 	if err != nil {
 		return fmt.Errorf("grade bounds backfill failed: %w", err)
