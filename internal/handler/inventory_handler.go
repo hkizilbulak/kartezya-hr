@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"kartezya-hr/internal/authz"
 	"kartezya-hr/internal/domain"
 	"kartezya-hr/internal/service"
 	"kartezya-hr/internal/types"
@@ -363,7 +364,7 @@ func (h *InventoryHandler) AssignItemToEmployee(c *gin.Context) {
 func (h *InventoryHandler) GetInventoryReports(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
-	
+
 	offset := (page - 1) * limit
 	if offset < 0 {
 		offset = 0
@@ -379,7 +380,7 @@ func (h *InventoryHandler) GetInventoryReports(c *gin.Context) {
 	if status := c.Query("status"); status != "" {
 		filters["status"] = status
 	}
-	
+
 	sortParams := types.SortParams{
 		Sort:      c.DefaultQuery("sort", "created_at"),
 		Direction: c.DefaultQuery("direction", "DESC"),
@@ -401,4 +402,87 @@ func (h *InventoryHandler) GetInventoryReports(c *gin.Context) {
 			"total_pages": (total + int64(limit) - 1) / int64(limit),
 		},
 	})
+}
+
+// GetItemByID returns a single inventory item by ID including its assignment history
+func (h *InventoryHandler) GetItemByID(c *gin.Context) {
+	userID, _, roles, ok := getUserContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Authentication required"})
+		return
+	}
+
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid item ID"})
+		return
+	}
+
+	item, err := h.inventoryService.GetItemByID(uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Item not found"})
+		return
+	}
+
+	// Privileged roles (Admin, HR, Financial) can view any inventory item.
+	// Employees can only view items currently assigned to them.
+	hasPrivilegedAccess := authz.HasCapability(roles, authz.CanViewInventory) || authz.HasCapability(roles, authz.CanReportInventory)
+	if !hasPrivilegedAccess {
+		employee, err := h.employeeService.GetEmployeeByUserID(userID)
+		if err != nil {
+			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Insufficient permissions"})
+			return
+		}
+		if item.EmployeeID == nil || *item.EmployeeID != employee.ID {
+			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Insufficient permissions"})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": item})
+}
+
+// GetItemHistories returns assignment history for a given inventory item
+func (h *InventoryHandler) GetItemHistories(c *gin.Context) {
+	userID, _, roles, ok := getUserContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Authentication required"})
+		return
+	}
+
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid item ID"})
+		return
+	}
+
+	// Privileged roles (Admin, HR, Financial) can view any inventory item history.
+	// Employees can only view history of items currently assigned to them.
+	hasPrivilegedAccess := authz.HasCapability(roles, authz.CanViewInventory) || authz.HasCapability(roles, authz.CanReportInventory)
+	if !hasPrivilegedAccess {
+		item, err := h.inventoryService.GetItemByID(uint(id))
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Item not found"})
+			return
+		}
+		employee, err := h.employeeService.GetEmployeeByUserID(userID)
+		if err != nil {
+			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Insufficient permissions"})
+			return
+		}
+		if item.EmployeeID == nil || *item.EmployeeID != employee.ID {
+			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Insufficient permissions"})
+			return
+		}
+	}
+
+	histories, err := h.inventoryService.GetItemHistories(uint(id))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": histories})
 }
